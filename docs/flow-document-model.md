@@ -143,16 +143,17 @@ Resolution is pure: it allocates a new resolved result and never mutates `FlowDo
 
 ## Integrity boundary
 
-`DocumentIntegrity` can carry an algorithm, hash, and canonicalization version, but this milestone does not compute or verify them. Canonicalization and SHA-256 services remain the responsibility of `Flow.Security`.
+`DocumentIntegrity` can carry an algorithm, hash, and canonicalization version. `Flow.Security` now provides `FlowDocumentCanonicalizer` and `Sha256DocumentIntegrityService`; the stored integrity record itself is excluded from its hash input to avoid recursion.
 
 Presentation, layout context, renderer constraints, and reader state will not participate in the canonical document hash.
+
+The experimental `flow-json-0.1` serializer preserves presentation and integrity for round-trip development interchange. It is deliberately separate from the compact `flow-c14n-0.1` projection. The exact included and excluded fields are specified in [canonicalization.md](canonicalization.md).
 
 ## Deferred behavior
 
 This model intentionally does not yet implement:
 
-- JSON serialization;
-- canonicalization, hashing, or signatures;
+- digital signatures;
 - automatic TOC entry generation;
 - layout or rendering.
 
