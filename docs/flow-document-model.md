@@ -122,6 +122,25 @@ Presentation intentions express preferences such as keeping a heading with follo
 
 No presentation type stores coordinates, viewport dimensions, rendered dimensions, page numbers, or device state.
 
+## User preferences and resolved styles
+
+`UserReadingPreferences` belongs to `Flow.Layout`, not `Flow.Documents`. It can override body and heading font families independently, apply global and heading-specific font scales, scale line height, set paragraph spacing and content margins, and choose a reading theme.
+
+`TypographyResolver` applies four immutable layers:
+
+```text
+Flow defaults
+< DocumentPresentation
+< UserReadingPreferences
+< RendererSafetyConstraints
+```
+
+The result contains complete `ResolvedTypographyStyle` values for every typography role plus the resolved content margin and theme. Partial author properties inherit from Flow defaults. User font choices do not replace the code font unless renderer safety explicitly requires one font for all roles.
+
+Renderer limits are the highest-precedence accessibility layer. They clamp font size and line height and can establish minimum paragraph spacing/content margins, a required font, or a required theme. Length limits only compare values with matching units; a renderer must provide environmental conversion before constraining different units.
+
+Resolution is pure: it allocates a new resolved result and never mutates `FlowDocument`, `DocumentPresentation`, `TypographySet`, or `TypographyStyle`. Preferences, constraints, and resolved values are reader/runtime state and must not participate in canonicalization or document identity.
+
 ## Integrity boundary
 
 `DocumentIntegrity` can carry an algorithm, hash, and canonicalization version, but this milestone does not compute or verify them. Canonicalization and SHA-256 services remain the responsibility of `Flow.Security`.
@@ -133,7 +152,6 @@ Presentation, layout context, renderer constraints, and reader state will not pa
 This model intentionally does not yet implement:
 
 - JSON serialization;
-- default, user-preference, and renderer-constraint style cascade;
 - canonicalization, hashing, or signatures;
 - automatic TOC entry generation;
 - layout or rendering.

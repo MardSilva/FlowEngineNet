@@ -10,8 +10,11 @@ public sealed record DocumentPresentation
         CaptionPresentation? captions = null,
         FootnotePresentation? footnotes = null,
         CodeBlockPresentation? codeBlocks = null,
-        TableOfContentsPresentation? tableOfContents = null)
+        TableOfContentsPresentation? tableOfContents = null,
+        ReadingTheme? theme = null)
     {
+        PresentationIntentValidation.ValidateEnum(theme, nameof(theme));
+
         Typography = typography ?? new TypographySet();
         Headings = headings;
         Paragraphs = paragraphs;
@@ -20,6 +23,7 @@ public sealed record DocumentPresentation
         Footnotes = footnotes;
         CodeBlocks = codeBlocks;
         TableOfContents = tableOfContents;
+        Theme = theme;
     }
 
     public TypographySet Typography { get; }
@@ -37,4 +41,6 @@ public sealed record DocumentPresentation
     public CodeBlockPresentation? CodeBlocks { get; }
 
     public TableOfContentsPresentation? TableOfContents { get; }
+
+    public ReadingTheme? Theme { get; }
 }
