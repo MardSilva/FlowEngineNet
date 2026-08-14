@@ -101,9 +101,28 @@ The current validator checks:
 
 Chapters must be document-root children, sections belong to chapters or other sections, list items belong to lists, and captions belong to figures. Constructors make several invalid states impossible, but the document-wide pass remains necessary for cross-node invariants.
 
-## Presentation and integrity boundaries
+## Presentation and typography
 
-`DocumentPresentation` is currently an explicit empty value representing the optional presentation layer. Typed typography properties will be added in the dedicated presentation milestone instead of introducing premature CSS-like strings.
+`DocumentPresentation` is optional. A document with `Presentation == null` remains complete and usable. When present, it contains a `TypographySet` plus small, typed presentation intentions for headings, paragraphs, figures, captions, footnotes, code blocks, and the table of contents.
+
+`TypographySet` maps independent `TypographyRole` values to partial `TypographyStyle` values. The supported roles are body, chapter title, headings 1 through 6, subtitle, TOC title and levels 1 through 3, caption, footnote, block quote, and code. A missing style or property means “unspecified”, allowing defaults and future user preferences to participate in the cascade without mutating the document.
+
+`TypographyStyle` supports:
+
+- one semantic font-family name;
+- typed font size, weight, and style;
+- unitless line height;
+- typed letter spacing;
+- alignment and text transformation enums;
+- typed margins and indentation.
+
+`Length` preserves its numeric value and unit as `Pixel`, `RootEm`, `Em`, or `Percent`. It is not a CSS string. Font-family values reject CSS lists and expression punctuation; renderer-specific fallback lists will belong to renderer policy rather than the canonical document model.
+
+Presentation intentions express preferences such as keeping a heading with following content, keeping a figure with its caption, preferred figure placement, maximum semantic width, preserving code whitespace, or choosing a footnote presentation. `BottomOfPage` is a preference that a capable renderer may decline; it stores no page number, position, or computed pagination result.
+
+No presentation type stores coordinates, viewport dimensions, rendered dimensions, page numbers, or device state.
+
+## Integrity boundary
 
 `DocumentIntegrity` can carry an algorithm, hash, and canonicalization version, but this milestone does not compute or verify them. Canonicalization and SHA-256 services remain the responsibility of `Flow.Security`.
 
@@ -114,7 +133,7 @@ Presentation, layout context, renderer constraints, and reader state will not pa
 This model intentionally does not yet implement:
 
 - JSON serialization;
-- typography and style cascade;
+- default, user-preference, and renderer-constraint style cascade;
 - canonicalization, hashing, or signatures;
 - automatic TOC entry generation;
 - layout or rendering.

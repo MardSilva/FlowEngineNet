@@ -38,6 +38,28 @@ public sealed class SemanticConformanceTests
     }
 
     [Fact]
+    public void Conformance_006_HeadingCustomTypography()
+    {
+        var bodyStyle = new TypographyStyle(fontFamily: "Georgia", fontSize: Length.Px(18));
+        var headingStyle = new TypographyStyle(
+            fontFamily: "Arial",
+            fontSize: Length.Px(32),
+            fontWeight: FontWeight.Bold);
+        var presentation = new DocumentPresentation(
+            new TypographySet(
+            [
+                KeyValuePair.Create(TypographyRole.Body, bodyStyle),
+                KeyValuePair.Create(TypographyRole.Heading1, headingStyle),
+            ]));
+
+        Assert.Same(bodyStyle, presentation.Typography[TypographyRole.Body]);
+        Assert.Same(headingStyle, presentation.Typography[TypographyRole.Heading1]);
+        Assert.NotEqual(
+            presentation.Typography[TypographyRole.Body]?.FontSize,
+            presentation.Typography[TypographyRole.Heading1]?.FontSize);
+    }
+
+    [Fact]
     public void Conformance_010_FigureCaptionRelationship()
     {
         var caption = new Caption(new NodeId("caption-model"), [new Text("Flow model")]);
