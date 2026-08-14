@@ -38,7 +38,9 @@ Safety constraints run last and may clamp font sizes, line height, paragraph spa
 
 ## Security boundary
 
-Canonicalization includes identity, selected metadata, assets, and semantic content. It excludes layout context, `UserReadingPreferences`, resolved styles, renderer constraints, and renderer output. Standard .NET cryptographic primitives will be used; Flow will not define cryptographic algorithms.
+`Flow.Documents` owns the deterministic, readable `flow-json-0.1` development serializer. `Flow.Security` independently projects a document into `flow-c14n-0.1` bytes and hashes them with standard SHA-256. Keeping the writers separate prevents formatting or presentation round-trip changes from silently changing the canonical profile.
+
+Canonicalization includes identity, all currently modeled canonical metadata, semantic structure/content, asset references, asset metadata, and complete asset bytes. It excludes `DocumentPresentation`, `DocumentIntegrity`, layout context, `UserReadingPreferences`, resolved styles, renderer constraints, pagination, and renderer output. See [canonicalization.md](canonicalization.md) for the normative 0.1 field list.
 
 ## EPUB interoperability
 

@@ -8,9 +8,9 @@ Flow is not currently a replacement for PDF or EPUB. Version 0.1 focuses on prov
 
 ## Current status
 
-Development milestone: `0.1.0-alpha.2`.
+Development milestone: `0.1.0-alpha.3`.
 
-The repository foundation, immutable semantic document model, stable anchors, document index, structural validation, typed author presentation, user reading preferences, and four-layer style cascade are implemented. Canonicalization, adaptive layout, rendering, and EPUB import remain under development.
+The repository foundation, immutable semantic document model, stable anchors, validation, typed presentation, reader style cascade, experimental `.flow.json`, `flow-c14n-0.1`, and SHA-256 document hashes are implemented. Adaptive layout, rendering, and EPUB import remain under development.
 
 ## Build
 
@@ -30,6 +30,7 @@ Input -> FlowDocument -> LayoutDocument -> Renderer
 ```
 
 See [docs/architecture.md](docs/architecture.md) for project boundaries and dependency rules.
+See [docs/canonicalization.md](docs/canonicalization.md) for the exact canonical field set and hash profile.
 
 ## Sample
 

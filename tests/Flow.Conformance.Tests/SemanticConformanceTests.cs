@@ -1,6 +1,7 @@
 using Flow.Core;
 using Flow.Documents;
 using Flow.Layout;
+using Flow.Security;
 
 namespace Flow.Conformance.Tests;
 
@@ -36,6 +37,32 @@ public sealed class SemanticConformanceTests
         var resolved = document.ResolveAnchor(DocumentAnchor.Parse("flow:chapter-introduction/p-002"));
 
         Assert.Same(paragraph, resolved);
+    }
+
+    [Fact]
+    public void Conformance_004_FontChangeDoesNotChangeHash()
+    {
+        var georgia = CreateDocument(
+            [new Paragraph(new NodeId("p-one"), [new Text("Canonical")])],
+            presentation: Presentation("Georgia", 16));
+        var arial = CreateDocument(
+            [new Paragraph(new NodeId("p-one"), [new Text("Canonical")])],
+            presentation: Presentation("Arial", 28));
+        var service = new Sha256DocumentIntegrityService(new FlowDocumentCanonicalizer());
+
+        Assert.Equal(service.ComputeHash(georgia), service.ComputeHash(arial));
+    }
+
+    [Fact]
+    public void Conformance_005_ContentChangeChangesHash()
+    {
+        var original = CreateDocument(
+            [new Paragraph(new NodeId("p-one"), [new Text("The amount is €1,000.")])]);
+        var changed = CreateDocument(
+            [new Paragraph(new NodeId("p-one"), [new Text("The amount is €10,000.")])]);
+        var service = new Sha256DocumentIntegrityService(new FlowDocumentCanonicalizer());
+
+        Assert.NotEqual(service.ComputeHash(original).Hash, service.ComputeHash(changed).Hash);
     }
 
     [Fact]
@@ -120,10 +147,21 @@ public sealed class SemanticConformanceTests
 
     private static FlowDocument CreateDocument(
         IEnumerable<DocumentNode> children,
-        IEnumerable<FlowAsset>? assets = null) =>
+        IEnumerable<FlowAsset>? assets = null,
+        DocumentPresentation? presentation = null) =>
         new(
             new DocumentIdentity(new DocumentId("urn:flow:document:conformance")),
             new DocumentMetadata("Conformance document"),
             new DocumentContent(children),
-            assets);
+            assets,
+            presentation);
+
+    private static DocumentPresentation Presentation(string fontFamily, double fontSize) =>
+        new(
+            new TypographySet(
+            [
+                KeyValuePair.Create(
+                    TypographyRole.Body,
+                    new TypographyStyle(fontFamily: fontFamily, fontSize: Length.Px(fontSize))),
+            ]));
 }

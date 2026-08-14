@@ -19,6 +19,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\..\src\Flow.Layout\Flow.Layout.csproj" />
     <ProjectReference Include="..\..\src\Flow.Security\Flow.Security.csproj" />
   </ItemGroup>
 
