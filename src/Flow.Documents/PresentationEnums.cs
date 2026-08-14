@@ -32,3 +32,12 @@ public enum TableOfContentsLeaderStyle
     Dots,
     Lines,
 }
+
+public enum ReadingTheme
+{
+    System,
+    Light,
+    Dark,
+    Sepia,
+    HighContrast,
+}

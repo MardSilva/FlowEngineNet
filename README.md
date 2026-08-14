@@ -8,7 +8,9 @@ Flow is not currently a replacement for PDF or EPUB. Version 0.1 focuses on prov
 
 ## Current status
 
-The repository foundation, immutable semantic document model, stable anchors, document index, structural validation, and typed author presentation are implemented. User style overrides, canonicalization, layout, rendering, and EPUB import remain under development.
+Development milestone: `0.1.0-alpha.2`.
+
+The repository foundation, immutable semantic document model, stable anchors, document index, structural validation, typed author presentation, user reading preferences, and four-layer style cascade are implemented. Canonicalization, adaptive layout, rendering, and EPUB import remain under development.
 
 ## Build
 

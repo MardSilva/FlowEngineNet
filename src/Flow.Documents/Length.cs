@@ -24,6 +24,16 @@ public readonly record struct Length
     public static Length Em(double value) => new(value, LengthUnit.Em);
 
     public static Length Percent(double value) => new(value, LengthUnit.Percent);
+
+    public Length Scale(double factor)
+    {
+        if (!double.IsFinite(factor) || factor <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(factor), factor, "A length scale must be finite and greater than zero.");
+        }
+
+        return new Length(Value * factor, Unit);
+    }
 }
 
 public enum LengthUnit

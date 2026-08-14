@@ -1,5 +1,6 @@
 using Flow.Core;
 using Flow.Documents;
+using Flow.Layout;
 
 namespace Flow.Conformance.Tests;
 
@@ -57,6 +58,25 @@ public sealed class SemanticConformanceTests
         Assert.NotEqual(
             presentation.Typography[TypographyRole.Body]?.FontSize,
             presentation.Typography[TypographyRole.Heading1]?.FontSize);
+    }
+
+    [Fact]
+    public void Conformance_009_UserFontOverride()
+    {
+        var presentation = new DocumentPresentation(
+            new TypographySet(
+            [
+                KeyValuePair.Create(
+                    TypographyRole.Body,
+                    new TypographyStyle(fontFamily: "Author Serif")),
+            ]));
+
+        var resolved = new TypographyResolver().Resolve(
+            presentation,
+            new UserReadingPreferences(preferredBodyFont: "Reader Serif"));
+
+        Assert.Equal("Reader Serif", resolved.Typography[TypographyRole.Body].FontFamily);
+        Assert.Equal("Author Serif", presentation.Typography[TypographyRole.Body]?.FontFamily);
     }
 
     [Fact]

@@ -8,7 +8,7 @@
 
 - `Flow.Core` contains renderer-independent primitives and shared contracts.
 - `Flow.Documents` contains the semantic document model, serialization, anchors, and validation.
-- `Flow.Layout` transforms documents plus environmental context into renderer-independent layout decisions.
+- `Flow.Layout` owns reader state, resolves the style cascade, and transforms documents plus environmental context into renderer-independent layout decisions.
 - `Flow.Rendering` defines rendering contracts.
 - `Flow.Rendering.Html` produces standalone semantic HTML and CSS.
 - `Flow.Security` owns canonicalization, hashing, and experimental signing abstractions.
@@ -21,9 +21,24 @@ Dependencies point inward: domain projects never reference presentation or infra
 
 An importer or serializer creates a `FlowDocument`. The layout engine combines that immutable model with a `LayoutContext`. A renderer consumes the resulting layout without changing canonical content.
 
+## Style cascade
+
+`TypographyResolver` is a pure service in `Flow.Layout`. It resolves styles in this order:
+
+```text
+Flow defaults
+< document presentation
+< user reading preferences
+< renderer safety constraints
+```
+
+Author styles are partial and immutable. Resolution produces a complete `ResolvedReadingStyle` for all typography roles without modifying the source document. Reader font choices, scaling, spacing, margins, and theme remain runtime state in `Flow.Layout`; they are not properties of `FlowDocument`.
+
+Safety constraints run last and may clamp font sizes, line height, paragraph spacing, and content margins or require an accessible font/theme. Typed lengths are compared only when their units match because conversion requires renderer context.
+
 ## Security boundary
 
-Canonicalization includes identity, selected metadata, assets, and semantic content. It excludes layout context, user reading preferences, and renderer output. Standard .NET cryptographic primitives will be used; Flow will not define cryptographic algorithms.
+Canonicalization includes identity, selected metadata, assets, and semantic content. It excludes layout context, `UserReadingPreferences`, resolved styles, renderer constraints, and renderer output. Standard .NET cryptographic primitives will be used; Flow will not define cryptographic algorithms.
 
 ## EPUB interoperability
 
