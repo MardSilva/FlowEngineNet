@@ -21,6 +21,10 @@ Dependencies point inward: domain projects never reference presentation or infra
 
 An importer or serializer creates a `FlowDocument`. The layout engine combines that immutable model with a `LayoutContext`. A renderer consumes the resulting layout without changing canonical content.
 
+`AdaptiveLayoutEngine` implements the flowing-reading stage. It validates the source document, resolves the style cascade, chooses a viewport profile, and recursively projects semantic nodes into `LayoutNode` values while preserving every `NodeId`. `LayoutProfile` carries constraints such as column count, margins, maximum content width, and responsive-figure behavior; it never contains measured positions or pages. See [adaptive-layout.md](adaptive-layout.md).
+
+`ReadingMode.Paged` and `ReadingMode.Print` are reserved extension points and are intentionally unsupported in the alpha.4 engine.
+
 ## Style cascade
 
 `TypographyResolver` is a pure service in `Flow.Layout`. It resolves styles in this order:

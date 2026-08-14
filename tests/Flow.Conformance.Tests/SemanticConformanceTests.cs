@@ -88,6 +88,21 @@ public sealed class SemanticConformanceTests
     }
 
     [Fact]
+    public void Conformance_008_SmallScreenUsesOneColumn()
+    {
+        var document = CreateDocument(
+            [new Paragraph(new NodeId("p-small-screen"), [new Text("Readable")])]);
+
+        var layout = new AdaptiveLayoutEngine().Layout(
+            document,
+            new LayoutContext(390, 844, DeviceClass.Phone, allowTwoColumns: true));
+
+        Assert.Equal(ViewportCategory.Small, layout.Profile.ViewportCategory);
+        Assert.Equal(1, layout.Profile.ColumnCount);
+        Assert.Equal(Length.Px(16), layout.Profile.ContentMargin);
+    }
+
+    [Fact]
     public void Conformance_009_UserFontOverride()
     {
         var presentation = new DocumentPresentation(
