@@ -9,7 +9,7 @@ public sealed class ProjectDependencyConformanceTests
     {
         var properties = XDocument.Load(Path.Combine(FindRepositoryRoot(), "Directory.Build.props"));
 
-        Assert.Equal("0.1.0", properties.Descendants("VersionPrefix").Single().Value);
+        Assert.Equal("0.2.0", properties.Descendants("VersionPrefix").Single().Value);
         Assert.Equal("false", properties.Descendants("IsPackable").Single().Value);
         Assert.Equal("true", properties.Descendants("GenerateDocumentationFile").Single().Value);
     }
@@ -27,7 +27,7 @@ public sealed class ProjectDependencyConformanceTests
             ["Flow.Rendering.Html"] = ["Flow.Rendering"],
             ["Flow.Security"] = ["Flow.Documents"],
             ["Flow.Epub"] = ["Flow.Core", "Flow.Documents"],
-            ["Flow.Cli"] = ["Flow.Documents", "Flow.Layout", "Flow.Rendering.Html", "Flow.Security"],
+            ["Flow.Cli"] = ["Flow.Documents", "Flow.Epub", "Flow.Layout", "Flow.Rendering.Html", "Flow.Security"],
         };
 
         foreach (var (projectName, expectedReferences) in expected)

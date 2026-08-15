@@ -13,14 +13,18 @@
 
 ## 0.2
 
-- Experimental pagination
-- More EPUB interoperability
+- Real EPUB import through the CLI
+- EPUB navigation, metadata, fidelity reports, and broader semantics
+- Self-contained HTML book packages with separate TOC and chapters
+- Large-publication performance and fidelity gates
+
+Physical production pagination is not part of the EPUB import gate.
 
 ## 0.3
 
 - Signature transport and trust experiments
 - Provenance
-- PDF rendering experiment
+- Digital PDF-to-Flow import experiment after the EPUB large-book gate
 
 ## 0.4
 

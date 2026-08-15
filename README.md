@@ -14,7 +14,7 @@ The project is not a replacement for PDF or EPUB. Version 0.1 tests engine found
 
 ## Current milestone
 
-The current development milestone is **`0.1.0-rc.1`**.
+The current development milestone is **`0.2.0-alpha.1`**, focused on real EPUB workflows.
 
 Implemented:
 
@@ -117,7 +117,7 @@ The layout operation validates the semantic document first. Invalid IDs, hierarc
 | `Flow.Rendering` | Renderer contracts and immutable rendered output | Implemented for 0.1 |
 | `Flow.Rendering.Html` | Deterministic standalone semantic HTML adapter | Implemented for 0.1 |
 | `Flow.Epub` | Diagnostic-first EPUB-to-`FlowDocument` prototype | Implemented subset for 0.1 |
-| `Flow.Cli` | Sample, inspect, validate, hash, and HTML rendering commands | Implemented for 0.1 |
+| `Flow.Cli` | EPUB import, sample, inspect, validate, hash, and HTML rendering commands | EPUB CLI integration in 0.2 alpha |
 
 Dependencies point inward: the document domain does not reference layout or renderer projects. EPUB and HTML remain adapters at the edge. The approved direct dependency graph is enforced by `Flow.Conformance.Tests`.
 
@@ -154,12 +154,13 @@ The final clean-directory review passes 134 tests with zero build warnings; see 
 
 ## Roadmap direction
 
-The next useful increments are:
+The real EPUB cycle now follows these increments:
 
-1. connect the EPUB prototype to the existing layout, renderer, and CLI pipeline;
-2. add end-to-end EPUB conformance fixtures from real publications;
-3. broaden navigation, accessibility metadata, CSS, tables, and media support;
-4. harden accessibility and interoperability from measured evidence.
+1. import EPUB through the CLI into a valid, deterministic `.flow.json`;
+2. add navigation, accessibility metadata, CSS, tables, notes, and media fallbacks;
+3. generate a self-contained HTML book with its own TOC and chapter files;
+4. validate fidelity and performance against legal real-world publications;
+5. pass the large-book gate before beginning the PDF importer.
 
 A document can only be considered end-to-end usable when an EPUB can be imported without silent semantic loss, represented as a valid `FlowDocument`, laid out, rendered, inspected, and round-tripped through the supported Flow format. The repository has not reached that point yet.
 
@@ -175,6 +176,7 @@ Start-Process samples/SampleBook/desktop.html
 To reproduce the pipeline from the semantic source:
 
 ```powershell
+dotnet run --project src/Flow.Cli -- import path/to/book.epub --output book.flow.json
 dotnet run --project src/Flow.Cli -- inspect samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- validate samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- hash samples/SampleBook/sample.flow.json

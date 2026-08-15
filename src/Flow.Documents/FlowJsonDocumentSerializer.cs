@@ -23,8 +23,8 @@ public sealed class FlowJsonDocumentSerializer : IFlowDocumentSerializer
             await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        buffer.Position = 0;
-        await buffer.CopyToAsync(destination, cancellationToken).ConfigureAwait(false);
+        var json = buffer.GetBuffer().AsMemory(0, checked((int)buffer.Length));
+        await WriteWithLfLineEndingsAsync(json, destination, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -61,5 +61,40 @@ public sealed class FlowJsonDocumentSerializer : IFlowDocumentSerializer
                 $"The .flow.json document is semantically invalid: {exception.Message}",
                 innerException: exception);
         }
+    }
+
+    private static async Task WriteWithLfLineEndingsAsync(
+        ReadOnlyMemory<byte> source,
+        Stream destination,
+        CancellationToken cancellationToken)
+    {
+        if (source.Span.IndexOf((byte)'\r') < 0)
+        {
+            await destination.WriteAsync(source, cancellationToken).ConfigureAwait(false);
+            return;
+        }
+
+        var normalized = NormalizeLineEndings(source.Span);
+        await destination.WriteAsync(normalized, cancellationToken).ConfigureAwait(false);
+    }
+
+    private static byte[] NormalizeLineEndings(ReadOnlySpan<byte> source)
+    {
+        var normalized = new byte[source.Length];
+        var written = 0;
+        for (var index = 0; index < source.Length; index++)
+        {
+            if (source[index] == '\r' && index + 1 < source.Length && source[index + 1] == '\n')
+            {
+                normalized[written++] = (byte)'\n';
+                index++;
+                continue;
+            }
+
+            normalized[written++] = source[index];
+        }
+
+        Array.Resize(ref normalized, written);
+        return normalized;
     }
 }

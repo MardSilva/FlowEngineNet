@@ -18,6 +18,7 @@ public sealed class CliCommandParser
         return arguments[0] switch
         {
             "sample" => ParseSample(arguments),
+            "import" => ParseImport(arguments),
             "inspect" => ParseDocumentCommand(arguments, static path => new InspectCommand(path)),
             "validate" => ParseDocumentCommand(arguments, static path => new ValidateCommand(path)),
             "hash" => ParseDocumentCommand(arguments, static path => new HashCommand(path)),
@@ -26,6 +27,27 @@ public sealed class CliCommandParser
                 $"FLOWCLI_UNKNOWN_COMMAND: Unknown command '{arguments[0]}'. Run 'flow help' for usage."),
         };
     }
+
+    private static CommandParseResult ParseImport(IReadOnlyList<string> arguments)
+    {
+        if (arguments.Count == 2)
+        {
+            return CommandParseResult.Success(
+                new ImportEpubCommand(arguments[1], DefaultImportOutputPath(arguments[1])));
+        }
+
+        if (arguments.Count == 4 && arguments[2] == "--output" && !string.IsNullOrWhiteSpace(arguments[3]))
+        {
+            return CommandParseResult.Success(new ImportEpubCommand(arguments[1], arguments[3]));
+        }
+
+        return CommandParseResult.Failure($"FLOWCLI_USAGE: {ImportUsage}");
+    }
+
+    private static string DefaultImportOutputPath(string sourcePath) =>
+        sourcePath.EndsWith(".epub", StringComparison.OrdinalIgnoreCase)
+            ? $"{sourcePath[..^5]}.flow.json"
+            : $"{sourcePath}.flow.json";
 
     private static CommandParseResult ParseSample(IReadOnlyList<string> arguments) =>
         arguments.Count switch
@@ -111,4 +133,6 @@ public sealed class CliCommandParser
 
     private const string RenderUsage =
         "Usage: flow render <document> --html <output> --width <n> --height <n>";
+
+    private const string ImportUsage = "Usage: flow import <book.epub> [--output <book.flow.json>]";
 }

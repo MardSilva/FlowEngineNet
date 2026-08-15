@@ -1,3 +1,5 @@
+using System.IO.Compression;
+using System.Text;
 using System.Xml.Linq;
 using Flow.Cli;
 using Flow.Core;
@@ -86,6 +88,56 @@ public sealed class FlowCliIntegrationTests
     }
 
     [Fact]
+    public async Task Import_EpubProducesAValidDeterministicFlowDocument()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var epubPath = workspace.PathOf("real-book.epub");
+        var documentPath = workspace.PathOf("imported.flow.json");
+        CreateMinimalEpub(epubPath);
+        var application = FlowCliApplication.CreateDefault();
+
+        var import = await RunAsync(
+            application,
+            ["import", epubPath, "--output", documentPath]);
+        var validate = await RunAsync(application, ["validate", documentPath]);
+        var inspect = await RunAsync(application, ["inspect", documentPath]);
+
+        Assert.Equal(0, import.ExitCode);
+        Assert.True(File.Exists(documentPath));
+        Assert.Contains("Imported EPUB:", import.Output, StringComparison.Ordinal);
+        Assert.Contains("Title: Livro real mínimo", import.Output, StringComparison.Ordinal);
+        Assert.Contains("Hash: SHA-256:", import.Output, StringComparison.Ordinal);
+        Assert.Equal(string.Empty, import.Error);
+        Assert.Equal((0, "Valid: no semantic validation errors."), (validate.ExitCode, validate.Output.Trim()));
+        Assert.Equal(0, inspect.ExitCode);
+        Assert.Contains("Chapters: 1", inspect.Output, StringComparison.Ordinal);
+
+        await using var stream = File.OpenRead(documentPath);
+        var document = await new FlowJsonDocumentSerializer().DeserializeAsync(stream);
+        Assert.Equal("Livro real mínimo", document.Metadata.Title);
+        Assert.Contains(document.Index.Locations, static location => location.Node is Heading);
+        Assert.Contains(document.Index.Locations, static location => location.Node is Paragraph);
+    }
+
+    [Fact]
+    public async Task Import_InvalidEpubReportsDiagnosticsAndDoesNotWritePartialOutput()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var epubPath = workspace.PathOf("invalid.epub");
+        var documentPath = workspace.PathOf("invalid.flow.json");
+        await File.WriteAllTextAsync(epubPath, "not a ZIP archive");
+
+        var result = await RunAsync(
+            FlowCliApplication.CreateDefault(),
+            ["import", epubPath, "--output", documentPath]);
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.False(File.Exists(documentPath));
+        Assert.Contains("EPUB001", result.Error, StringComparison.Ordinal);
+        Assert.Contains("FLOWCLI_EPUB_IMPORT_FAILED", result.Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task Validate_ReturnsTwoAndDiagnosticsForInvalidDocument()
     {
         using var workspace = new TemporaryWorkspace();
@@ -165,7 +217,8 @@ public sealed class FlowCliIntegrationTests
         var result = await RunAsync(FlowCliApplication.CreateDefault(), ["help"]);
 
         Assert.Equal(0, result.ExitCode);
-        Assert.Contains("0.1.0-rc.1 (experimental)", result.Output, StringComparison.Ordinal);
+        Assert.Contains("0.2.0-alpha.1 (experimental)", result.Output, StringComparison.Ordinal);
+        Assert.Contains("flow import <book.epub>", result.Output, StringComparison.Ordinal);
         Assert.Contains("flow validate <document>", result.Output, StringComparison.Ordinal);
         Assert.Contains("Exit codes: 0 success, 1 command/input failure, 2 semantic validation failure.", result.Output, StringComparison.Ordinal);
     }
@@ -199,6 +252,65 @@ public sealed class FlowCliIntegrationTests
     private static string OutputValue(string output, string prefix) =>
         output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Single(line => line.StartsWith(prefix, StringComparison.Ordinal))[prefix.Length..].Trim();
+
+    private static void CreateMinimalEpub(string path)
+    {
+        using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
+        AddText(archive, "mimetype", "application/epub+zip", CompressionLevel.NoCompression);
+        AddText(
+            archive,
+            "META-INF/container.xml",
+            """
+            <?xml version="1.0" encoding="utf-8"?>
+            <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+              <rootfiles>
+                <rootfile full-path="EPUB/package.opf" media-type="application/oebps-package+xml" />
+              </rootfiles>
+            </container>
+            """);
+        AddText(
+            archive,
+            "EPUB/package.opf",
+            """
+            <?xml version="1.0" encoding="utf-8"?>
+            <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id">
+              <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                <dc:identifier id="book-id">urn:flow:test:real-epub</dc:identifier>
+                <dc:title>Livro real mínimo</dc:title>
+                <dc:language>pt-PT</dc:language>
+                <dc:creator>Flow contributors</dc:creator>
+              </metadata>
+              <manifest>
+                <item id="chapter" href="text/chapter.xhtml" media-type="application/xhtml+xml" />
+              </manifest>
+              <spine><itemref idref="chapter" /></spine>
+            </package>
+            """);
+        AddText(
+            archive,
+            "EPUB/text/chapter.xhtml",
+            """
+            <?xml version="1.0" encoding="utf-8"?>
+            <html xmlns="http://www.w3.org/1999/xhtml" lang="pt-PT">
+              <head><title>Capítulo um</title></head>
+              <body>
+                <h1 id="chapter-one">Capítulo um</h1>
+                <p id="opening">O primeiro parágrafo importado pelo Flow.</p>
+              </body>
+            </html>
+            """);
+    }
+
+    private static void AddText(
+        ZipArchive archive,
+        string path,
+        string content,
+        CompressionLevel compressionLevel = CompressionLevel.Optimal)
+    {
+        var entry = archive.CreateEntry(path, compressionLevel);
+        using var stream = entry.Open();
+        stream.Write(Encoding.UTF8.GetBytes(content));
+    }
 
     private sealed record CliResult(int ExitCode, string Output, string Error);
 
