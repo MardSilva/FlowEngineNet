@@ -1,5 +1,6 @@
 namespace Flow.Epub;
 
+/// <summary>Defines resource limits used to reduce malicious archive and XML input risk.</summary>
 public sealed record EpubImportLimits
 {
     public EpubImportLimits(

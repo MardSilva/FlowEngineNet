@@ -9,6 +9,7 @@ using Flow.Documents;
 
 namespace Flow.Epub;
 
+/// <summary>Security-bounded reference implementation of the experimental EPUB import profile.</summary>
 public sealed class EpubImporter : IEpubImporter
 {
     private const string ContainerPath = "META-INF/container.xml";
@@ -19,11 +20,14 @@ public sealed class EpubImporter : IEpubImporter
 
     private readonly EpubImportLimits limits;
 
+    /// <summary>Creates an importer with optional host-defined resource limits.</summary>
+    /// <param name="limits">Limits to apply, or <see langword="null" /> for conservative defaults.</param>
     public EpubImporter(EpubImportLimits? limits = null)
     {
         this.limits = limits ?? new EpubImportLimits();
     }
 
+    /// <inheritdoc />
     public async Task<EpubImportResult> ImportAsync(
         Stream source,
         CancellationToken cancellationToken = default)

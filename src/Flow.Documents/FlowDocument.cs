@@ -4,6 +4,7 @@ using Flow.Core;
 
 namespace Flow.Documents;
 
+/// <summary>The immutable aggregate root for canonical semantic content and optional presentation intent.</summary>
 public sealed record FlowDocument
 {
     public FlowDocument(
@@ -42,9 +43,12 @@ public sealed record FlowDocument
 
     public FlowDocumentIndex Index { get; }
 
+    /// <summary>Attempts to resolve a semantic anchor through the immutable document index.</summary>
     public bool TryResolveAnchor(DocumentAnchor anchor, [NotNullWhen(true)] out DocumentNode? node) =>
         Index.TryResolve(anchor, out node);
 
+    /// <summary>Resolves a semantic anchor to one unique node.</summary>
+    /// <exception cref="KeyNotFoundException">The anchor is missing or ambiguous.</exception>
     public DocumentNode ResolveAnchor(DocumentAnchor anchor)
     {
         if (!TryResolveAnchor(anchor, out var node))

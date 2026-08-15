@@ -86,3 +86,5 @@ SignatureVerificationResult result = signatures.Verify(
 The service never owns or disposes the supplied keys. Private-key storage, rotation, access control, public-key distribution, revocation, and trust policy remain outside Flow.
 
 The implementation follows the standard [.NET RSA signing API](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rsa.signdata?view=net-10.0) and [.NET RSA verification API](https://learn.microsoft.com/en-us/dotnet/api/system.security.cryptography.rsa.verifydata?view=net-10.0).
+
+No package, key profile, or signature envelope is published in Flow 0.1. See [known limitations](known-limitations.md).

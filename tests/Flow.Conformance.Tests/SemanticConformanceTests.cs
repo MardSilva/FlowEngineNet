@@ -1,3 +1,4 @@
+using System.Xml.Linq;
 using Flow.Core;
 using Flow.Documents;
 using Flow.Layout;
@@ -8,6 +9,23 @@ namespace Flow.Conformance.Tests;
 
 public sealed class SemanticConformanceTests
 {
+    [Fact]
+    public void Conformance_001_DocumentIdentityRemainsStableAcrossLayouts()
+    {
+        var document = CreateDocument(
+            [new Paragraph(new NodeId("p-identity"), [new Text("One identity")])]);
+        var engine = new AdaptiveLayoutEngine();
+
+        var mobile = engine.Layout(document, new LayoutContext(390, 844, DeviceClass.Phone));
+        var desktop = engine.Layout(document, new LayoutContext(1600, 1000, DeviceClass.Desktop));
+
+        Assert.Same(document.Identity.Id, mobile.DocumentId);
+        Assert.Same(document.Identity.Id, desktop.DocumentId);
+        Assert.Equal(mobile.DocumentId, desktop.DocumentId);
+        Assert.Equal(document.Identity.Version, mobile.DocumentVersion);
+        Assert.Equal(document.Identity.Version, desktop.DocumentVersion);
+    }
+
     [Fact]
     public void Conformance_002_DuplicateNodeIdIsInvalid()
     {
@@ -89,20 +107,30 @@ public sealed class SemanticConformanceTests
     }
 
     [Fact]
-    public void Conformance_007_SemanticHtmlPreservesStableIdAndEscapesContent()
+    public void Conformance_007_TableOfContentsGeneratesNavigableAnchor()
     {
+        var headingId = new NodeId("heading-destination");
+        var target = DocumentAnchor.Create([headingId]);
         var document = CreateDocument(
-            [new Paragraph(new NodeId("safe-paragraph"), [new Text("Flow < content & identity")])]);
+        [
+            new TableOfContents(
+                new NodeId("toc-main"),
+                [new Text("Contents")],
+                [new TableOfContentsEntry([new Text("Destination")], target, 1)]),
+            new Heading(headingId, 1, [new Text("Destination")]),
+        ]);
         var preferences = new UserReadingPreferences();
         var layout = new AdaptiveLayoutEngine().Layout(
             document,
-            new LayoutContext(390, 844, DeviceClass.Phone, userPreferences: preferences));
+            new LayoutContext(800, 1000, DeviceClass.Tablet, userPreferences: preferences));
 
-        var html = new HtmlDocumentRenderer().RenderToString(document, layout, preferences);
+        var html = XDocument.Parse(new HtmlDocumentRenderer().RenderToString(document, layout, preferences));
+        var navigation = html.Descendants("nav").Single();
+        var link = navigation.Descendants("a").Single();
 
-        Assert.Contains("<article", html, StringComparison.Ordinal);
-        Assert.Contains("<p id=\"safe-paragraph\">Flow &lt; content &amp; identity</p>", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("Flow.Documents.Paragraph", html, StringComparison.Ordinal);
+        Assert.Equal("toc-main", (string?)navigation.Attribute("id"));
+        Assert.Equal("#heading-destination", (string?)link.Attribute("href"));
+        Assert.Equal("heading-destination", (string?)html.Descendants("h1").Single().Attribute("id"));
     }
 
     [Fact]
@@ -176,6 +204,23 @@ public sealed class SemanticConformanceTests
         Assert.Contains(
             invalidResult.Errors,
             diagnostic => diagnostic.Code == ValidationDiagnosticCodes.UnresolvedFootnoteReference);
+    }
+
+    [Fact]
+    public void Conformance_012_HtmlSemanticOutputPreservesStableIdAndEscapesContent()
+    {
+        var document = CreateDocument(
+            [new Paragraph(new NodeId("safe-paragraph"), [new Text("Flow < content & identity")])]);
+        var preferences = new UserReadingPreferences();
+        var layout = new AdaptiveLayoutEngine().Layout(
+            document,
+            new LayoutContext(390, 844, DeviceClass.Phone, userPreferences: preferences));
+
+        var html = new HtmlDocumentRenderer().RenderToString(document, layout, preferences);
+
+        Assert.Contains("<article", html, StringComparison.Ordinal);
+        Assert.Contains("<p id=\"safe-paragraph\">Flow &lt; content &amp; identity</p>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Flow.Documents.Paragraph", html, StringComparison.Ordinal);
     }
 
     private static FlowDocument CreateDocument(

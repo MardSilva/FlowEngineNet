@@ -6,6 +6,7 @@ using Flow.Security;
 
 namespace Flow.Cli;
 
+/// <summary>Executes typed CLI commands against the Flow domain services.</summary>
 public sealed class CliOperations
 {
     private readonly IFlowDocumentSerializer _serializer;
@@ -34,6 +35,7 @@ public sealed class CliOperations
         _htmlRenderer = htmlRenderer;
     }
 
+    /// <summary>Executes a parsed command and writes its normal output.</summary>
     public async Task<int> ExecuteAsync(
         CliCommand command,
         TextWriter output,
@@ -56,13 +58,20 @@ public sealed class CliOperations
 
     private static async Task<int> ShowHelpAsync(TextWriter output)
     {
-        await output.WriteLineAsync("Flow Engine .NET 0.1").ConfigureAwait(false);
+        await output.WriteLineAsync("Flow Engine .NET 0.1.0-rc.1 (experimental)").ConfigureAwait(false);
+        await output.WriteLineAsync("The .flow.json format and all 0.x APIs may change.").ConfigureAwait(false);
         await output.WriteLineAsync("Commands:").ConfigureAwait(false);
-        await output.WriteLineAsync("  flow sample [output]").ConfigureAwait(false);
-        await output.WriteLineAsync("  flow inspect <document>").ConfigureAwait(false);
-        await output.WriteLineAsync("  flow validate <document>").ConfigureAwait(false);
-        await output.WriteLineAsync("  flow hash <document>").ConfigureAwait(false);
+        await output.WriteLineAsync("  flow sample [output]                         Create the reference .flow.json book.")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync("  flow inspect <document>                      Show semantic document counts.")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync("  flow validate <document>                     Validate semantic invariants.")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync("  flow hash <document>                         Compute the canonical SHA-256 hash.")
+            .ConfigureAwait(false);
         await output.WriteLineAsync("  flow render <document> --html <output> --width <n> --height <n>")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync("Exit codes: 0 success, 1 command/input failure, 2 semantic validation failure.")
             .ConfigureAwait(false);
         return 0;
     }
@@ -79,7 +88,7 @@ public sealed class CliOperations
             await _serializer.SerializeAsync(SampleBookFactory.Create(), stream, cancellationToken).ConfigureAwait(false);
         }
 
-        await output.WriteLineAsync($"Sample: {path}").ConfigureAwait(false);
+        await output.WriteLineAsync($"Sample written: {path}").ConfigureAwait(false);
         return 0;
     }
 
@@ -99,7 +108,17 @@ public sealed class CliOperations
             .ConfigureAwait(false);
         await output.WriteLineAsync($"Chapters: {document.Content.Children.Count(static node => node is Chapter).ToString(CultureInfo.InvariantCulture)}")
             .ConfigureAwait(false);
+        await output.WriteLineAsync($"Sections: {CountNodes<Section>(document).ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync($"Paragraphs: {CountNodes<Paragraph>(document).ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync($"Figures: {CountNodes<Figure>(document).ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync($"Footnotes: {CountNodes<Footnote>(document).ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
         await output.WriteLineAsync($"Assets: {document.Assets.Count.ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync($"Anchors: {document.Index.NodeCount.ToString(CultureInfo.InvariantCulture)}")
             .ConfigureAwait(false);
         await output.WriteLineAsync($"Presentation: {(document.Presentation is null ? "no" : "yes")}")
             .ConfigureAwait(false);
@@ -115,7 +134,7 @@ public sealed class CliOperations
         var validation = _validator.Validate(document);
         if (validation.IsValid)
         {
-            await output.WriteLineAsync("Valid.").ConfigureAwait(false);
+            await output.WriteLineAsync("Valid: no semantic validation errors.").ConfigureAwait(false);
             return 0;
         }
 
@@ -205,4 +224,8 @@ public sealed class CliOperations
 
     private static string CssNumber(double value) =>
         value.ToString("0.################", CultureInfo.InvariantCulture);
+
+    private static int CountNodes<TNode>(FlowDocument document)
+        where TNode : DocumentNode =>
+        document.Index.Locations.Count(static location => location.Node is TNode);
 }

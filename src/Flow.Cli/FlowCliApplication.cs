@@ -5,6 +5,7 @@ using Flow.Security;
 
 namespace Flow.Cli;
 
+/// <summary>Coordinates CLI parsing, operations, diagnostics, and process-style exit codes.</summary>
 public sealed class FlowCliApplication
 {
     private readonly CliCommandParser _parser;
@@ -18,6 +19,7 @@ public sealed class FlowCliApplication
         _operations = operations;
     }
 
+    /// <summary>Creates the default local command composition.</summary>
     public static FlowCliApplication CreateDefault() =>
         new(
             new CliCommandParser(),
@@ -28,6 +30,7 @@ public sealed class FlowCliApplication
                 new AdaptiveLayoutEngine(),
                 new HtmlDocumentRenderer()));
 
+    /// <summary>Runs one command without taking ownership of the supplied writers.</summary>
     public async Task<int> RunAsync(
         IReadOnlyList<string> arguments,
         TextWriter output,
@@ -59,7 +62,7 @@ public sealed class FlowCliApplication
                                           or ArgumentException
                                           or NotSupportedException)
         {
-            await error.WriteLineAsync($"Error: {exception.Message}").ConfigureAwait(false);
+            await error.WriteLineAsync($"FLOWCLI_OPERATION_FAILED: {exception.Message}").ConfigureAwait(false);
             return 1;
         }
     }

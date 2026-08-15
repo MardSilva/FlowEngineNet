@@ -3,6 +3,7 @@ using System.Text;
 
 namespace Flow.Rendering;
 
+/// <summary>Contains immutable bytes and media metadata produced by a renderer.</summary>
 public sealed record RenderedDocument
 {
     public RenderedDocument(
@@ -31,8 +32,10 @@ public sealed record RenderedDocument
 
     public ImmutableArray<byte> Content { get; }
 
+    /// <summary>Decodes the rendered content as UTF-8 text.</summary>
     public string ReadAsUtf8() => Encoding.UTF8.GetString(Content.AsSpan());
 
+    /// <summary>Writes the immutable rendered bytes to a file, replacing an existing target.</summary>
     public void WriteTo(string path)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);

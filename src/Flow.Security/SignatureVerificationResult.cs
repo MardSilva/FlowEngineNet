@@ -1,5 +1,6 @@
 namespace Flow.Security;
 
+/// <summary>Classifies the mathematical result of signature verification.</summary>
 public enum SignatureVerificationStatus
 {
     Valid,
@@ -9,6 +10,7 @@ public enum SignatureVerificationStatus
     InvalidKey,
 }
 
+/// <summary>Reports signature verification without making a key-trust or identity claim.</summary>
 public sealed record SignatureVerificationResult
 {
     private SignatureVerificationResult(SignatureVerificationStatus status, string message)
@@ -21,6 +23,7 @@ public sealed record SignatureVerificationResult
 
     public string Message { get; }
 
+    /// <summary>Gets whether the mathematical signature verification succeeded.</summary>
     public bool IsValid => Status == SignatureVerificationStatus.Valid;
 
     public static SignatureVerificationResult Valid() =>

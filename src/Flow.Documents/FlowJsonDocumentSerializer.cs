@@ -2,8 +2,10 @@ using System.Text.Json;
 
 namespace Flow.Documents;
 
+/// <summary>Reads and writes the deterministic, experimental <c>flow-json-0.1</c> representation.</summary>
 public sealed class FlowJsonDocumentSerializer : IFlowDocumentSerializer
 {
+    /// <inheritdoc />
     public async Task SerializeAsync(
         FlowDocument document,
         Stream destination,
@@ -25,6 +27,7 @@ public sealed class FlowJsonDocumentSerializer : IFlowDocumentSerializer
         await buffer.CopyToAsync(destination, cancellationToken).ConfigureAwait(false);
     }
 
+    /// <inheritdoc />
     public async Task<FlowDocument> DeserializeAsync(
         Stream source,
         CancellationToken cancellationToken = default)

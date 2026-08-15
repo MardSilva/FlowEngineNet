@@ -4,7 +4,7 @@
 
 ## Reading mode
 
-`0.1.0-alpha.4` implements `ReadingMode.Flow` completely. `Paged` and `Print` are reserved contract values and fail explicitly with `NotSupportedException`; the engine does not approximate either mode.
+Flow 0.1 implements `ReadingMode.Flow`. `Paged` and `Print` are reserved contract values and fail explicitly with `NotSupportedException`; the engine does not approximate either mode or claim production pagination.
 
 ## Viewport profiles
 

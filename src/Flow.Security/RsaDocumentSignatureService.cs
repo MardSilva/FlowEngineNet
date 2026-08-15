@@ -3,6 +3,7 @@ using Flow.Documents;
 
 namespace Flow.Security;
 
+/// <summary>Signs and verifies canonical bytes with the experimental RSA-PSS-SHA256 profile.</summary>
 public sealed class RsaDocumentSignatureService : IDocumentSigner, IDocumentSignatureVerifier
 {
     public const string Algorithm = "RSA-PSS-SHA256";
@@ -16,6 +17,7 @@ public sealed class RsaDocumentSignatureService : IDocumentSigner, IDocumentSign
         _canonicalizer = canonicalizer;
     }
 
+    /// <inheritdoc />
     public DocumentSignature Sign(
         FlowDocument document,
         AsymmetricAlgorithm signingKey,
@@ -44,6 +46,7 @@ public sealed class RsaDocumentSignatureService : IDocumentSigner, IDocumentSign
             signature);
     }
 
+    /// <inheritdoc />
     public SignatureVerificationResult Verify(
         FlowDocument document,
         DocumentSignature signature,

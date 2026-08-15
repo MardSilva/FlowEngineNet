@@ -1,7 +1,10 @@
 namespace Flow.Core;
 
+/// <summary>Identifies a Flow document with an absolute URI that is independent of any rendition.</summary>
 public sealed record DocumentId
 {
+    /// <summary>Creates a document identifier.</summary>
+    /// <param name="value">An absolute URI with no surrounding whitespace.</param>
     public DocumentId(string value)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(value);
@@ -24,7 +27,9 @@ public sealed record DocumentId
         Value = value;
     }
 
+    /// <summary>Gets the absolute URI value.</summary>
     public string Value { get; }
 
+    /// <inheritdoc />
     public override string ToString() => Value;
 }

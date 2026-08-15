@@ -157,6 +157,6 @@ This model intentionally does not yet implement:
 
 - automatic TOC entry generation;
 - embedded signature transport or trust policy;
-- EPUB import.
+- semantic nodes for tables, mathematics, rich media, per-span language, and annotations.
 
-Those behaviors will be layered over the semantic model without adding dependencies from `Flow.Documents` to infrastructure projects. Adaptive Flow layout and standalone HTML rendering already exist in their outward projects.
+Those behaviors can be layered over the semantic model without adding dependencies from `Flow.Documents` to infrastructure projects. Adaptive Flow layout, standalone HTML rendering, and a limited EPUB importer already exist in outward projects.

@@ -2,6 +2,8 @@
 
 The `flow` executable is a deliberately small composition layer over the document serializer, validator, canonicalizer, layout engine, and HTML renderer. Command parsing is implemented independently from command operations and uses no external CLI framework.
 
+The help output identifies the CLI and `.flow.json` representation as experimental. Stable `FLOWCLI_*` prefixes distinguish command, option, value, and operation failures. Exit code `0` means success, `1` means command/input/I/O failure, and `2` means the document parsed but failed semantic validation.
+
 ## Commands
 
 ```text
@@ -14,13 +16,15 @@ flow render <document> --html <output> --width <n> --height <n>
 
 `sample` writes “The Flow Experiment” to the optional output path or to `sample.flow.json` in the current directory. The command serializes the same typed sample factory used to generate the committed reference document.
 
-`inspect` reports identity, metadata, node and chapter counts, assets, and presentation availability.
+`inspect` reports identity, metadata, total nodes, chapters, sections, paragraphs, figures, footnotes, assets, addressable anchors, and presentation availability.
 
 `validate` returns exit code `0` for a structurally valid document and `2` when validation diagnostics contain errors. Parsing, file, and command errors return `1`.
 
 `hash` reports the algorithm, uppercase hexadecimal document hash, and canonicalization profile.
 
 `render` resolves `ReadingMode.Flow` for the requested logical viewport, writes standalone HTML, and reports the source identity, canonical hash, anchor count, and selected viewport category. Width and height use invariant-culture positive numbers.
+
+The CLI reads `.flow.json`; it does not yet expose EPUB import, signing, verification, reader-preference switches, PDF, or paged output. Successful `sample` and `render` operations replace their target files.
 
 During development, invoke the executable through the project:
 

@@ -8,10 +8,12 @@ using Flow.Rendering;
 
 namespace Flow.Rendering.Html;
 
+/// <summary>Produces deterministic standalone semantic HTML5 with embedded CSS and assets.</summary>
 public sealed class HtmlDocumentRenderer : IDocumentRenderer
 {
     private static readonly UTF8Encoding Utf8WithoutBom = new(encoderShouldEmitUTF8Identifier: false);
 
+    /// <inheritdoc />
     public RenderedDocument Render(
         FlowDocument document,
         LayoutDocument layout,
@@ -27,12 +29,14 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
         return new RenderedDocument("text/html; charset=utf-8", ".html", Utf8WithoutBom.GetBytes(html));
     }
 
+    /// <summary>Renders a standalone HTML document as a UTF-16 .NET string.</summary>
     public string RenderToString(
         FlowDocument document,
         LayoutDocument layout,
         UserReadingPreferences userPreferences) =>
         Render(document, layout, userPreferences).ReadAsUtf8();
 
+    /// <summary>Renders and writes a standalone HTML document to a file.</summary>
     public void RenderToFile(
         FlowDocument document,
         LayoutDocument layout,
@@ -59,7 +63,7 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
 
         if (layout.ReadingMode != ReadingMode.Flow)
         {
-            throw new NotSupportedException("The HTML renderer supports ReadingMode.Flow only in 0.1.0-beta.1.");
+            throw new NotSupportedException("The HTML renderer supports ReadingMode.Flow only in 0.1.");
         }
 
         var layoutNodes = Flatten(layout.Nodes).ToArray();

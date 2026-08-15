@@ -2,6 +2,7 @@ using Flow.Documents;
 
 namespace Flow.Layout;
 
+/// <summary>Purely resolves Flow defaults, author presentation, reader preferences, and safety constraints.</summary>
 public sealed class TypographyResolver
 {
     public ResolvedReadingStyle Resolve(

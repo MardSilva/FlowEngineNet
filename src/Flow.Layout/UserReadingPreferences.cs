@@ -2,6 +2,7 @@ using Flow.Documents;
 
 namespace Flow.Layout;
 
+/// <summary>Contains reader-controlled, noncanonical typography, spacing, margin, and theme preferences.</summary>
 public sealed record UserReadingPreferences
 {
     public UserReadingPreferences(
