@@ -14,7 +14,7 @@ The project is not currently a replacement for PDF or EPUB. Version 0.1 is build
 
 ## Current milestone
 
-The current development milestone is **`0.1.0-beta.2`**.
+The current development milestone is **`0.1.0-rc.1`**.
 
 Implemented:
 
@@ -24,6 +24,8 @@ Implemented:
 - reader-preference cascade with renderer safety constraints;
 - deterministic experimental `.flow.json` serialization;
 - `flow-c14n-0.1` canonicalization and SHA-256 document hashes;
+- experimental local RSA-PSS-SHA256 signatures over canonical bytes;
+- a diagnostic-first, security-bounded EPUB import prototype;
 - renderer-independent adaptive layout for `ReadingMode.Flow`;
 - deterministic standalone HTML5 rendering with embedded CSS and assets;
 - the five-chapter “The Flow Experiment” reference book;
@@ -35,10 +37,10 @@ Implemented:
 Not implemented yet:
 
 - renderers other than standalone HTML;
-- EPUB import;
+- broad EPUB interoperability and EPUB export;
 - paged and print layout modes;
 - reader or editor applications;
-- signatures, provenance, DRM, or cloud publishing services.
+- certificate trust, PKI, provenance, DRM, or cloud publishing services.
 
 `ReadingMode.Paged` and `ReadingMode.Print` are reserved contracts and deliberately fail until their behavior is properly specified and tested.
 
@@ -111,10 +113,10 @@ The layout operation validates the semantic document first. Invalid IDs, hierarc
 | `Flow.Core` | Stable IDs, anchors, and shared primitives | Implemented |
 | `Flow.Documents` | Semantic model, validation, presentation, and `.flow.json` | Implemented for 0.1 alpha |
 | `Flow.Layout` | Style cascade and adaptive Flow layout | Implemented for alpha.4 |
-| `Flow.Security` | Canonicalization and SHA-256 integrity | Implemented for 0.1 alpha |
+| `Flow.Security` | Canonicalization, hashing, and local RSA signature proof of concept | Implemented for rc.1 |
 | `Flow.Rendering` | Renderer contracts and immutable rendered output | Implemented for beta.1 |
 | `Flow.Rendering.Html` | Deterministic standalone semantic HTML adapter | Implemented for beta.1 |
-| `Flow.Epub` | EPUB import adapter | Planned |
+| `Flow.Epub` | Diagnostic-first EPUB-to-`FlowDocument` prototype | Implemented for rc.1 |
 | `Flow.Cli` | Sample, inspect, validate, hash, and HTML rendering commands | Implemented for beta.2 |
 
 Dependencies point inward: the document domain does not reference layout or renderer projects. EPUB and HTML remain adapters at the edge.
@@ -130,7 +132,7 @@ dotnet build Flow.sln
 dotnet test Flow.sln --no-build
 ```
 
-At `0.1.0-beta.2`, the active suites contain 115 passing tests.
+At `0.1.0-rc.1`, the active suites contain 129 passing tests.
 
 ## Documentation
 
@@ -140,6 +142,8 @@ At `0.1.0-beta.2`, the active suites contain 115 passing tests.
 - [Standalone HTML renderer](docs/html-renderer.md)
 - [Command-line interface](docs/cli.md)
 - [Canonicalization and hashing](docs/canonicalization.md)
+- [Experimental document signatures](docs/signatures.md)
+- [Experimental EPUB import](docs/epub-import.md)
 - [Roadmap](docs/roadmap.md)
 - [Research findings](docs/research-findings.md)
 
@@ -147,10 +151,10 @@ At `0.1.0-beta.2`, the active suites contain 115 passing tests.
 
 The next useful increments are:
 
-1. build a limited, diagnostic-first EPUB importer;
-2. connect EPUB import to the existing layout, renderer, and CLI pipeline;
-3. add end-to-end EPUB conformance fixtures;
-4. harden accessibility and interoperability from real publication evidence.
+1. connect the EPUB prototype to the existing layout, renderer, and CLI pipeline;
+2. add end-to-end EPUB conformance fixtures from real publications;
+3. broaden navigation, accessibility metadata, CSS, tables, and media support;
+4. harden accessibility and interoperability from measured evidence.
 
 A document can only be considered end-to-end usable when an EPUB can be imported without silent semantic loss, represented as a valid `FlowDocument`, laid out, rendered, inspected, and round-tripped through the supported Flow format. The repository has not reached that point yet.
 

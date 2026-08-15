@@ -54,6 +54,10 @@ Safety constraints run last and may clamp font sizes, line height, paragraph spa
 
 Canonicalization includes identity, all currently modeled canonical metadata, semantic structure/content, asset references, asset metadata, and complete asset bytes. It excludes `DocumentPresentation`, `DocumentIntegrity`, layout context, `UserReadingPreferences`, resolved styles, renderer constraints, pagination, and renderer output. See [canonicalization.md](canonicalization.md) for the normative 0.1 field list.
 
+The experimental signature layer signs exactly the versioned canonical bytes with standard .NET RSA-PSS/SHA-256 APIs. Keys are supplied and owned by the caller. Flow defines no certificate, PKI, key discovery, revocation, or trust policy, and a successful mathematical verification is not treated as proof of real-world identity. See [signatures.md](signatures.md).
+
 ## EPUB interoperability
 
 EPUB is an input adapter, not a dependency of the core model. Unsupported constructs must produce diagnostics rather than disappear silently.
+
+`EpubImporter` reads the container, OPF manifest/spine, and XHTML resources through bounded archive streams. It never extracts files, resolves external XML entities, or performs network access. Conversion preserves spine order and creates stable semantic IDs independent of pagination or visual position. Recoverable unsupported text is retained with a warning; unsafe or structurally missing input produces an error. See [epub-import.md](epub-import.md).

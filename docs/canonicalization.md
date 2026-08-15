@@ -80,6 +80,7 @@ The following never participate in `flow-c14n-0.1`:
 - pagination and reading mode;
 - renderer output or renderer implementation;
 - `DocumentIntegrity`, because including a stored hash in its own input would be recursive.
+- `DocumentSignature`, which is external evidence over the completed canonical bytes and is not part of `FlowDocument`.
 
 Changing any excluded value must leave canonical bytes and the document hash unchanged.
 
@@ -92,6 +93,8 @@ Changing any excluded value must leave canonical bytes and the document hash unc
 - canonicalization version: `flow-c14n-0.1`.
 
 No Flow-specific cryptographic primitive is introduced.
+
+The experimental signature service applies standard RSA-PSS/SHA-256 directly to these canonical bytes. Signature verification and trust semantics are documented separately in [signatures.md](signatures.md).
 
 ## Relationship to JSON Canonicalization Scheme
 
