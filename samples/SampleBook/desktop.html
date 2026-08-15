@@ -1,0 +1,347 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'" />
+<title>The Flow Experiment</title>
+<style>
+:root {
+  color-scheme: light;
+  background: #f4ecd8;
+  color: #3b2f24;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; min-height: 100%; padding: 0; }
+body { background: inherit; color: inherit; }
+article {
+  font-family: "Source Serif 4";
+  font-size: 19px;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0em;
+  line-height: 1.65;
+  margin-block-start: 0px;
+  margin-block-end: 1rem;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+  column-count: 1;
+  column-gap: 0px;
+  margin: 0 auto;
+  max-width: 1120px;
+  padding: 64px;
+}
+p, li {
+  font-family: "Source Serif 4";
+  font-size: 19px;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0em;
+  line-height: 1.65;
+  margin-block-start: 0px;
+  margin-block-end: 1rem;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+}
+[data-typography="chapter-title"] {
+  font-family: "Source Sans 3";
+  font-size: 42px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0em;
+  line-height: 1.15;
+  margin-block-start: 1.5rem;
+  margin-block-end: 1.5rem;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+}
+[data-typography="heading-1"] {
+  font-family: "Source Sans 3";
+  font-size: 34px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0em;
+  line-height: 1.2;
+  margin-block-start: 1.5rem;
+  margin-block-end: 0.75rem;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+}
+[data-typography="heading-2"] {
+  font-family: "Source Sans 3";
+  font-size: 27px;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0em;
+  line-height: 1.25;
+  margin-block-start: 1.5rem;
+  margin-block-end: 0.75rem;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+}
+[data-typography="heading-3"] {
+  font-family: "System Sans Serif";
+  font-size: 24px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0em;
+  line-height: 1.5;
+  margin-block-start: 1.5rem;
+  margin-block-end: 0.75rem;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+}
+[data-typography="heading-4"] {
+  font-family: "System Sans Serif";
+  font-size: 22px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0em;
+  line-height: 1.5;
+  margin-block-start: 1.5rem;
+  margin-block-end: 0.75rem;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+}
+[data-typography="heading-5"] {
+  font-family: "System Sans Serif";
+  font-size: 20px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0em;
+  line-height: 1.5;
+  margin-block-start: 1.5rem;
+  margin-block-end: 0.75rem;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+}
+[data-typography="heading-6"] {
+  font-family: "System Sans Serif";
+  font-size: 18px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0em;
+  line-height: 1.5;
+  margin-block-start: 1.5rem;
+  margin-block-end: 0.75rem;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+}
+[data-typography="subtitle"] {
+  font-family: "System Serif";
+  font-size: 22px;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0em;
+  line-height: 1.5;
+  margin-block-start: 0px;
+  margin-block-end: 0px;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+}
+nav > h2 {
+  font-family: "Source Sans 3";
+  font-size: 30px;
+  font-style: normal;
+  font-weight: 700;
+  letter-spacing: 0em;
+  line-height: 1.2;
+  margin-block-start: 1.5rem;
+  margin-block-end: 0.75rem;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+}
+nav li[data-level="1"] {
+  font-family: "Source Sans 3";
+  font-size: 18px;
+  font-style: normal;
+  font-weight: 500;
+  letter-spacing: 0em;
+  line-height: 1.5;
+  margin-block-start: 0px;
+  margin-block-end: 0px;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+}
+nav li[data-level="2"] {
+  font-family: "System Serif";
+  font-size: 17px;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0em;
+  line-height: 1.5;
+  margin-block-start: 0px;
+  margin-block-end: 0px;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+}
+nav li[data-level="3"] {
+  font-family: "System Serif";
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0em;
+  line-height: 1.5;
+  margin-block-start: 0px;
+  margin-block-end: 0px;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+}
+figcaption {
+  font-family: "Source Sans 3";
+  font-size: 14px;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0em;
+  line-height: 1.4;
+  margin-block-start: 0px;
+  margin-block-end: 0px;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+}
+[role="doc-footnote"], [role="doc-footnote"] p {
+  font-family: "Source Serif 4";
+  font-size: 13px;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0em;
+  line-height: 1.45;
+  margin-block-start: 0px;
+  margin-block-end: 0px;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+}
+blockquote, blockquote p {
+  font-family: "Source Serif 4";
+  font-size: 20px;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0em;
+  line-height: 1.6;
+  margin-block-start: 0px;
+  margin-block-end: 0px;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+}
+pre, code {
+  font-family: "System Monospace";
+  font-size: 15px;
+  font-style: normal;
+  font-weight: 400;
+  letter-spacing: 0em;
+  line-height: 1.45;
+  margin-block-start: 0px;
+  margin-block-end: 0px;
+  text-align: start;
+  text-indent: 0px;
+  text-transform: none;
+}
+nav, blockquote { break-inside: avoid; }
+figure { margin-inline: auto; }
+figure img { display: block; height: auto; max-width: 100%; width: 100%; }
+figcaption { margin-top: 0.5rem; }
+pre { max-width: 100%; overflow-x: auto; }
+nav ol { list-style: none; padding-inline-start: 0; }
+nav li[data-level="2"] { padding-inline-start: 1.5rem; }
+nav li[data-level="3"] { padding-inline-start: 3rem; }
+a { color: inherit; text-decoration-thickness: from-font; }
+@media (max-width: 599px) {
+  article { column-count: 1; max-width: 100%; padding: 16px; }
+  figure { float: none; max-width: 100% !important; }
+}
+</style>
+</head>
+<body>
+<article data-document-id="urn:flow:sample:the-flow-experiment">
+<nav id="table-of-contents" aria-label="Table of contents">
+<h2>Contents</h2>
+<ol>
+<li data-level="1"><a href="#identity-title">Identity Before Appearance</a></li>
+<li data-level="1"><a href="#structure-title">Structure Carries Meaning</a></li>
+<li data-level="1"><a href="#reading-title">One Book, Many Readers</a></li>
+<li data-level="1"><a href="#figures-title">Figures That Adapt</a></li>
+<li data-level="1"><a href="#verification-title">Evidence, Not Promises</a></li>
+</ol>
+</nav>
+<section id="chapter-identity">
+<h1 id="identity-title" data-typography="chapter-title" style="break-after: avoid;">Identity Before Appearance</h1>
+<p id="identity-opening">Flow begins with a <strong>stable document identity</strong>, then keeps that identity separate from screens, fonts, and pages.</p>
+<p id="identity-principle"><em>Document is not layout</em> is the experiment&#39;s central constraint. A narrow phone and a wide desktop may disagree about columns, but not about what the document says.<a href="#identity-footnote" role="doc-noteref" aria-label="Footnote"><sup>note</sup></a></p>
+<p id="identity-link">Jump ahead to <a href="#verification-title">the verification chapter</a> to see how the claim is tested.</p>
+<section id="identity-footnote" role="doc-footnote">
+<p id="identity-footnote-text">Viewport, layout, theme, and renderer state are excluded from the canonical hash.</p>
+</section>
+</section>
+<section id="chapter-structure">
+<h1 id="structure-title" data-typography="chapter-title" style="break-after: avoid;">Structure Carries Meaning</h1>
+<p id="structure-opening">A Flow document records chapters, sections, lists, quotations, figures, notes, and links as semantic nodes rather than visual coordinates.</p>
+<section id="structure-checklist">
+<h2 id="structure-checklist-title" data-typography="heading-2" style="break-after: avoid;">What the model preserves</h2>
+<ul id="structure-unordered-list">
+<li id="structure-item-identity">
+<p id="structure-item-identity-text">Stable IDs and anchors</p>
+</li>
+<li id="structure-item-order">
+<p id="structure-item-order-text">Canonical reading order</p>
+</li>
+<li id="structure-item-assets">
+<p id="structure-item-assets-text">Explicit asset relationships</p>
+</li>
+</ul>
+<ol id="structure-ordered-list">
+<li id="structure-step-model">
+<p id="structure-step-model-text">Create the semantic document</p>
+</li>
+<li id="structure-step-layout">
+<p id="structure-step-layout-text">Resolve layout for a reading context</p>
+</li>
+<li id="structure-step-render">
+<p id="structure-step-render-text">Render through an adapter</p>
+</li>
+</ol>
+</section>
+</section>
+<section id="chapter-reading">
+<h1 id="reading-title" data-typography="chapter-title" style="break-after: avoid;">One Book, Many Readers</h1>
+<p id="reading-opening">Authors can suggest typography while readers retain control over body fonts, heading fonts, scale, spacing, margins, and theme.</p>
+<blockquote id="reading-quote" data-typography="blockquote">
+<p id="reading-quote-text">Adaptation is useful only when the document&#39;s meaning survives the adaptation.</p>
+</blockquote>
+<p id="reading-inline">This sentence demonstrates <u>underline</u>, <s>discarded wording</s>, and the inline token <code>ReadingMode.Flow</code> without storing CSS in the document.</p>
+</section>
+<section id="chapter-figures">
+<h1 id="figures-title" data-typography="chapter-title" style="break-after: avoid;">Figures That Adapt</h1>
+<p id="figures-opening">A figure points to a canonical asset while layout decides how it fits the available reading surface.</p>
+<figure id="adaptive-figure" style="max-width: 100%; break-inside: avoid; display: block; float: none;">
+<img src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5NjAiIGhlaWdodD0iNDgwIiB2aWV3Qm94PSIwIDAgOTYwIDQ4MCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJGbG93IGRvY3VtZW50IGFkYXB0aW5nIHRvIHR3byB2aWV3cG9ydHMiPgogIDxyZWN0IHdpZHRoPSI5NjAiIGhlaWdodD0iNDgwIiByeD0iMzIiIGZpbGw9IiNmNGVjZDgiLz4KICA8cmVjdCB4PSI3MiIgeT0iODgiIHdpZHRoPSIyNDAiIGhlaWdodD0iMzA0IiByeD0iMTgiIGZpbGw9IiNmZmYiIHN0cm9rZT0iIzNiMmYyNCIgc3Ryb2tlLXdpZHRoPSI4Ii8+CiAgPHJlY3QgeD0iNjQ4IiB5PSI4OCIgd2lkdGg9IjI0MCIgaGVpZ2h0PSIzMDQiIHJ4PSIxOCIgZmlsbD0iI2ZmZiIgc3Ryb2tlPSIjM2IyZjI0IiBzdHJva2Utd2lkdGg9IjgiLz4KICA8cGF0aCBkPSJNMzEyIDI0MEg2NDgiIHN0cm9rZT0iI2E2NTAzMiIgc3Ryb2tlLXdpZHRoPSIxMiIvPgogIDxwYXRoIGQ9Ik01OTQgMTk4TDY0OCAyNDAgNTk0IDI4MiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjYTY1MDMyIiBzdHJva2Utd2lkdGg9IjEyIi8+CiAgPGcgc3Ryb2tlPSIjOGI3OTY1IiBzdHJva2Utd2lkdGg9IjgiPgogICAgPHBhdGggZD0iTTExMiAxNDRIMjcyTTExMiAxODRIMjcyTTExMiAyMjRIMjcyTTExMiAyNjRIMjcyTTExMiAzMDRIMjMyIi8+CiAgICA8cGF0aCBkPSJNNjg4IDE0NEg4NDhNNjg4IDE4NEg4NDhNNjg4IDIyNEg4NDhNNjg4IDI2NEg4NDhNNjg4IDMwNEg4MDgiLz4KICA8L2c+CiAgPHRleHQgeD0iMTkyIiB5PSI2MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjgiIGZpbGw9IiMzYjJmMjQiPk1vYmlsZTwvdGV4dD4KICA8dGV4dCB4PSI3NjgiIHk9IjYwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIyOCIgZmlsbD0iIzNiMmYyNCI+RGVza3RvcDwvdGV4dD4KICA8dGV4dCB4PSI0ODAiIHk9IjQzOCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjgiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjYTY1MDMyIj5zYW1lIGlkZW50aXR5IMK3IHNhbWUgY29udGVudDwvdGV4dD4KPC9zdmc+" alt="One Flow document branching into mobile and desktop reading layouts" />
+<figcaption id="adaptive-figure-caption">The same semantic document flowing through mobile and desktop layouts.</figcaption>
+</figure>
+<p id="figures-external-link">The standalone renderer uses standard <a href="https://html.spec.whatwg.org/">HTML5</a> rather than inventing a new display language.</p>
+</section>
+<section id="chapter-verification">
+<h1 id="verification-title" data-typography="chapter-title" style="break-after: avoid;">Evidence, Not Promises</h1>
+<p id="verification-opening">The experiment is successful only when different presentations preserve the same IDs, anchors, and canonical hash.</p>
+<pre id="verification-code" style="break-inside: avoid; white-space: pre-wrap;"><code data-language="csharp">var hash = integrity.ComputeHash(document);
+Console.WriteLine(hash.Hash);</code></pre>
+<p id="verification-closing"><strong>Change presentation</strong>, and the hash stays fixed. <strong>Change content</strong>, and the hash changes. That is a claim the test suite can falsify.</p>
+</section>
+</article>
+</body>
+</html>

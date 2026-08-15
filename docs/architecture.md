@@ -29,6 +29,10 @@ An importer or serializer creates a `FlowDocument`. The layout engine combines t
 
 `Flow.Rendering` defines the renderer boundary and immutable rendered bytes. `Flow.Rendering.Html` implements the first adapter: deterministic standalone HTML5 with embedded CSS and assets. It consumes resolved layout state without mutating or recanonicalizing the source document. Before rendering, it verifies semantic validity, document/layout identity, and the one-to-one relationship between semantic and layout nodes. See [html-renderer.md](html-renderer.md).
 
+## Command-line composition
+
+`Flow.Cli` contains a framework-free parser that produces typed command records, operations that compose the domain services, and a thin application boundary for exit codes and diagnostics. It does not place command-line concerns in the document, layout, security, or rendering projects. See [cli.md](cli.md).
+
 ## Style cascade
 
 `TypographyResolver` is a pure service in `Flow.Layout`. It resolves styles in this order:

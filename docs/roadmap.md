@@ -7,6 +7,8 @@
 - Typography and reader overrides
 - Stable anchors and hashing
 - Renderer-independent adaptive Flow layout
+- Standalone HTML renderer
+- Sample book and reference CLI
 - EPUB import prototype
 
 ## 0.2
