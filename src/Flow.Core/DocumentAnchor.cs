@@ -3,6 +3,8 @@ using System.Diagnostics.CodeAnalysis;
 
 namespace Flow.Core;
 
+/// <summary>Represents an immutable semantic path in a Flow document.</summary>
+/// <remarks>Anchors use the <c>flow:&lt;node-id&gt;[/&lt;node-id&gt;...]</c> grammar.</remarks>
 public sealed class DocumentAnchor : IEquatable<DocumentAnchor>
 {
     private const string Prefix = "flow:";
@@ -14,12 +16,18 @@ public sealed class DocumentAnchor : IEquatable<DocumentAnchor>
         Value = Prefix + string.Join('/', segments.Select(static segment => segment.Value));
     }
 
+    /// <summary>Gets the ordered path segments.</summary>
     public ImmutableArray<NodeId> Segments { get; }
 
+    /// <summary>Gets the final node identifier addressed by this anchor.</summary>
     public NodeId TargetId => Segments[^1];
 
+    /// <summary>Gets the canonical textual representation.</summary>
     public string Value { get; }
 
+    /// <summary>Creates an anchor from one or more semantic path segments.</summary>
+    /// <param name="segments">The path from an optional ancestor to the target node.</param>
+    /// <returns>A canonical Flow anchor.</returns>
     public static DocumentAnchor Create(IEnumerable<NodeId> segments)
     {
         ArgumentNullException.ThrowIfNull(segments);
@@ -45,6 +53,10 @@ public sealed class DocumentAnchor : IEquatable<DocumentAnchor>
         return new DocumentAnchor(copiedSegments);
     }
 
+    /// <summary>Parses a Flow anchor.</summary>
+    /// <param name="value">The canonical anchor text.</param>
+    /// <returns>The parsed anchor.</returns>
+    /// <exception cref="FormatException">The value does not follow the Flow anchor grammar.</exception>
     public static DocumentAnchor Parse(string value)
     {
         ArgumentNullException.ThrowIfNull(value);
@@ -57,6 +69,10 @@ public sealed class DocumentAnchor : IEquatable<DocumentAnchor>
         return anchor;
     }
 
+    /// <summary>Attempts to parse a Flow anchor without throwing for invalid syntax.</summary>
+    /// <param name="value">The candidate anchor text.</param>
+    /// <param name="anchor">The parsed anchor when successful.</param>
+    /// <returns><see langword="true" /> when the value is a valid Flow anchor.</returns>
     public static bool TryParse(string? value, [NotNullWhen(true)] out DocumentAnchor? anchor)
     {
         anchor = null;
@@ -93,12 +109,16 @@ public sealed class DocumentAnchor : IEquatable<DocumentAnchor>
         return true;
     }
 
+    /// <inheritdoc />
     public bool Equals(DocumentAnchor? other) =>
         other is not null && string.Equals(Value, other.Value, StringComparison.Ordinal);
 
+    /// <inheritdoc />
     public override bool Equals(object? obj) => obj is DocumentAnchor other && Equals(other);
 
+    /// <inheritdoc />
     public override int GetHashCode() => StringComparer.Ordinal.GetHashCode(Value);
 
+    /// <inheritdoc />
     public override string ToString() => Value;
 }

@@ -1,5 +1,6 @@
 namespace Flow.Epub;
 
+/// <summary>Classifies the effect of an EPUB import diagnostic.</summary>
 public enum EpubDiagnosticSeverity
 {
     Information,
@@ -7,12 +8,14 @@ public enum EpubDiagnosticSeverity
     Error,
 }
 
+/// <summary>Describes one EPUB structural, security, or fidelity finding.</summary>
 public sealed record EpubDiagnostic(
     string Code,
     EpubDiagnosticSeverity Severity,
     string Message,
     string? Resource = null);
 
+/// <summary>Defines stable diagnostic codes emitted by the EPUB import prototype.</summary>
 public static class EpubDiagnosticCodes
 {
     public const string InvalidArchive = "EPUB001";

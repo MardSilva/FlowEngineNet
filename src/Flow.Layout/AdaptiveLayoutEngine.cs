@@ -2,6 +2,7 @@ using Flow.Documents;
 
 namespace Flow.Layout;
 
+/// <summary>Implements the renderer-independent adaptive layout profile for <see cref="ReadingMode.Flow" />.</summary>
 public sealed class AdaptiveLayoutEngine : ILayoutEngine
 {
     public const double MediumViewportMinimumWidth = 600;
@@ -26,6 +27,7 @@ public sealed class AdaptiveLayoutEngine : ILayoutEngine
         _typographyResolver = typographyResolver;
     }
 
+    /// <inheritdoc />
     public LayoutDocument Layout(FlowDocument document, LayoutContext context)
     {
         ArgumentNullException.ThrowIfNull(document);
@@ -34,7 +36,7 @@ public sealed class AdaptiveLayoutEngine : ILayoutEngine
         if (context.ReadingMode != ReadingMode.Flow)
         {
             throw new NotSupportedException(
-                $"Reading mode '{context.ReadingMode}' is not implemented. Flow is the only mode supported in 0.1.0-alpha.4.");
+                $"Reading mode '{context.ReadingMode}' is not implemented. Flow is the only mode supported in 0.1.");
         }
 
         var validation = _validator.Validate(document);

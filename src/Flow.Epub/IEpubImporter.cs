@@ -1,6 +1,11 @@
 namespace Flow.Epub;
 
+/// <summary>Imports a security-bounded subset of EPUB into the Flow semantic model.</summary>
 public interface IEpubImporter
 {
+    /// <summary>Imports an EPUB stream and reports all detected errors and fidelity limitations.</summary>
+    /// <param name="source">A readable EPUB ZIP stream owned by the caller.</param>
+    /// <param name="cancellationToken">A token that can cancel asynchronous I/O.</param>
+    /// <returns>A result containing an optional document and immutable diagnostics.</returns>
     public Task<EpubImportResult> ImportAsync(Stream source, CancellationToken cancellationToken = default);
 }

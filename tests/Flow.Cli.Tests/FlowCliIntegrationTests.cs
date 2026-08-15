@@ -74,7 +74,12 @@ public sealed class FlowCliIntegrationTests
         Assert.Equal(0, inspect.ExitCode);
         Assert.Contains($"ID: {SampleBookFactory.DocumentUrn}", inspect.Output, StringComparison.Ordinal);
         Assert.Contains("Chapters: 5", inspect.Output, StringComparison.Ordinal);
-        Assert.Equal((0, "Valid."), (validate.ExitCode, validate.Output.Trim()));
+        Assert.Contains("Sections: 1", inspect.Output, StringComparison.Ordinal);
+        Assert.Contains("Paragraphs: 18", inspect.Output, StringComparison.Ordinal);
+        Assert.Contains("Figures: 1", inspect.Output, StringComparison.Ordinal);
+        Assert.Contains("Footnotes: 1", inspect.Output, StringComparison.Ordinal);
+        Assert.Contains("Anchors: 44", inspect.Output, StringComparison.Ordinal);
+        Assert.Equal((0, "Valid: no semantic validation errors."), (validate.ExitCode, validate.Output.Trim()));
         Assert.Equal(0, hash.ExitCode);
         Assert.Contains("Hash: SHA-256:", hash.Output, StringComparison.Ordinal);
         Assert.Contains("Canonicalization: flow-c14n-0.1", hash.Output, StringComparison.Ordinal);
@@ -151,7 +156,18 @@ public sealed class FlowCliIntegrationTests
         Assert.Equal(1, parseError.ExitCode);
         Assert.Contains("Unknown command", parseError.Error, StringComparison.Ordinal);
         Assert.Equal(1, fileError.ExitCode);
-        Assert.Contains("Error:", fileError.Error, StringComparison.Ordinal);
+        Assert.Contains("FLOWCLI_OPERATION_FAILED:", fileError.Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Help_StatesExperimentalStatusCommandsAndExitCodes()
+    {
+        var result = await RunAsync(FlowCliApplication.CreateDefault(), ["help"]);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("0.1.0-rc.1 (experimental)", result.Output, StringComparison.Ordinal);
+        Assert.Contains("flow validate <document>", result.Output, StringComparison.Ordinal);
+        Assert.Contains("Exit codes: 0 success, 1 command/input failure, 2 semantic validation failure.", result.Output, StringComparison.Ordinal);
     }
 
     private static async Task<CliResult> RunAsync(FlowCliApplication application, string[] arguments)

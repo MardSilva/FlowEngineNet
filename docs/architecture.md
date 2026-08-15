@@ -17,13 +17,15 @@
 
 Dependencies point inward: domain projects never reference presentation or infrastructure projects. The CLI may compose all projects, while HTML and EPUB remain adapters at the edge.
 
+The approved direct graph is executable evidence in `ProjectDependencyConformanceTests`: Core has no project dependency; Documents depends only on Core; Layout depends on Core and Documents; Rendering depends on Documents and Layout; HTML depends only on Rendering; Security depends only on Documents; EPUB depends only on Core and Documents; and the CLI composes Documents, Layout, HTML, and Security. An unused CLI-to-EPUB reference was removed during the final 0.1 review.
+
 ## Rendering pipeline
 
 An importer or serializer creates a `FlowDocument`. The layout engine combines that immutable model with a `LayoutContext`. A renderer consumes the resulting layout without changing canonical content.
 
 `AdaptiveLayoutEngine` implements the flowing-reading stage. It validates the source document, resolves the style cascade, chooses a viewport profile, and recursively projects semantic nodes into `LayoutNode` values while preserving every `NodeId`. `LayoutProfile` carries constraints such as column count, margins, maximum content width, and responsive-figure behavior; it never contains measured positions or pages. See [adaptive-layout.md](adaptive-layout.md).
 
-`ReadingMode.Paged` and `ReadingMode.Print` are reserved extension points and are intentionally unsupported in the alpha.4 engine.
+`ReadingMode.Paged` and `ReadingMode.Print` are reserved extension points and are intentionally unsupported in the 0.1 engine.
 
 ## HTML rendering
 

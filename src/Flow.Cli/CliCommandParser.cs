@@ -2,8 +2,10 @@ using System.Globalization;
 
 namespace Flow.Cli;
 
+/// <summary>Parses framework-free command-line arguments into typed Flow CLI commands.</summary>
 public sealed class CliCommandParser
 {
+    /// <summary>Parses one complete argument vector.</summary>
     public CommandParseResult Parse(IReadOnlyList<string> arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
@@ -20,7 +22,8 @@ public sealed class CliCommandParser
             "validate" => ParseDocumentCommand(arguments, static path => new ValidateCommand(path)),
             "hash" => ParseDocumentCommand(arguments, static path => new HashCommand(path)),
             "render" => ParseRender(arguments),
-            _ => CommandParseResult.Failure($"Unknown command '{arguments[0]}'."),
+            _ => CommandParseResult.Failure(
+                $"FLOWCLI_UNKNOWN_COMMAND: Unknown command '{arguments[0]}'. Run 'flow help' for usage."),
         };
     }
 
@@ -29,7 +32,7 @@ public sealed class CliCommandParser
         {
             1 => CommandParseResult.Success(new SampleCommand("sample.flow.json")),
             2 => CommandParseResult.Success(new SampleCommand(arguments[1])),
-            _ => CommandParseResult.Failure("Usage: flow sample [output]"),
+            _ => CommandParseResult.Failure("FLOWCLI_USAGE: Usage: flow sample [output]"),
         };
 
     private static CommandParseResult ParseDocumentCommand(
@@ -37,13 +40,13 @@ public sealed class CliCommandParser
         Func<string, CliCommand> create) =>
         arguments.Count == 2
             ? CommandParseResult.Success(create(arguments[1]))
-            : CommandParseResult.Failure($"Usage: flow {arguments[0]} <document>");
+            : CommandParseResult.Failure($"FLOWCLI_USAGE: Usage: flow {arguments[0]} <document>");
 
     private static CommandParseResult ParseRender(IReadOnlyList<string> arguments)
     {
         if (arguments.Count < 2)
         {
-            return CommandParseResult.Failure(RenderUsage);
+            return CommandParseResult.Failure($"FLOWCLI_USAGE: {RenderUsage}");
         }
 
         string? outputPath = null;
@@ -54,7 +57,8 @@ public sealed class CliCommandParser
         {
             if (index + 1 >= arguments.Count)
             {
-                return CommandParseResult.Failure($"Option '{arguments[index]}' requires a value. {RenderUsage}");
+                return CommandParseResult.Failure(
+                    $"FLOWCLI_USAGE: Option '{arguments[index]}' requires a value. {RenderUsage}");
             }
 
             var option = arguments[index];
@@ -67,7 +71,8 @@ public sealed class CliCommandParser
                 case "--width" when width is null:
                     if (!TryParseDimension(value, out var parsedWidth))
                     {
-                        return CommandParseResult.Failure("--width must be a finite number greater than zero.");
+                        return CommandParseResult.Failure(
+                            "FLOWCLI_INVALID_VALUE: --width must be a finite number greater than zero.");
                     }
 
                     width = parsedWidth;
@@ -75,21 +80,24 @@ public sealed class CliCommandParser
                 case "--height" when height is null:
                     if (!TryParseDimension(value, out var parsedHeight))
                     {
-                        return CommandParseResult.Failure("--height must be a finite number greater than zero.");
+                        return CommandParseResult.Failure(
+                            "FLOWCLI_INVALID_VALUE: --height must be a finite number greater than zero.");
                     }
 
                     height = parsedHeight;
                     break;
                 case "--html" or "--width" or "--height":
-                    return CommandParseResult.Failure($"Option '{option}' was specified more than once.");
+                    return CommandParseResult.Failure(
+                        $"FLOWCLI_DUPLICATE_OPTION: Option '{option}' was specified more than once.");
                 default:
-                    return CommandParseResult.Failure($"Unknown render option '{option}'. {RenderUsage}");
+                    return CommandParseResult.Failure(
+                        $"FLOWCLI_UNKNOWN_OPTION: Unknown render option '{option}'. {RenderUsage}");
             }
         }
 
         if (string.IsNullOrWhiteSpace(outputPath) || width is null || height is null)
         {
-            return CommandParseResult.Failure(RenderUsage);
+            return CommandParseResult.Failure($"FLOWCLI_USAGE: {RenderUsage}");
         }
 
         return CommandParseResult.Success(

@@ -82,7 +82,12 @@ Language: en
 Authors: Flow Contributors
 Nodes: 44
 Chapters: 5
+Sections: 1
+Paragraphs: 18
+Figures: 1
+Footnotes: 1
 Assets: 1
+Anchors: 44
 Presentation: yes
 ```
 
@@ -97,7 +102,7 @@ dotnet run --project src/Flow.Cli -- validate samples/SampleBook/sample.flow.jso
 Expected result:
 
 ```text
-Valid.
+Valid: no semantic validation errors.
 ```
 
 Validation checks stable IDs, hierarchy, heading levels, figure assets, footnote references, internal anchors, and table-of-contents destinations. A valid result therefore means more than “the JSON parsed.”
@@ -108,7 +113,7 @@ Validation checks stable IDs, hierarchy, heading levels, figure assets, footnote
 dotnet run --project src/Flow.Cli -- hash samples/SampleBook/sample.flow.json
 ```
 
-Expected evidence for `0.1.0-beta.2`:
+Expected evidence for `0.1.0-rc.1`:
 
 ```text
 Hash: SHA-256:F607E8E1EADF7EA07B91E5E25B8B99C9D6205DDBED47CAA4D34A2B66014B27CD
@@ -217,13 +222,13 @@ The command replaces the target file if it already exists.
 
 This sample proves the current `.flow.json` → validation/hash → adaptive layout → standalone HTML pipeline. It does not yet prove:
 
-- EPUB import or semantic-loss diagnostics from real publications;
+- broad EPUB interoperability or semantic-loss measurements across real publisher publications;
 - editing and saving from a reader application;
 - paged or print layout;
 - font embedding—the named fonts fall back to locally available fonts;
-- digital signatures, provenance, DRM, or publishing services.
+- signature trust/transport, provenance, DRM, or publishing services.
 
-The project reaches the EPUB milestone only when a real EPUB can enter this same pipeline without silent semantic loss. That work has not been implemented yet.
+The library now has a limited, diagnostic-first EPUB importer tested with a project-generated EPUB. It is not connected to this CLI pipeline and has not been validated against a broad real-world corpus, so the complete “EPUB in → inspect/hash/render” user workflow is still absent.
 
 ## Related documentation
 
@@ -233,3 +238,5 @@ The project reaches the EPUB milestone only when a real EPUB can enter this same
 - [Adaptive layout](../../docs/adaptive-layout.md)
 - [Standalone HTML renderer](../../docs/html-renderer.md)
 - [Canonicalization and hashing](../../docs/canonicalization.md)
+- [EPUB import prototype](../../docs/epub-import.md)
+- [Known limitations](../../docs/known-limitations.md)

@@ -2,6 +2,7 @@ using Flow.Documents;
 
 namespace Flow.Layout;
 
+/// <summary>Describes the host's broad device category without affecting canonical identity.</summary>
 public enum DeviceClass
 {
     Unknown,
@@ -11,6 +12,7 @@ public enum DeviceClass
     Print,
 }
 
+/// <summary>Selects continuous, paged, or print reading behavior.</summary>
 public enum ReadingMode
 {
     Flow,
@@ -18,6 +20,7 @@ public enum ReadingMode
     Print,
 }
 
+/// <summary>Contains noncanonical runtime inputs used to produce one layout.</summary>
 public sealed record LayoutContext
 {
     public LayoutContext(

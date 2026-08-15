@@ -10,7 +10,7 @@ The central invariant is:
 Document != Layout != Rendering
 ```
 
-The project is not currently a replacement for PDF or EPUB. Version 0.1 is building and testing the engine foundations needed before a complete reader, editor, or publishing workflow can exist.
+The project is not a replacement for PDF or EPUB. Version 0.1 tests engine foundations; it does not provide a complete reader, editor, or publishing workflow.
 
 ## Current milestone
 
@@ -111,15 +111,15 @@ The layout operation validates the semantic document first. Invalid IDs, hierarc
 | Project | Responsibility | Status |
 | --- | --- | --- |
 | `Flow.Core` | Stable IDs, anchors, and shared primitives | Implemented |
-| `Flow.Documents` | Semantic model, validation, presentation, and `.flow.json` | Implemented for 0.1 alpha |
-| `Flow.Layout` | Style cascade and adaptive Flow layout | Implemented for alpha.4 |
-| `Flow.Security` | Canonicalization, hashing, and local RSA signature proof of concept | Implemented for rc.1 |
-| `Flow.Rendering` | Renderer contracts and immutable rendered output | Implemented for beta.1 |
-| `Flow.Rendering.Html` | Deterministic standalone semantic HTML adapter | Implemented for beta.1 |
-| `Flow.Epub` | Diagnostic-first EPUB-to-`FlowDocument` prototype | Implemented for rc.1 |
-| `Flow.Cli` | Sample, inspect, validate, hash, and HTML rendering commands | Implemented for beta.2 |
+| `Flow.Documents` | Semantic model, validation, presentation, and `.flow.json` | Implemented for 0.1 |
+| `Flow.Layout` | Style cascade and adaptive Flow layout | Implemented for 0.1 |
+| `Flow.Security` | Canonicalization, hashing, and local RSA signature proof of concept | Implemented for 0.1 |
+| `Flow.Rendering` | Renderer contracts and immutable rendered output | Implemented for 0.1 |
+| `Flow.Rendering.Html` | Deterministic standalone semantic HTML adapter | Implemented for 0.1 |
+| `Flow.Epub` | Diagnostic-first EPUB-to-`FlowDocument` prototype | Implemented subset for 0.1 |
+| `Flow.Cli` | Sample, inspect, validate, hash, and HTML rendering commands | Implemented for 0.1 |
 
-Dependencies point inward: the document domain does not reference layout or renderer projects. EPUB and HTML remain adapters at the edge.
+Dependencies point inward: the document domain does not reference layout or renderer projects. EPUB and HTML remain adapters at the edge. The approved direct dependency graph is enforced by `Flow.Conformance.Tests`.
 
 ## Requirements and build
 
@@ -132,7 +132,9 @@ dotnet build Flow.sln
 dotnet test Flow.sln --no-build
 ```
 
-At `0.1.0-rc.1`, the active suites contain 129 passing tests.
+The build emits XML documentation files for public assemblies. The numbered [0.1 conformance profile](docs/conformance.md) and feature suites run on Windows and Linux in GitHub Actions.
+
+The final clean-directory review passes 134 tests with zero build warnings; see the [0.1 release review](docs/0.1-release-review.md).
 
 ## Documentation
 
@@ -144,6 +146,9 @@ At `0.1.0-rc.1`, the active suites contain 129 passing tests.
 - [Canonicalization and hashing](docs/canonicalization.md)
 - [Experimental document signatures](docs/signatures.md)
 - [Experimental EPUB import](docs/epub-import.md)
+- [0.1 conformance profile](docs/conformance.md)
+- [Known limitations](docs/known-limitations.md)
+- [0.1 release review](docs/0.1-release-review.md)
 - [Roadmap](docs/roadmap.md)
 - [Research findings](docs/research-findings.md)
 
@@ -180,7 +185,7 @@ The detailed [sample walkthrough](samples/SampleBook/README.md) explains prerequ
 
 ## Versioning and compatibility
 
-All `0.x` APIs, JSON fields, canonicalization rules, and layout profiles are experimental and may change. Canonicalization changes require a new named profile so that an existing document hash never silently acquires different semantics.
+All `0.x` APIs, JSON fields, canonicalization rules, and layout profiles are experimental and may change. Canonicalization changes require a new named profile so that an existing document hash never silently acquires different semantics. No packages are published for 0.1; see the complete [known limitations](docs/known-limitations.md).
 
 ## License
 

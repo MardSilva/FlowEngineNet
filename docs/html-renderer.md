@@ -6,7 +6,7 @@ The `LayoutDocument` is authoritative for the resolved typography, theme, margin
 
 ## Output profile
 
-The beta.1 output is a standalone document containing:
+The 0.1 output is a standalone document containing:
 
 - an HTML5 doctype, UTF-8 metadata, viewport metadata, title, and language when available;
 - a restrictive content security policy with scripts and network-loaded resources disabled;
@@ -18,6 +18,8 @@ The beta.1 output is a standalone document containing:
 - responsive image and small-viewport rules.
 
 No CLR namespace, record name, or internal C# class name is emitted. Typed semantic role names such as `heading-2` may appear in `data-typography` attributes because they are renderer-facing semantics, not implementation type names.
+
+This is not a WCAG conformance claim. The output has semantic and escaping tests, but Flow 0.1 has not completed a browser, screen-reader, right-to-left, vertical-writing, or accessibility audit.
 
 ## Safety rules
 

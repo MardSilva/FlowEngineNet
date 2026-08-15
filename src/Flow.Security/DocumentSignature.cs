@@ -2,6 +2,7 @@ using System.Collections.Immutable;
 
 namespace Flow.Security;
 
+/// <summary>Contains detached signature evidence over versioned canonical document bytes.</summary>
 public sealed record DocumentSignature
 {
     public DocumentSignature(
@@ -25,12 +26,16 @@ public sealed record DocumentSignature
         Value = ImmutableArray.CreateRange(value.ToArray());
     }
 
+    /// <summary>Gets the closed signature algorithm identifier.</summary>
     public string Algorithm { get; }
 
+    /// <summary>Gets the opaque caller-defined key reference.</summary>
     public string KeyId { get; }
 
+    /// <summary>Gets the canonicalization profile used before signing.</summary>
     public string CanonicalizationVersion { get; }
 
+    /// <summary>Gets an immutable copy of the signature bytes.</summary>
     public ImmutableArray<byte> Value { get; }
 
     private static void ValidateToken(string value, string parameterName)

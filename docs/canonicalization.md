@@ -101,3 +101,5 @@ The experimental signature service applies standard RSA-PSS/SHA-256 directly to 
 [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785.html) defines the JSON Canonicalization Scheme (JCS), including deterministic primitive serialization, lexicographic property sorting, UTF-8 output, and removal of whitespace. `flow-c14n-0.1` is not declared JCS-compatible: it uses a versioned semantic projection and fixed schema order rather than lexicographic property sorting.
 
 JCS could replace the final JSON byte-normalization layer in a future profile. It would not remove the need for a Flow projection that decides which document fields are canonical and excludes reader/presentation state. Any such change requires a new canonicalization version and conformance vectors.
+
+Flow 0.1 has no independent implementation or published interoperability vectors outside this repository. It also performs no Unicode normalization and holds complete canonical bytes in memory. See [known limitations](known-limitations.md).

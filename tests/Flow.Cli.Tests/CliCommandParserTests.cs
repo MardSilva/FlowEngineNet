@@ -51,9 +51,12 @@ public sealed class CliCommandParserTests
     [Fact]
     public void Parse_RejectsUnknownOrIncompleteCommands()
     {
-        Assert.False(_parser.Parse(["unknown"]).IsSuccess);
-        Assert.False(_parser.Parse(["inspect"]).IsSuccess);
-        Assert.False(_parser.Parse(["render", "book.flow.json", "--html", "book.html"]).IsSuccess);
+        Assert.StartsWith("FLOWCLI_UNKNOWN_COMMAND:", _parser.Parse(["unknown"]).Error, StringComparison.Ordinal);
+        Assert.StartsWith("FLOWCLI_USAGE:", _parser.Parse(["inspect"]).Error, StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_USAGE:",
+            _parser.Parse(["render", "book.flow.json", "--html", "book.html"]).Error,
+            StringComparison.Ordinal);
         Assert.False(
             _parser.Parse(
                 ["render", "book.flow.json", "--html", "one.html", "--html", "two.html", "--width", "800", "--height", "600"])

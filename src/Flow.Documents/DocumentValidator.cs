@@ -3,8 +3,12 @@ using Flow.Core;
 
 namespace Flow.Documents;
 
+/// <summary>Validates document-wide semantic, hierarchy, asset, and reference invariants.</summary>
 public sealed class DocumentValidator
 {
+    /// <summary>Validates a complete immutable document without modifying it.</summary>
+    /// <param name="document">The document to validate.</param>
+    /// <returns>All diagnostics found in deterministic validation-pass order.</returns>
     public ValidationResult Validate(FlowDocument document)
     {
         ArgumentNullException.ThrowIfNull(document);
