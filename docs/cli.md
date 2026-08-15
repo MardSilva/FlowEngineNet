@@ -1,4 +1,4 @@
-# Flow CLI 0.1
+# Flow CLI 0.2
 
 The `flow` executable is a deliberately small composition layer over the document serializer, validator, canonicalizer, layout engine, and HTML renderer. Command parsing is implemented independently from command operations and uses no external CLI framework.
 
@@ -8,6 +8,7 @@ The help output identifies the CLI and `.flow.json` representation as experiment
 
 ```text
 flow sample [output]
+flow import <book.epub> [--output <book.flow.json>]
 flow inspect <document>
 flow validate <document>
 flow hash <document>
@@ -15,6 +16,8 @@ flow render <document> --html <output> --width <n> --height <n>
 ```
 
 `sample` writes “The Flow Experiment” to the optional output path or to `sample.flow.json` in the current directory. The command serializes the same typed sample factory used to generate the committed reference document.
+
+`import` accepts a security-bounded EPUB and writes a deterministic `.flow.json`. Without `--output`, the destination is the source path with `.epub` replaced by `.flow.json`. Warnings and errors use stable `EPUB*`/`FLOWCLI_*` diagnostics. The command validates before writing, uses an atomic replacement, reports the imported identity and hash, and never leaves a partial output after a failed import.
 
 `inspect` reports identity, metadata, total nodes, chapters, sections, paragraphs, figures, footnotes, assets, addressable anchors, and presentation availability.
 
@@ -24,12 +27,13 @@ flow render <document> --html <output> --width <n> --height <n>
 
 `render` resolves `ReadingMode.Flow` for the requested logical viewport, writes standalone HTML, and reports the source identity, canonical hash, anchor count, and selected viewport category. Width and height use invariant-culture positive numbers.
 
-The CLI reads `.flow.json`; it does not yet expose EPUB import, signing, verification, reader-preference switches, PDF, or paged output. Successful `sample` and `render` operations replace their target files.
+The CLI imports the currently supported EPUB subset and reads `.flow.json`; it does not yet expose signing, verification, reader-preference switches, PDF, or paged output. Successful `sample`, `import`, and `render` operations replace their target files.
 
 During development, invoke the executable through the project:
 
 ```powershell
 dotnet run --project src/Flow.Cli -- sample sample.flow.json
+dotnet run --project src/Flow.Cli -- import book.epub --output book.flow.json
 dotnet run --project src/Flow.Cli -- validate sample.flow.json
 dotnet run --project src/Flow.Cli -- render sample.flow.json --html sample.html --width 390 --height 844
 ```

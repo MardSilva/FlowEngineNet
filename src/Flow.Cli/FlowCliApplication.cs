@@ -1,4 +1,5 @@
 using Flow.Documents;
+using Flow.Epub;
 using Flow.Layout;
 using Flow.Rendering.Html;
 using Flow.Security;
@@ -25,6 +26,7 @@ public sealed class FlowCliApplication
             new CliCommandParser(),
             new CliOperations(
                 new FlowJsonDocumentSerializer(),
+                new EpubImporter(),
                 new DocumentValidator(),
                 new Sha256DocumentIntegrityService(new FlowDocumentCanonicalizer()),
                 new AdaptiveLayoutEngine(),
@@ -50,7 +52,8 @@ public sealed class FlowCliApplication
 
         try
         {
-            return await _operations.ExecuteAsync(parseResult.Command!, output, cancellationToken).ConfigureAwait(false);
+            return await _operations.ExecuteAsync(parseResult.Command!, output, error, cancellationToken)
+                .ConfigureAwait(false);
         }
         catch (FlowSerializationException exception)
         {

@@ -1,6 +1,6 @@
 # Experimental EPUB import
 
-`Flow.Epub` is an input adapter that maps a deliberately limited EPUB subset to an immutable `FlowDocument`. It is part of Flow 0.1; it is not an EPUB 3.3 conformance checker or general-purpose reading system.
+`Flow.Epub` is an input adapter that maps a deliberately limited EPUB subset to an immutable `FlowDocument`. The adapter began in Flow 0.1 and is connected to the CLI in 0.2.0-alpha.1; it is not an EPUB 3.3 conformance checker or general-purpose reading system.
 
 ## Public contract
 
@@ -42,6 +42,6 @@ The suite also generates malicious and incomplete variants to verify DTD rejecti
 
 The prototype does not yet support CSS interpretation, EPUB navigation documents as Flow table-of-contents nodes, media overlays, scripting, SVG semantics, MathML, tables, audio/video, encryption/DRM, font embedding, EPUB CFI, fixed-layout publications, or full accessibility metadata. These resources are diagnosed when encountered.
 
-The CLI does not yet expose an `import epub` command. Therefore this milestone proves the adapter and its security boundary, but it does not yet constitute the complete user workflow “open any `.epub`, edit it, and publish it again.”
+The CLI exposes `flow import <book.epub> [--output <book.flow.json>]`. It writes only after a complete, semantically valid import and reports diagnostics without silently accepting a partial result. This closes the first command-line pipeline, but it does not yet constitute the complete workflow “open any `.epub`, edit it, and publish it again.”
 
 The mapping is evaluated against the [W3C EPUB 3.3 specification](https://www.w3.org/TR/epub-33/). The next interoperability work should prioritize the standardized EPUB navigation document and accessibility metadata instead of inventing equivalent Flow-only vocabularies.

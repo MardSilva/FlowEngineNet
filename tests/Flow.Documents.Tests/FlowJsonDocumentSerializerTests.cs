@@ -18,6 +18,7 @@ public sealed class FlowJsonDocumentSerializerTests
 
         Assert.Equal(first, second);
         Assert.Contains('\n', json);
+        Assert.DoesNotContain('\r', json);
         Assert.Contains("\"format\": \"flow-json-0.1\"", json, StringComparison.Ordinal);
         Assert.True(
             json.IndexOf("\"id\": \"asset-a.bin\"", StringComparison.Ordinal)

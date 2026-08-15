@@ -17,7 +17,7 @@
 
 Dependencies point inward: domain projects never reference presentation or infrastructure projects. The CLI may compose all projects, while HTML and EPUB remain adapters at the edge.
 
-The approved direct graph is executable evidence in `ProjectDependencyConformanceTests`: Core has no project dependency; Documents depends only on Core; Layout depends on Core and Documents; Rendering depends on Documents and Layout; HTML depends only on Rendering; Security depends only on Documents; EPUB depends only on Core and Documents; and the CLI composes Documents, Layout, HTML, and Security. An unused CLI-to-EPUB reference was removed during the final 0.1 review.
+The approved direct graph is executable evidence in `ProjectDependencyConformanceTests`: Core has no project dependency; Documents depends only on Core; Layout depends on Core and Documents; Rendering depends on Documents and Layout; HTML depends only on Rendering; Security depends only on Documents; EPUB depends only on Core and Documents; and the CLI composes Documents, EPUB, Layout, HTML, and Security. The CLI-to-EPUB reference became intentional when `flow import` was introduced in 0.2.0-alpha.1.
 
 ## Rendering pipeline
 

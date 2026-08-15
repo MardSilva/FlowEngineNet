@@ -11,6 +11,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Flow.Documents\Flow.Documents.csproj" />
+    <ProjectReference Include="..\Flow.Epub\Flow.Epub.csproj" />
     <ProjectReference Include="..\Flow.Layout\Flow.Layout.csproj" />
     <ProjectReference Include="..\Flow.Rendering.Html\Flow.Rendering.Html.csproj" />
     <ProjectReference Include="..\Flow.Security\Flow.Security.csproj" />

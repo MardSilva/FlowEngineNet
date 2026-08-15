@@ -10,6 +10,12 @@ public sealed class CliCommandParserTests
     public void Parse_RecognizesAllCommands()
     {
         Assert.IsType<SampleCommand>(_parser.Parse(["sample"]).Command);
+        var import = Assert.IsType<ImportEpubCommand>(_parser.Parse(["import", "book.epub"]).Command);
+        Assert.Equal("book.flow.json", import.OutputPath);
+
+        var importWithOutput = Assert.IsType<ImportEpubCommand>(
+            _parser.Parse(["import", "book.epub", "--output", "library/book.flow.json"]).Command);
+        Assert.Equal("library/book.flow.json", importWithOutput.OutputPath);
         Assert.IsType<InspectCommand>(_parser.Parse(["inspect", "book.flow.json"]).Command);
         Assert.IsType<ValidateCommand>(_parser.Parse(["validate", "book.flow.json"]).Command);
         Assert.IsType<HashCommand>(_parser.Parse(["hash", "book.flow.json"]).Command);
@@ -53,6 +59,10 @@ public sealed class CliCommandParserTests
     {
         Assert.StartsWith("FLOWCLI_UNKNOWN_COMMAND:", _parser.Parse(["unknown"]).Error, StringComparison.Ordinal);
         Assert.StartsWith("FLOWCLI_USAGE:", _parser.Parse(["inspect"]).Error, StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_USAGE:",
+            _parser.Parse(["import", "book.epub", "--unknown", "book.flow.json"]).Error,
+            StringComparison.Ordinal);
         Assert.StartsWith(
             "FLOWCLI_USAGE:",
             _parser.Parse(["render", "book.flow.json", "--html", "book.html"]).Error,
