@@ -1,2 +1,11 @@
-samples/SampleBook/*.flow.json text eol=lf
-samples/SampleBook/*.html text eol=lf
+* text=auto eol=lf
+
+*.epub binary
+*.gif binary
+*.ico binary
+*.jpeg binary
+*.jpg binary
+*.pdf binary
+*.png binary
+*.webp binary
+*.zip binary
