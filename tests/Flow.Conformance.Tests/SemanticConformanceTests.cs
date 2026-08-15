@@ -1,6 +1,7 @@
 using Flow.Core;
 using Flow.Documents;
 using Flow.Layout;
+using Flow.Rendering.Html;
 using Flow.Security;
 
 namespace Flow.Conformance.Tests;
@@ -85,6 +86,23 @@ public sealed class SemanticConformanceTests
         Assert.NotEqual(
             presentation.Typography[TypographyRole.Body]?.FontSize,
             presentation.Typography[TypographyRole.Heading1]?.FontSize);
+    }
+
+    [Fact]
+    public void Conformance_007_SemanticHtmlPreservesStableIdAndEscapesContent()
+    {
+        var document = CreateDocument(
+            [new Paragraph(new NodeId("safe-paragraph"), [new Text("Flow < content & identity")])]);
+        var preferences = new UserReadingPreferences();
+        var layout = new AdaptiveLayoutEngine().Layout(
+            document,
+            new LayoutContext(390, 844, DeviceClass.Phone, userPreferences: preferences));
+
+        var html = new HtmlDocumentRenderer().RenderToString(document, layout, preferences);
+
+        Assert.Contains("<article", html, StringComparison.Ordinal);
+        Assert.Contains("<p id=\"safe-paragraph\">Flow &lt; content &amp; identity</p>", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("Flow.Documents.Paragraph", html, StringComparison.Ordinal);
     }
 
     [Fact]
