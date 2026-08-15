@@ -10,3 +10,5 @@ artifacts/
 *.nupkg
 *.snupkg
 samples/SampleBook/*.html
+!samples/SampleBook/mobile.html
+!samples/SampleBook/desktop.html

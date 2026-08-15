@@ -14,7 +14,7 @@ The project is not currently a replacement for PDF or EPUB. Version 0.1 is build
 
 ## Current milestone
 
-The current development milestone is **`0.1.0-beta.1`**.
+The current development milestone is **`0.1.0-beta.2`**.
 
 Implemented:
 
@@ -26,6 +26,8 @@ Implemented:
 - `flow-c14n-0.1` canonicalization and SHA-256 document hashes;
 - renderer-independent adaptive layout for `ReadingMode.Flow`;
 - deterministic standalone HTML5 rendering with embedded CSS and assets;
+- the five-chapter “The Flow Experiment” reference book;
+- a lightweight CLI for sampling, inspection, validation, hashing, and HTML rendering;
 - small, medium, and large viewport profiles;
 - responsive figures, semantic ID preservation, and typed layout intentions;
 - unit and semantic-conformance tests.
@@ -34,9 +36,8 @@ Not implemented yet:
 
 - renderers other than standalone HTML;
 - EPUB import;
-- functional CLI commands;
 - paged and print layout modes;
-- complete sample book, reader, or editor;
+- reader or editor applications;
 - signatures, provenance, DRM, or cloud publishing services.
 
 `ReadingMode.Paged` and `ReadingMode.Print` are reserved contracts and deliberately fail until their behavior is properly specified and tested.
@@ -114,7 +115,7 @@ The layout operation validates the semantic document first. Invalid IDs, hierarc
 | `Flow.Rendering` | Renderer contracts and immutable rendered output | Implemented for beta.1 |
 | `Flow.Rendering.Html` | Deterministic standalone semantic HTML adapter | Implemented for beta.1 |
 | `Flow.Epub` | EPUB import adapter | Planned |
-| `Flow.Cli` | Command-line composition root | Foundation only |
+| `Flow.Cli` | Sample, inspect, validate, hash, and HTML rendering commands | Implemented for beta.2 |
 
 Dependencies point inward: the document domain does not reference layout or renderer projects. EPUB and HTML remain adapters at the edge.
 
@@ -129,7 +130,7 @@ dotnet build Flow.sln
 dotnet test Flow.sln --no-build
 ```
 
-At `0.1.0-beta.1`, the active suites contain 102 passing tests.
+At `0.1.0-beta.2`, the active suites contain 115 passing tests.
 
 ## Documentation
 
@@ -137,6 +138,7 @@ At `0.1.0-beta.1`, the active suites contain 102 passing tests.
 - [Semantic document model](docs/flow-document-model.md)
 - [Adaptive layout](docs/adaptive-layout.md)
 - [Standalone HTML renderer](docs/html-renderer.md)
+- [Command-line interface](docs/cli.md)
 - [Canonicalization and hashing](docs/canonicalization.md)
 - [Roadmap](docs/roadmap.md)
 - [Research findings](docs/research-findings.md)
@@ -146,11 +148,23 @@ At `0.1.0-beta.1`, the active suites contain 102 passing tests.
 The next useful increments are:
 
 1. build a limited, diagnostic-first EPUB importer;
-2. connect EPUB import, layout, and HTML rendering in the CLI;
-3. create a complete sample book and end-to-end conformance fixture;
-4. harden accessibility and interoperability from real EPUB evidence.
+2. connect EPUB import to the existing layout, renderer, and CLI pipeline;
+3. add end-to-end EPUB conformance fixtures;
+4. harden accessibility and interoperability from real publication evidence.
 
 A document can only be considered end-to-end usable when an EPUB can be imported without silent semantic loss, represented as a valid `FlowDocument`, laid out, rendered, inspected, and round-tripped through the supported Flow format. The repository has not reached that point yet.
+
+## CLI quick start
+
+```powershell
+dotnet run --project src/Flow.Cli -- sample sample.flow.json
+dotnet run --project src/Flow.Cli -- inspect sample.flow.json
+dotnet run --project src/Flow.Cli -- validate sample.flow.json
+dotnet run --project src/Flow.Cli -- hash sample.flow.json
+dotnet run --project src/Flow.Cli -- render sample.flow.json --html sample.html --width 390 --height 844
+```
+
+The committed [sample book](samples/SampleBook/README.md) includes its `.flow.json` source and mobile/desktop HTML evidence.
 
 ## Versioning and compatibility
 

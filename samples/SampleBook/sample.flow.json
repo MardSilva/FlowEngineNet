@@ -1,0 +1,721 @@
+{
+  "format": "flow-json-0.1",
+  "identity": {
+    "id": "urn:flow:sample:the-flow-experiment",
+    "version": "1.0"
+  },
+  "metadata": {
+    "title": "The Flow Experiment",
+    "language": "en",
+    "authors": [
+      "Flow Contributors"
+    ],
+    "subtitle": "A document that changes shape without changing identity",
+    "description": "A five-chapter reference book exercising the Flow 0.1 semantic model."
+  },
+  "content": {
+    "nodes": [
+      {
+        "type": "tableOfContents",
+        "id": "table-of-contents",
+        "title": [
+          {
+            "type": "text",
+            "value": "Contents"
+          }
+        ],
+        "maximumDepth": 3,
+        "entries": [
+          {
+            "level": 1,
+            "target": "flow:chapter-identity/identity-title",
+            "label": [
+              {
+                "type": "text",
+                "value": "Identity Before Appearance"
+              }
+            ]
+          },
+          {
+            "level": 1,
+            "target": "flow:chapter-structure/structure-title",
+            "label": [
+              {
+                "type": "text",
+                "value": "Structure Carries Meaning"
+              }
+            ]
+          },
+          {
+            "level": 1,
+            "target": "flow:chapter-reading/reading-title",
+            "label": [
+              {
+                "type": "text",
+                "value": "One Book, Many Readers"
+              }
+            ]
+          },
+          {
+            "level": 1,
+            "target": "flow:chapter-figures/figures-title",
+            "label": [
+              {
+                "type": "text",
+                "value": "Figures That Adapt"
+              }
+            ]
+          },
+          {
+            "level": 1,
+            "target": "flow:chapter-verification/verification-title",
+            "label": [
+              {
+                "type": "text",
+                "value": "Evidence, Not Promises"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "chapter",
+        "id": "chapter-identity",
+        "children": [
+          {
+            "type": "heading",
+            "id": "identity-title",
+            "level": 1,
+            "content": [
+              {
+                "type": "text",
+                "value": "Identity Before Appearance"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "id": "identity-opening",
+            "content": [
+              {
+                "type": "text",
+                "value": "Flow begins with a "
+              },
+              {
+                "type": "strong",
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "stable document identity"
+                  }
+                ]
+              },
+              {
+                "type": "text",
+                "value": ", then keeps that identity separate from screens, fonts, and pages."
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "id": "identity-principle",
+            "content": [
+              {
+                "type": "emphasis",
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "Document is not layout"
+                  }
+                ]
+              },
+              {
+                "type": "text",
+                "value": " is the experiment\u0027s central constraint. A narrow phone and a wide desktop may disagree about columns, but not about what the document says."
+              },
+              {
+                "type": "footnoteReference",
+                "targetId": "identity-footnote"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "id": "identity-link",
+            "content": [
+              {
+                "type": "text",
+                "value": "Jump ahead to "
+              },
+              {
+                "type": "link",
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "the verification chapter"
+                  }
+                ],
+                "target": "flow:chapter-verification/verification-title"
+              },
+              {
+                "type": "text",
+                "value": " to see how the claim is tested."
+              }
+            ]
+          },
+          {
+            "type": "footnote",
+            "id": "identity-footnote",
+            "children": [
+              {
+                "type": "paragraph",
+                "id": "identity-footnote-text",
+                "content": [
+                  {
+                    "type": "text",
+                    "value": "Viewport, layout, theme, and renderer state are excluded from the canonical hash."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "chapter",
+        "id": "chapter-structure",
+        "children": [
+          {
+            "type": "heading",
+            "id": "structure-title",
+            "level": 1,
+            "content": [
+              {
+                "type": "text",
+                "value": "Structure Carries Meaning"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "id": "structure-opening",
+            "content": [
+              {
+                "type": "text",
+                "value": "A Flow document records chapters, sections, lists, quotations, figures, notes, and links as semantic nodes rather than visual coordinates."
+              }
+            ]
+          },
+          {
+            "type": "section",
+            "id": "structure-checklist",
+            "children": [
+              {
+                "type": "heading",
+                "id": "structure-checklist-title",
+                "level": 2,
+                "content": [
+                  {
+                    "type": "text",
+                    "value": "What the model preserves"
+                  }
+                ]
+              },
+              {
+                "type": "unorderedList",
+                "id": "structure-unordered-list",
+                "items": [
+                  {
+                    "type": "listItem",
+                    "id": "structure-item-identity",
+                    "children": [
+                      {
+                        "type": "paragraph",
+                        "id": "structure-item-identity-text",
+                        "content": [
+                          {
+                            "type": "text",
+                            "value": "Stable IDs and anchors"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "listItem",
+                    "id": "structure-item-order",
+                    "children": [
+                      {
+                        "type": "paragraph",
+                        "id": "structure-item-order-text",
+                        "content": [
+                          {
+                            "type": "text",
+                            "value": "Canonical reading order"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "listItem",
+                    "id": "structure-item-assets",
+                    "children": [
+                      {
+                        "type": "paragraph",
+                        "id": "structure-item-assets-text",
+                        "content": [
+                          {
+                            "type": "text",
+                            "value": "Explicit asset relationships"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              },
+              {
+                "type": "orderedList",
+                "id": "structure-ordered-list",
+                "start": 1,
+                "items": [
+                  {
+                    "type": "listItem",
+                    "id": "structure-step-model",
+                    "children": [
+                      {
+                        "type": "paragraph",
+                        "id": "structure-step-model-text",
+                        "content": [
+                          {
+                            "type": "text",
+                            "value": "Create the semantic document"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "listItem",
+                    "id": "structure-step-layout",
+                    "children": [
+                      {
+                        "type": "paragraph",
+                        "id": "structure-step-layout-text",
+                        "content": [
+                          {
+                            "type": "text",
+                            "value": "Resolve layout for a reading context"
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "type": "listItem",
+                    "id": "structure-step-render",
+                    "children": [
+                      {
+                        "type": "paragraph",
+                        "id": "structure-step-render-text",
+                        "content": [
+                          {
+                            "type": "text",
+                            "value": "Render through an adapter"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "chapter",
+        "id": "chapter-reading",
+        "children": [
+          {
+            "type": "heading",
+            "id": "reading-title",
+            "level": 1,
+            "content": [
+              {
+                "type": "text",
+                "value": "One Book, Many Readers"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "id": "reading-opening",
+            "content": [
+              {
+                "type": "text",
+                "value": "Authors can suggest typography while readers retain control over body fonts, heading fonts, scale, spacing, margins, and theme."
+              }
+            ]
+          },
+          {
+            "type": "blockQuote",
+            "id": "reading-quote",
+            "children": [
+              {
+                "type": "paragraph",
+                "id": "reading-quote-text",
+                "content": [
+                  {
+                    "type": "text",
+                    "value": "Adaptation is useful only when the document\u0027s meaning survives the adaptation."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "id": "reading-inline",
+            "content": [
+              {
+                "type": "text",
+                "value": "This sentence demonstrates "
+              },
+              {
+                "type": "underline",
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "underline"
+                  }
+                ]
+              },
+              {
+                "type": "text",
+                "value": ", "
+              },
+              {
+                "type": "strikethrough",
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "discarded wording"
+                  }
+                ]
+              },
+              {
+                "type": "text",
+                "value": ", and the inline token "
+              },
+              {
+                "type": "inlineCode",
+                "code": "ReadingMode.Flow"
+              },
+              {
+                "type": "text",
+                "value": " without storing CSS in the document."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "chapter",
+        "id": "chapter-figures",
+        "children": [
+          {
+            "type": "heading",
+            "id": "figures-title",
+            "level": 1,
+            "content": [
+              {
+                "type": "text",
+                "value": "Figures That Adapt"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "id": "figures-opening",
+            "content": [
+              {
+                "type": "text",
+                "value": "A figure points to a canonical asset while layout decides how it fits the available reading surface."
+              }
+            ]
+          },
+          {
+            "type": "figure",
+            "id": "adaptive-figure",
+            "assetId": "flow-experiment.svg",
+            "alternativeText": "One Flow document branching into mobile and desktop reading layouts",
+            "caption": {
+              "type": "caption",
+              "id": "adaptive-figure-caption",
+              "content": [
+                {
+                  "type": "text",
+                  "value": "The same semantic document flowing through mobile and desktop layouts."
+                }
+              ]
+            }
+          },
+          {
+            "type": "paragraph",
+            "id": "figures-external-link",
+            "content": [
+              {
+                "type": "text",
+                "value": "The standalone renderer uses standard "
+              },
+              {
+                "type": "link",
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "HTML5"
+                  }
+                ],
+                "target": "https://html.spec.whatwg.org/"
+              },
+              {
+                "type": "text",
+                "value": " rather than inventing a new display language."
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "chapter",
+        "id": "chapter-verification",
+        "children": [
+          {
+            "type": "heading",
+            "id": "verification-title",
+            "level": 1,
+            "content": [
+              {
+                "type": "text",
+                "value": "Evidence, Not Promises"
+              }
+            ]
+          },
+          {
+            "type": "paragraph",
+            "id": "verification-opening",
+            "content": [
+              {
+                "type": "text",
+                "value": "The experiment is successful only when different presentations preserve the same IDs, anchors, and canonical hash."
+              }
+            ]
+          },
+          {
+            "type": "codeBlock",
+            "id": "verification-code",
+            "code": "var hash = integrity.ComputeHash(document);\nConsole.WriteLine(hash.Hash);",
+            "language": "csharp"
+          },
+          {
+            "type": "paragraph",
+            "id": "verification-closing",
+            "content": [
+              {
+                "type": "strong",
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "Change presentation"
+                  }
+                ]
+              },
+              {
+                "type": "text",
+                "value": ", and the hash stays fixed. "
+              },
+              {
+                "type": "strong",
+                "children": [
+                  {
+                    "type": "text",
+                    "value": "Change content"
+                  }
+                ]
+              },
+              {
+                "type": "text",
+                "value": ", and the hash changes. That is a claim the test suite can falsify."
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "assets": [
+    {
+      "id": "flow-experiment.svg",
+      "mediaType": "image/svg\u002Bxml",
+      "fileName": "flow-experiment.svg",
+      "data": "PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI5NjAiIGhlaWdodD0iNDgwIiB2aWV3Qm94PSIwIDAgOTYwIDQ4MCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJGbG93IGRvY3VtZW50IGFkYXB0aW5nIHRvIHR3byB2aWV3cG9ydHMiPgogIDxyZWN0IHdpZHRoPSI5NjAiIGhlaWdodD0iNDgwIiByeD0iMzIiIGZpbGw9IiNmNGVjZDgiLz4KICA8cmVjdCB4PSI3MiIgeT0iODgiIHdpZHRoPSIyNDAiIGhlaWdodD0iMzA0IiByeD0iMTgiIGZpbGw9IiNmZmYiIHN0cm9rZT0iIzNiMmYyNCIgc3Ryb2tlLXdpZHRoPSI4Ii8+CiAgPHJlY3QgeD0iNjQ4IiB5PSI4OCIgd2lkdGg9IjI0MCIgaGVpZ2h0PSIzMDQiIHJ4PSIxOCIgZmlsbD0iI2ZmZiIgc3Ryb2tlPSIjM2IyZjI0IiBzdHJva2Utd2lkdGg9IjgiLz4KICA8cGF0aCBkPSJNMzEyIDI0MEg2NDgiIHN0cm9rZT0iI2E2NTAzMiIgc3Ryb2tlLXdpZHRoPSIxMiIvPgogIDxwYXRoIGQ9Ik01OTQgMTk4TDY0OCAyNDAgNTk0IDI4MiIgZmlsbD0ibm9uZSIgc3Ryb2tlPSIjYTY1MDMyIiBzdHJva2Utd2lkdGg9IjEyIi8+CiAgPGcgc3Ryb2tlPSIjOGI3OTY1IiBzdHJva2Utd2lkdGg9IjgiPgogICAgPHBhdGggZD0iTTExMiAxNDRIMjcyTTExMiAxODRIMjcyTTExMiAyMjRIMjcyTTExMiAyNjRIMjcyTTExMiAzMDRIMjMyIi8+CiAgICA8cGF0aCBkPSJNNjg4IDE0NEg4NDhNNjg4IDE4NEg4NDhNNjg4IDIyNEg4NDhNNjg4IDI2NEg4NDhNNjg4IDMwNEg4MDgiLz4KICA8L2c+CiAgPHRleHQgeD0iMTkyIiB5PSI2MCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjgiIGZpbGw9IiMzYjJmMjQiPk1vYmlsZTwvdGV4dD4KICA8dGV4dCB4PSI3NjgiIHk9IjYwIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmb250LWZhbWlseT0ic2Fucy1zZXJpZiIgZm9udC1zaXplPSIyOCIgZmlsbD0iIzNiMmYyNCI+RGVza3RvcDwvdGV4dD4KICA8dGV4dCB4PSI0ODAiIHk9IjQzOCIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZm9udC1mYW1pbHk9InNhbnMtc2VyaWYiIGZvbnQtc2l6ZT0iMjgiIGZvbnQtd2VpZ2h0PSJib2xkIiBmaWxsPSIjYTY1MDMyIj5zYW1lIGlkZW50aXR5IMK3IHNhbWUgY29udGVudDwvdGV4dD4KPC9zdmc+"
+    }
+  ],
+  "presentation": {
+    "theme": "Sepia",
+    "typography": [
+      {
+        "role": "Body",
+        "style": {
+          "fontFamily": "Source Serif 4",
+          "fontSize": {
+            "value": 19,
+            "unit": "Pixel"
+          },
+          "fontWeight": "Normal",
+          "lineHeight": 1.65
+        }
+      },
+      {
+        "role": "ChapterTitle",
+        "style": {
+          "fontFamily": "Source Sans 3",
+          "fontSize": {
+            "value": 42,
+            "unit": "Pixel"
+          },
+          "fontWeight": "Bold",
+          "lineHeight": 1.15
+        }
+      },
+      {
+        "role": "Heading1",
+        "style": {
+          "fontFamily": "Source Sans 3",
+          "fontSize": {
+            "value": 34,
+            "unit": "Pixel"
+          },
+          "fontWeight": "Bold",
+          "lineHeight": 1.2
+        }
+      },
+      {
+        "role": "Heading2",
+        "style": {
+          "fontFamily": "Source Sans 3",
+          "fontSize": {
+            "value": 27,
+            "unit": "Pixel"
+          },
+          "fontWeight": "SemiBold",
+          "lineHeight": 1.25
+        }
+      },
+      {
+        "role": "TableOfContentsTitle",
+        "style": {
+          "fontFamily": "Source Sans 3",
+          "fontSize": {
+            "value": 30,
+            "unit": "Pixel"
+          },
+          "fontWeight": "Bold",
+          "lineHeight": 1.2
+        }
+      },
+      {
+        "role": "TableOfContentsLevel1",
+        "style": {
+          "fontFamily": "Source Sans 3",
+          "fontSize": {
+            "value": 18,
+            "unit": "Pixel"
+          },
+          "fontWeight": "Medium",
+          "lineHeight": 1.5
+        }
+      },
+      {
+        "role": "Caption",
+        "style": {
+          "fontFamily": "Source Sans 3",
+          "fontSize": {
+            "value": 14,
+            "unit": "Pixel"
+          },
+          "fontWeight": "Normal",
+          "lineHeight": 1.4
+        }
+      },
+      {
+        "role": "Footnote",
+        "style": {
+          "fontFamily": "Source Serif 4",
+          "fontSize": {
+            "value": 13,
+            "unit": "Pixel"
+          },
+          "fontWeight": "Normal",
+          "lineHeight": 1.45
+        }
+      },
+      {
+        "role": "BlockQuote",
+        "style": {
+          "fontFamily": "Source Serif 4",
+          "fontSize": {
+            "value": 20,
+            "unit": "Pixel"
+          },
+          "fontWeight": "Normal",
+          "lineHeight": 1.6
+        }
+      },
+      {
+        "role": "Code",
+        "style": {
+          "fontFamily": "System Monospace",
+          "fontSize": {
+            "value": 15,
+            "unit": "Pixel"
+          },
+          "fontWeight": "Normal",
+          "lineHeight": 1.45
+        }
+      }
+    ],
+    "headings": {
+      "keepWithNext": true,
+      "avoidBreakAfter": true
+    },
+    "paragraphs": {
+      "keepTogether": false
+    },
+    "figures": {
+      "importance": "Essential",
+      "keepWithCaption": true,
+      "preferredPlacement": "Block",
+      "maximumWidth": {
+        "value": 100,
+        "unit": "Percent"
+      }
+    },
+    "captions": {
+      "keepWithFigure": true
+    },
+    "footnotes": {
+      "preferredPresentation": "EndOfSection"
+    },
+    "codeBlocks": {
+      "avoidSplit": true,
+      "preserveWhitespace": true
+    },
+    "tableOfContents": {
+      "generateFromDocumentStructure": false,
+      "leaderStyle": "Dots"
+    }
+  }
+}
