@@ -145,6 +145,8 @@ Resolution is pure: it allocates a new resolved result and never mutates `FlowDo
 
 `DocumentIntegrity` can carry an algorithm, hash, and canonicalization version. `Flow.Security` now provides `FlowDocumentCanonicalizer` and `Sha256DocumentIntegrityService`; the stored integrity record itself is excluded from its hash input to avoid recursion.
 
+`Flow.Security` also provides an experimental local RSA signature proof of concept over the same canonical bytes. `DocumentSignature` is not part of `FlowDocument` and is not serialized in `flow-json-0.1`; key ownership, transport, and trust remain external. See [signatures.md](signatures.md).
+
 Presentation, layout context, renderer constraints, and reader state will not participate in the canonical document hash.
 
 The experimental `flow-json-0.1` serializer preserves presentation and integrity for round-trip development interchange. It is deliberately separate from the compact `flow-c14n-0.1` projection. The exact included and excluded fields are specified in [canonicalization.md](canonicalization.md).
@@ -153,8 +155,8 @@ The experimental `flow-json-0.1` serializer preserves presentation and integrity
 
 This model intentionally does not yet implement:
 
-- digital signatures;
 - automatic TOC entry generation;
-- layout or rendering.
+- embedded signature transport or trust policy;
+- EPUB import.
 
-Those behaviors will be layered over the semantic model without adding dependencies from `Flow.Documents` to infrastructure projects.
+Those behaviors will be layered over the semantic model without adding dependencies from `Flow.Documents` to infrastructure projects. Adaptive Flow layout and standalone HTML rendering already exist in their outward projects.

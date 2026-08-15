@@ -1,0 +1,2 @@
+samples/SampleBook/*.flow.json text eol=lf
+samples/SampleBook/*.html text eol=lf
