@@ -156,15 +156,23 @@ A document can only be considered end-to-end usable when an EPUB can be imported
 
 ## CLI quick start
 
+To see the current end-to-end result without generating anything, open the committed mobile and desktop files:
+
 ```powershell
-dotnet run --project src/Flow.Cli -- sample sample.flow.json
-dotnet run --project src/Flow.Cli -- inspect sample.flow.json
-dotnet run --project src/Flow.Cli -- validate sample.flow.json
-dotnet run --project src/Flow.Cli -- hash sample.flow.json
-dotnet run --project src/Flow.Cli -- render sample.flow.json --html sample.html --width 390 --height 844
+Start-Process samples/SampleBook/mobile.html
+Start-Process samples/SampleBook/desktop.html
 ```
 
-The committed [sample book](samples/SampleBook/README.md) includes its `.flow.json` source and mobile/desktop HTML evidence.
+To reproduce the pipeline from the semantic source:
+
+```powershell
+dotnet run --project src/Flow.Cli -- inspect samples/SampleBook/sample.flow.json
+dotnet run --project src/Flow.Cli -- validate samples/SampleBook/sample.flow.json
+dotnet run --project src/Flow.Cli -- hash samples/SampleBook/sample.flow.json
+dotnet run --project src/Flow.Cli -- render samples/SampleBook/sample.flow.json --html sample.html --width 390 --height 844
+```
+
+The detailed [sample walkthrough](samples/SampleBook/README.md) explains prerequisites, expected output, what to compare, safe experiments, limitations, and how the committed evidence is verified.
 
 ## Versioning and compatibility
 
