@@ -72,7 +72,8 @@ internal static class MinimalEpubFactory
         string? package = null,
         string? chapterOne = null,
         bool includeSecondChapter = true,
-        bool includeImage = true)
+        bool includeImage = true,
+        IReadOnlyDictionary<string, string>? additionalTextEntries = null)
     {
         var result = new MemoryStream();
         using (var archive = new ZipArchive(result, ZipArchiveMode.Create, leaveOpen: true))
@@ -91,6 +92,14 @@ internal static class MinimalEpubFactory
                 var image = archive.CreateEntry("EPUB/images/flow.png", CompressionLevel.Optimal);
                 using var stream = image.Open();
                 stream.Write(OnePixelPng);
+            }
+
+            if (additionalTextEntries is not null)
+            {
+                foreach (var (path, content) in additionalTextEntries)
+                {
+                    AddText(archive, path, content);
+                }
             }
         }
 

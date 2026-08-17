@@ -19,6 +19,7 @@ public sealed class CliCommandParser
         {
             "sample" => ParseSample(arguments),
             "import" => ParseImport(arguments),
+            "epub-inspect" => ParseEpubInspect(arguments),
             "inspect" => ParseDocumentCommand(arguments, static path => new InspectCommand(path)),
             "validate" => ParseDocumentCommand(arguments, static path => new ValidateCommand(path)),
             "hash" => ParseDocumentCommand(arguments, static path => new HashCommand(path)),
@@ -48,6 +49,15 @@ public sealed class CliCommandParser
         sourcePath.EndsWith(".epub", StringComparison.OrdinalIgnoreCase)
             ? $"{sourcePath[..^5]}.flow.json"
             : $"{sourcePath}.flow.json";
+
+    private static CommandParseResult ParseEpubInspect(IReadOnlyList<string> arguments) =>
+        arguments.Count switch
+        {
+            2 => CommandParseResult.Success(new InspectEpubCommand(arguments[1], null)),
+            4 when arguments[2] == "--json" && !string.IsNullOrWhiteSpace(arguments[3]) =>
+                CommandParseResult.Success(new InspectEpubCommand(arguments[1], arguments[3])),
+            _ => CommandParseResult.Failure($"FLOWCLI_USAGE: {EpubInspectUsage}"),
+        };
 
     private static CommandParseResult ParseSample(IReadOnlyList<string> arguments) =>
         arguments.Count switch
@@ -135,4 +145,6 @@ public sealed class CliCommandParser
         "Usage: flow render <document> --html <output> --width <n> --height <n>";
 
     private const string ImportUsage = "Usage: flow import <book.epub> [--output <book.flow.json>]";
+
+    private const string EpubInspectUsage = "Usage: flow epub-inspect <book.epub> [--json <report.json>]";
 }

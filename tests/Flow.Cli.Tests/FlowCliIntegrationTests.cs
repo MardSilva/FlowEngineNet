@@ -1,9 +1,11 @@
 using System.IO.Compression;
 using System.Text;
+using System.Text.Json;
 using System.Xml.Linq;
 using Flow.Cli;
 using Flow.Core;
 using Flow.Documents;
+using Flow.Epub;
 using Flow.Layout;
 using Flow.Rendering.Html;
 
@@ -138,6 +140,63 @@ public sealed class FlowCliIntegrationTests
     }
 
     [Fact]
+    public async Task EpubInspect_ReportsStructureAndWritesDeterministicJsonWithoutImporting()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var epubPath = workspace.PathOf("inspection.epub");
+        var firstReportPath = workspace.PathOf("inspection-one.json");
+        var secondReportPath = workspace.PathOf("inspection-two.json");
+        CreateMinimalEpub(epubPath);
+        var application = FlowCliApplication.CreateDefault();
+
+        var first = await RunAsync(
+            application,
+            ["epub-inspect", epubPath, "--json", firstReportPath]);
+        var second = await RunAsync(
+            application,
+            ["epub-inspect", epubPath, "--json", secondReportPath]);
+
+        Assert.Equal(0, first.ExitCode);
+        Assert.Equal(0, second.ExitCode);
+        Assert.Equal(string.Empty, first.Error);
+        Assert.Contains("Status: valid", first.Output, StringComparison.Ordinal);
+        Assert.Contains("EPUB version: Epub3 (3.0)", first.Output, StringComparison.Ordinal);
+        Assert.Contains("Manifest items: 1", first.Output, StringComparison.Ordinal);
+        Assert.Contains("Spine items: 1 (linear 1, non-linear 0)", first.Output, StringComparison.Ordinal);
+        Assert.True(File.ReadAllBytes(firstReportPath).AsSpan().SequenceEqual(File.ReadAllBytes(secondReportPath)));
+
+        var reportBytes = await File.ReadAllBytesAsync(firstReportPath);
+        Assert.DoesNotContain((byte)'\r', reportBytes);
+        using var report = JsonDocument.Parse(reportBytes);
+        Assert.Equal("flow-epub-inspection-0.1", report.RootElement.GetProperty("format").GetString());
+        Assert.Equal("epub3", report.RootElement.GetProperty("package").GetProperty("versionFamily").GetString());
+        Assert.Equal(1, report.RootElement.GetProperty("manifest").GetArrayLength());
+        Assert.Equal(1, report.RootElement.GetProperty("spine").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task EpubInspect_InvalidZipStillWritesDiagnosticJsonReport()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var epubPath = workspace.PathOf("invalid-inspection.epub");
+        var reportPath = workspace.PathOf("invalid-inspection.json");
+        await File.WriteAllTextAsync(epubPath, "not a ZIP archive");
+
+        var result = await RunAsync(
+            FlowCliApplication.CreateDefault(),
+            ["epub-inspect", epubPath, "--json", reportPath]);
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.True(File.Exists(reportPath));
+        Assert.Contains("EPUB001", result.Error, StringComparison.Ordinal);
+        using var report = JsonDocument.Parse(await File.ReadAllBytesAsync(reportPath));
+        Assert.False(report.RootElement.GetProperty("success").GetBoolean());
+        Assert.Contains(
+            report.RootElement.GetProperty("diagnostics").EnumerateArray(),
+            static diagnostic => diagnostic.GetProperty("code").GetString() == EpubDiagnosticCodes.InvalidArchive);
+    }
+
+    [Fact]
     public async Task Validate_ReturnsTwoAndDiagnosticsForInvalidDocument()
     {
         using var workspace = new TemporaryWorkspace();
@@ -219,6 +278,7 @@ public sealed class FlowCliIntegrationTests
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("0.2.0-alpha.1 (experimental)", result.Output, StringComparison.Ordinal);
         Assert.Contains("flow import <book.epub>", result.Output, StringComparison.Ordinal);
+        Assert.Contains("flow epub-inspect <book.epub>", result.Output, StringComparison.Ordinal);
         Assert.Contains("flow validate <document>", result.Output, StringComparison.Ordinal);
         Assert.Contains("Exit codes: 0 success, 1 command/input failure, 2 semantic validation failure.", result.Output, StringComparison.Ordinal);
     }

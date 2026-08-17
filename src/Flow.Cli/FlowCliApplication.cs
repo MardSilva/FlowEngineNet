@@ -27,6 +27,7 @@ public sealed class FlowCliApplication
             new CliOperations(
                 new FlowJsonDocumentSerializer(),
                 new EpubImporter(),
+                new EpubPublicationInspector(),
                 new DocumentValidator(),
                 new Sha256DocumentIntegrityService(new FlowDocumentCanonicalizer()),
                 new AdaptiveLayoutEngine(),

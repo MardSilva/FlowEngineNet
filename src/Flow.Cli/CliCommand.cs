@@ -8,6 +8,8 @@ public sealed record SampleCommand(string OutputPath) : CliCommand;
 
 public sealed record ImportEpubCommand(string SourcePath, string OutputPath) : CliCommand;
 
+public sealed record InspectEpubCommand(string SourcePath, string? JsonOutputPath) : CliCommand;
+
 public sealed record InspectCommand(string DocumentPath) : CliCommand;
 
 public sealed record ValidateCommand(string DocumentPath) : CliCommand;

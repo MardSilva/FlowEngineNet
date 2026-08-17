@@ -12,6 +12,7 @@ public sealed class CliOperations
 {
     private readonly IFlowDocumentSerializer _serializer;
     private readonly IEpubImporter _epubImporter;
+    private readonly IEpubPublicationInspector _epubInspector;
     private readonly DocumentValidator _validator;
     private readonly IDocumentIntegrityService _integrityService;
     private readonly ILayoutEngine _layoutEngine;
@@ -20,6 +21,7 @@ public sealed class CliOperations
     public CliOperations(
         IFlowDocumentSerializer serializer,
         IEpubImporter epubImporter,
+        IEpubPublicationInspector epubInspector,
         DocumentValidator validator,
         IDocumentIntegrityService integrityService,
         ILayoutEngine layoutEngine,
@@ -27,6 +29,7 @@ public sealed class CliOperations
     {
         ArgumentNullException.ThrowIfNull(serializer);
         ArgumentNullException.ThrowIfNull(epubImporter);
+        ArgumentNullException.ThrowIfNull(epubInspector);
         ArgumentNullException.ThrowIfNull(validator);
         ArgumentNullException.ThrowIfNull(integrityService);
         ArgumentNullException.ThrowIfNull(layoutEngine);
@@ -34,6 +37,7 @@ public sealed class CliOperations
 
         _serializer = serializer;
         _epubImporter = epubImporter;
+        _epubInspector = epubInspector;
         _validator = validator;
         _integrityService = integrityService;
         _layoutEngine = layoutEngine;
@@ -57,6 +61,8 @@ public sealed class CliOperations
             SampleCommand sample => await CreateSampleAsync(sample, output, cancellationToken).ConfigureAwait(false),
             ImportEpubCommand import => await ImportEpubAsync(import, output, error, cancellationToken)
                 .ConfigureAwait(false),
+            InspectEpubCommand inspectEpub => await InspectEpubAsync(inspectEpub, output, error, cancellationToken)
+                .ConfigureAwait(false),
             InspectCommand inspect => await InspectAsync(inspect, output, cancellationToken).ConfigureAwait(false),
             ValidateCommand validate => await ValidateAsync(validate, output, cancellationToken).ConfigureAwait(false),
             HashCommand hash => await HashAsync(hash, output, cancellationToken).ConfigureAwait(false),
@@ -74,6 +80,8 @@ public sealed class CliOperations
             .ConfigureAwait(false);
         await output.WriteLineAsync("  flow import <book.epub> [--output <book.flow.json>]")
             .ConfigureAwait(false);
+        await output.WriteLineAsync("  flow epub-inspect <book.epub> [--json <report.json>]")
+            .ConfigureAwait(false);
         await output.WriteLineAsync("  flow inspect <document>                      Show semantic document counts.")
             .ConfigureAwait(false);
         await output.WriteLineAsync("  flow validate <document>                     Validate semantic invariants.")
@@ -85,6 +93,91 @@ public sealed class CliOperations
         await output.WriteLineAsync("Exit codes: 0 success, 1 command/input failure, 2 semantic validation failure.")
             .ConfigureAwait(false);
         return 0;
+    }
+
+    private async Task<int> InspectEpubAsync(
+        InspectEpubCommand command,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
+        var sourcePath = Path.GetFullPath(command.SourcePath);
+        if (!string.Equals(Path.GetExtension(sourcePath), ".epub", StringComparison.OrdinalIgnoreCase))
+        {
+            await error.WriteLineAsync("FLOWCLI_UNSUPPORTED_INPUT: epub-inspect accepts only .epub files.")
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        var jsonOutputPath = command.JsonOutputPath is null ? null : Path.GetFullPath(command.JsonOutputPath);
+        if (jsonOutputPath is not null && PathsEqual(sourcePath, jsonOutputPath))
+        {
+            await error.WriteLineAsync("FLOWCLI_INVALID_OUTPUT: The JSON report path must differ from the EPUB source path.")
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        await using var source = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
+        var inspection = await _epubInspector.InspectAsync(source, cancellationToken).ConfigureAwait(false);
+        await WriteEpubInspectionAsync(inspection, sourcePath, output).ConfigureAwait(false);
+        await WriteEpubDiagnosticsAsync(inspection.Diagnostics, output, error).ConfigureAwait(false);
+
+        if (jsonOutputPath is not null)
+        {
+            EnsureParentDirectory(jsonOutputPath);
+            await WriteInspectionAtomicallyAsync(inspection, jsonOutputPath, cancellationToken)
+                .ConfigureAwait(false);
+            await output.WriteLineAsync($"JSON report: {jsonOutputPath}").ConfigureAwait(false);
+        }
+
+        return inspection.IsSuccess ? 0 : 1;
+    }
+
+    private static async Task WriteEpubInspectionAsync(
+        EpubPublicationInspection inspection,
+        string sourcePath,
+        TextWriter output)
+    {
+        var package = inspection.Package;
+        await output.WriteLineAsync($"EPUB inspection: {sourcePath}").ConfigureAwait(false);
+        await output.WriteLineAsync($"Status: {(inspection.IsSuccess ? "valid" : "invalid")}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync($"Container: {inspection.ContainerPath}").ConfigureAwait(false);
+        await output.WriteLineAsync($"Package: {package?.Path ?? "(unavailable)"}").ConfigureAwait(false);
+        await output.WriteLineAsync(
+                $"EPUB version: {package?.VersionFamily.ToString() ?? "Unknown"} ({package?.DeclaredVersion ?? "unknown"})")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync($"Title: {package?.Title ?? "(none)"}").ConfigureAwait(false);
+        await output.WriteLineAsync($"Identifier: {package?.Identifier ?? "(none)"}").ConfigureAwait(false);
+        await output.WriteLineAsync($"Language: {package?.Language ?? "(none)"}").ConfigureAwait(false);
+        await output.WriteLineAsync($"Creators: {string.Join(", ", package?.Creators ?? [])}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(
+                $"Manifest items: {inspection.Resources.ManifestItemCount.ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(
+                $"Spine items: {inspection.Spine.Length.ToString(CultureInfo.InvariantCulture)} "
+                + $"(linear {inspection.Spine.Count(static item => item.IsLinear).ToString(CultureInfo.InvariantCulture)}, "
+                + $"non-linear {inspection.Spine.Count(static item => !item.IsLinear).ToString(CultureInfo.InvariantCulture)})")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(
+                $"Navigation documents: {inspection.NavigationDocumentPaths.Length.ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(
+                $"Archive entries: {inspection.Resources.ArchiveEntryCount.ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(
+                $"Compressed bytes: {inspection.Resources.TotalCompressedBytes.ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(
+                $"Uncompressed bytes: {inspection.Resources.TotalUncompressedBytes.ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync("Resource types:").ConfigureAwait(false);
+        foreach (var (mediaType, count) in inspection.Resources.MediaTypeCounts)
+        {
+            await output.WriteLineAsync($"  {mediaType}: {count.ToString(CultureInfo.InvariantCulture)}")
+                .ConfigureAwait(false);
+        }
     }
 
     private async Task<int> ImportEpubAsync(
@@ -293,6 +386,35 @@ public sealed class CliOperations
                              FileShare.None))
             {
                 await _serializer.SerializeAsync(document, destination, cancellationToken).ConfigureAwait(false);
+            }
+
+            File.Move(temporaryPath, outputPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
+        }
+    }
+
+    private static async Task WriteInspectionAtomicallyAsync(
+        EpubPublicationInspection inspection,
+        string outputPath,
+        CancellationToken cancellationToken)
+    {
+        var temporaryPath = $"{outputPath}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            await using (var destination = new FileStream(
+                             temporaryPath,
+                             FileMode.CreateNew,
+                             FileAccess.Write,
+                             FileShare.None))
+            {
+                await EpubInspectionJsonWriter.WriteAsync(inspection, destination, cancellationToken)
+                    .ConfigureAwait(false);
             }
 
             File.Move(temporaryPath, outputPath, overwrite: true);

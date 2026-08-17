@@ -32,4 +32,12 @@ public static class EpubDiagnosticCodes
     public const string MetadataFallback = "EPUB012";
     public const string NonLinearSpineItem = "EPUB013";
     public const string DocumentValidation = "EPUB014";
+    public const string UnsupportedVersion = "EPUB015";
+    public const string MultipleTableOfContents = "EPUB016";
+    public const string InvalidTableOfContents = "EPUB017";
+    public const string MissingTableOfContentsTarget = "EPUB018";
+    public const string EmptyTableOfContentsEntry = "EPUB019";
+    public const string InvalidTableOfContentsLevel = "EPUB020";
+    public const string CircularTableOfContentsReference = "EPUB021";
+    public const string TableOfContentsConflict = "EPUB022";
 }

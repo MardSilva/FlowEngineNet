@@ -20,6 +20,8 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Flow.Epub\Flow.Epub.csproj" />
+    <ProjectReference Include="..\..\src\Flow.Layout\Flow.Layout.csproj" />
+    <ProjectReference Include="..\..\src\Flow.Rendering.Html\Flow.Rendering.Html.csproj" />
   </ItemGroup>
 
 </Project>

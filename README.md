@@ -26,6 +26,8 @@ Implemented:
 - `flow-c14n-0.1` canonicalization and SHA-256 document hashes;
 - experimental local RSA-PSS-SHA256 signatures over canonical bytes;
 - a diagnostic-first, security-bounded EPUB import prototype;
+- non-converting EPUB 2/3 package inspection with deterministic JSON reports;
+- EPUB 3 Navigation Document import with EPUB 2 NCX fallback and stable Flow anchors;
 - renderer-independent adaptive layout for `ReadingMode.Flow`;
 - deterministic standalone HTML5 rendering with embedded CSS and assets;
 - the five-chapter “The Flow Experiment” reference book;
@@ -116,8 +118,8 @@ The layout operation validates the semantic document first. Invalid IDs, hierarc
 | `Flow.Security` | Canonicalization, hashing, and local RSA signature proof of concept | Implemented for 0.1 |
 | `Flow.Rendering` | Renderer contracts and immutable rendered output | Implemented for 0.1 |
 | `Flow.Rendering.Html` | Deterministic standalone semantic HTML adapter | Implemented for 0.1 |
-| `Flow.Epub` | Diagnostic-first EPUB-to-`FlowDocument` prototype | Implemented subset for 0.1 |
-| `Flow.Cli` | EPUB import, sample, inspect, validate, hash, and HTML rendering commands | EPUB CLI integration in 0.2 alpha |
+| `Flow.Epub` | Package inspection and diagnostic-first EPUB-to-`FlowDocument` adapter | Expanded subset in 0.2 alpha |
+| `Flow.Cli` | EPUB inspection/import, sample, inspect, validate, hash, and HTML rendering commands | EPUB CLI integration in 0.2 alpha |
 
 Dependencies point inward: the document domain does not reference layout or renderer projects. EPUB and HTML remain adapters at the edge. The approved direct dependency graph is enforced by `Flow.Conformance.Tests`.
 
@@ -157,7 +159,7 @@ The final clean-directory review passes 134 tests with zero build warnings; see 
 The real EPUB cycle now follows these increments:
 
 1. import EPUB through the CLI into a valid, deterministic `.flow.json`;
-2. add navigation, accessibility metadata, CSS, tables, notes, and media fallbacks;
+2. expand accessibility metadata, CSS, tables, notes, and media fallbacks (TOC navigation is now imported);
 3. generate a self-contained HTML book with its own TOC and chapter files;
 4. validate fidelity and performance against legal real-world publications;
 5. pass the large-book gate before beginning the PDF importer.
@@ -176,6 +178,7 @@ Start-Process samples/SampleBook/desktop.html
 To reproduce the pipeline from the semantic source:
 
 ```powershell
+dotnet run --project src/Flow.Cli -- epub-inspect path/to/book.epub --json epub-report.json
 dotnet run --project src/Flow.Cli -- import path/to/book.epub --output book.flow.json
 dotnet run --project src/Flow.Cli -- inspect samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- validate samples/SampleBook/sample.flow.json

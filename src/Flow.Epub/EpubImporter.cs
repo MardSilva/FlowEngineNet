@@ -17,6 +17,8 @@ public sealed class EpubImporter : IEpubImporter
     private static readonly XNamespace OpfNamespace = "http://www.idpf.org/2007/opf";
     private static readonly XNamespace DcNamespace = "http://purl.org/dc/elements/1.1/";
     private static readonly XNamespace XhtmlNamespace = "http://www.w3.org/1999/xhtml";
+    private static readonly XNamespace EpubNamespace = "http://www.idpf.org/2007/ops";
+    private static readonly XNamespace NcxNamespace = "http://www.daisy.org/z3986/2005/ncx/";
 
     private readonly EpubImportLimits limits;
 
@@ -41,7 +43,7 @@ public sealed class EpubImporter : IEpubImporter
         var diagnostics = new List<EpubDiagnostic>();
         try
         {
-            await using var archiveBuffer = await CopyWithLimitAsync(
+            await using var archiveBuffer = await EpubArchiveUtilities.CopyWithLimitAsync(
                 source,
                 limits.MaximumArchiveBytes,
                 cancellationToken).ConfigureAwait(false);
@@ -111,111 +113,15 @@ public sealed class EpubImporter : IEpubImporter
 
     private Dictionary<string, ZipArchiveEntry> IndexArchive(
         ZipArchive archive,
-        List<EpubDiagnostic> diagnostics)
-    {
-        if (archive.Entries.Count > limits.MaximumEntries)
-        {
-            diagnostics.Add(Error(
-                EpubDiagnosticCodes.ArchiveLimitExceeded,
-                $"The archive contains {archive.Entries.Count} entries; the limit is {limits.MaximumEntries}."));
-            return new Dictionary<string, ZipArchiveEntry>(StringComparer.Ordinal);
-        }
+        List<EpubDiagnostic> diagnostics) =>
+        EpubArchiveUtilities.IndexArchive(archive, limits, diagnostics);
 
-        long totalLength = 0;
-        var entries = new Dictionary<string, ZipArchiveEntry>(StringComparer.Ordinal);
-        foreach (var entry in archive.Entries)
-        {
-            if (entry.FullName.EndsWith("/", StringComparison.Ordinal))
-            {
-                continue;
-            }
-
-            if (!TryNormalizeArchivePath(null, entry.FullName, out var normalizedPath))
-            {
-                diagnostics.Add(Error(
-                    EpubDiagnosticCodes.UnsafePath,
-                    $"Archive entry '{entry.FullName}' has an unsafe path.",
-                    entry.FullName));
-                continue;
-            }
-
-            if (entry.Length > limits.MaximumTotalUncompressedBytes
-                || totalLength > limits.MaximumTotalUncompressedBytes - entry.Length)
-            {
-                diagnostics.Add(Error(
-                    EpubDiagnosticCodes.ArchiveLimitExceeded,
-                    "The archive exceeds the configured total uncompressed size limit.",
-                    normalizedPath));
-                continue;
-            }
-
-            totalLength += entry.Length;
-            var excessiveRatio = entry.Length > 1_024 * 1_024
-                && entry.CompressedLength == 0
-                || entry.CompressedLength > 0
-                && entry.Length / entry.CompressedLength > limits.MaximumCompressionRatio;
-            if (entry.Length > limits.MaximumEntryBytes
-                || excessiveRatio)
-            {
-                diagnostics.Add(Error(
-                    EpubDiagnosticCodes.ArchiveLimitExceeded,
-                    $"Archive entry '{normalizedPath}' exceeds the configured size or compression limits.",
-                    normalizedPath));
-                continue;
-            }
-
-            if (!entries.TryAdd(normalizedPath, entry))
-            {
-                diagnostics.Add(Error(
-                    EpubDiagnosticCodes.InvalidArchive,
-                    $"Archive path '{normalizedPath}' occurs more than once.",
-                    normalizedPath));
-            }
-        }
-
-        return entries;
-    }
-
-    private async Task<XDocument?> LoadXmlAsync(
+    private Task<XDocument?> LoadXmlAsync(
         ZipArchiveEntry entry,
         string resource,
         List<EpubDiagnostic> diagnostics,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            await using var source = entry.Open();
-            await using var buffer = await CopyWithLimitAsync(
-                source,
-                limits.MaximumEntryBytes,
-                cancellationToken).ConfigureAwait(false);
-            var settings = new XmlReaderSettings
-            {
-                Async = false,
-                DtdProcessing = DtdProcessing.Prohibit,
-                XmlResolver = null,
-                MaxCharactersInDocument = limits.MaximumXmlCharacters,
-                MaxCharactersFromEntities = 0,
-                IgnoreComments = true,
-                CloseInput = false,
-            };
-            using var reader = XmlReader.Create(buffer, settings);
-            return XDocument.Load(reader, LoadOptions.SetLineInfo);
-        }
-        catch (EpubLimitExceededException exception)
-        {
-            diagnostics.Add(Error(EpubDiagnosticCodes.ArchiveLimitExceeded, exception.Message, resource));
-            return null;
-        }
-        catch (Exception exception) when (exception is XmlException or InvalidDataException or IOException)
-        {
-            diagnostics.Add(Error(
-                EpubDiagnosticCodes.InvalidXml,
-                $"XML resource '{resource}' is invalid or unsafe: {exception.Message}",
-                resource));
-            return null;
-        }
-    }
+        CancellationToken cancellationToken) =>
+        EpubArchiveUtilities.LoadXmlAsync(entry, resource, limits, diagnostics, cancellationToken);
 
     private static string? ReadPackagePath(XDocument? container, List<EpubDiagnostic> diagnostics)
     {
@@ -289,6 +195,7 @@ public sealed class EpubImporter : IEpubImporter
             .FirstOrDefault(static value => value.Length > 0);
 
         var manifest = new Dictionary<string, ManifestItem>(StringComparer.Ordinal);
+        var manifestOrder = new List<ManifestItem>();
         foreach (var item in root.Element(OpfNamespace + "manifest")?.Elements(OpfNamespace + "item") ?? [])
         {
             var id = (string?)item.Attribute("id");
@@ -315,17 +222,24 @@ public sealed class EpubImporter : IEpubImporter
             var properties = ((string?)item.Attribute("properties") ?? string.Empty)
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .ToImmutableHashSet(StringComparer.Ordinal);
-            if (!manifest.TryAdd(id, new ManifestItem(id, resourcePath, mediaType, properties)))
+            var manifestItem = new ManifestItem(id, resourcePath, mediaType, properties);
+            if (!manifest.TryAdd(id, manifestItem))
             {
                 diagnostics.Add(Error(
                     EpubDiagnosticCodes.InvalidPackage,
                     $"Manifest ID '{id}' occurs more than once.",
                     packagePath));
             }
+            else
+            {
+                manifestOrder.Add(manifestItem);
+            }
         }
 
         var spine = new List<SpineItem>();
-        foreach (var itemReference in root.Element(OpfNamespace + "spine")?.Elements(OpfNamespace + "itemref") ?? [])
+        var spineElement = root.Element(OpfNamespace + "spine");
+        var spineTocId = (string?)spineElement?.Attribute("toc");
+        foreach (var itemReference in spineElement?.Elements(OpfNamespace + "itemref") ?? [])
         {
             var idref = (string?)itemReference.Attribute("idref");
             if (string.IsNullOrWhiteSpace(idref) || !manifest.TryGetValue(idref, out var item))
@@ -355,7 +269,17 @@ public sealed class EpubImporter : IEpubImporter
             return null;
         }
 
-        return new PackageModel(packagePath, title, identifier, language, authors, description, manifest, spine);
+        return new PackageModel(
+            packagePath,
+            title,
+            identifier,
+            language,
+            authors,
+            description,
+            manifest,
+            manifestOrder,
+            spine,
+            spineTocId);
     }
 
     private async Task<FlowDocument?> ConvertPackageAsync(
@@ -405,12 +329,25 @@ public sealed class EpubImporter : IEpubImporter
             return null;
         }
 
+        var navigationDocuments = await LoadNavigationDocumentsAsync(
+            package,
+            entries,
+            xhtmlDocuments,
+            diagnostics,
+            cancellationToken).ConfigureAwait(false);
+
         var context = new ConversionContext(entries, package.Manifest, diagnostics, limits);
         context.PrepareIds(xhtmlDocuments);
-        var chapters = new List<DocumentNode>();
+        var content = new List<DocumentNode>();
+        var tableOfContents = context.ConvertTableOfContents(navigationDocuments, package.SpineTocId);
+        if (tableOfContents is not null)
+        {
+            content.Add(tableOfContents);
+        }
+
         foreach (var xhtml in xhtmlDocuments)
         {
-            chapters.Add(await context.ConvertChapterAsync(xhtml, cancellationToken).ConfigureAwait(false));
+            content.Add(await context.ConvertChapterAsync(xhtml, cancellationToken).ConfigureAwait(false));
         }
 
         ReportUnusedManifestResources(package, context, diagnostics);
@@ -419,7 +356,7 @@ public sealed class EpubImporter : IEpubImporter
         var document = new FlowDocument(
             new DocumentIdentity(documentId),
             new DocumentMetadata(package.Title, package.Language, package.Authors, description: package.Description),
-            new DocumentContent(chapters),
+            new DocumentContent(content),
             context.Assets.Values);
 
         var validation = new DocumentValidator().Validate(document);
@@ -434,6 +371,51 @@ public sealed class EpubImporter : IEpubImporter
         }
 
         return document;
+    }
+
+    private async Task<IReadOnlyList<NavigationModel>> LoadNavigationDocumentsAsync(
+        PackageModel package,
+        IReadOnlyDictionary<string, ZipArchiveEntry> entries,
+        IReadOnlyList<XhtmlModel> xhtmlDocuments,
+        List<EpubDiagnostic> diagnostics,
+        CancellationToken cancellationToken)
+    {
+        var xhtmlByPath = xhtmlDocuments.ToDictionary(static item => item.Item.Path, StringComparer.Ordinal);
+        var candidates = package.ManifestOrder
+            .Where(static item => item.Properties.Contains("nav")
+                || string.Equals(item.MediaType, "application/x-dtbncx+xml", StringComparison.OrdinalIgnoreCase))
+            .ToArray();
+        var result = new List<NavigationModel>(candidates.Length);
+        foreach (var item in candidates)
+        {
+            XDocument? document;
+            if (xhtmlByPath.TryGetValue(item.Path, out var loaded))
+            {
+                document = loaded.Document;
+            }
+            else if (entries.TryGetValue(item.Path, out var entry))
+            {
+                document = await LoadXmlAsync(entry, item.Path, diagnostics, cancellationToken).ConfigureAwait(false);
+            }
+            else
+            {
+                diagnostics.Add(Error(
+                    EpubDiagnosticCodes.MissingResource,
+                    "A navigation resource declared by the package is missing from the archive.",
+                    item.Path));
+                continue;
+            }
+
+            if (document is not null)
+            {
+                result.Add(new NavigationModel(
+                    item,
+                    document,
+                    item.Properties.Contains("nav") ? NavigationKind.Epub3 : NavigationKind.Ncx));
+            }
+        }
+
+        return result;
     }
 
     private static void ReportUnusedManifestResources(
@@ -475,105 +457,16 @@ public sealed class EpubImporter : IEpubImporter
         return new DocumentId($"urn:flow:epub:{digest}");
     }
 
-    private static async Task<MemoryStream> CopyWithLimitAsync(
+    private static Task<MemoryStream> CopyWithLimitAsync(
         Stream source,
         long maximumBytes,
-        CancellationToken cancellationToken)
-    {
-        var result = new MemoryStream();
-        var buffer = new byte[81_920];
-        long total = 0;
-        while (true)
-        {
-            var read = await source.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
-            if (read == 0)
-            {
-                break;
-            }
+        CancellationToken cancellationToken) =>
+        EpubArchiveUtilities.CopyWithLimitAsync(source, maximumBytes, cancellationToken);
 
-            total += read;
-            if (total > maximumBytes)
-            {
-                await result.DisposeAsync().ConfigureAwait(false);
-                throw new EpubLimitExceededException($"Input exceeds the configured limit of {maximumBytes} bytes.");
-            }
+    private static bool TryNormalizeArchivePath(string? baseDirectory, string value, out string normalized) =>
+        EpubArchiveUtilities.TryNormalizeArchivePath(baseDirectory, value, out normalized);
 
-            await result.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
-        }
-
-        result.Position = 0;
-        return result;
-    }
-
-    private static bool TryNormalizeArchivePath(string? baseDirectory, string value, out string normalized)
-    {
-        normalized = string.Empty;
-        if (string.IsNullOrWhiteSpace(value)
-            || value.StartsWith("/", StringComparison.Ordinal)
-            || value.Contains('\\')
-            || value.Contains('\0')
-            || Uri.TryCreate(value, UriKind.Absolute, out _))
-        {
-            return false;
-        }
-
-        var pathOnly = value.Split(['#', '?'], 2)[0];
-        try
-        {
-            pathOnly = Uri.UnescapeDataString(pathOnly);
-        }
-        catch (UriFormatException)
-        {
-            return false;
-        }
-
-        var segments = new List<string>();
-        if (!string.IsNullOrEmpty(baseDirectory))
-        {
-            segments.AddRange(baseDirectory.Split('/', StringSplitOptions.RemoveEmptyEntries));
-        }
-
-        foreach (var segment in pathOnly.Split('/', StringSplitOptions.RemoveEmptyEntries))
-        {
-            if (segment == ".")
-            {
-                continue;
-            }
-
-            if (segment == "..")
-            {
-                if (segments.Count == 0)
-                {
-                    return false;
-                }
-
-                segments.RemoveAt(segments.Count - 1);
-                continue;
-            }
-
-            if (segment.Contains(':', StringComparison.Ordinal)
-                || segment.Any(char.IsControl))
-            {
-                return false;
-            }
-
-            segments.Add(segment);
-        }
-
-        if (segments.Count == 0)
-        {
-            return false;
-        }
-
-        normalized = string.Join('/', segments);
-        return true;
-    }
-
-    private static string GetDirectory(string path)
-    {
-        var separator = path.LastIndexOf('/');
-        return separator < 0 ? string.Empty : path[..separator];
-    }
+    private static string GetDirectory(string path) => EpubArchiveUtilities.GetDirectory(path);
 
     private static string NormalizedText(string value) =>
         string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
@@ -603,17 +496,30 @@ public sealed class EpubImporter : IEpubImporter
         ImmutableArray<string> Authors,
         string? Description,
         IReadOnlyDictionary<string, ManifestItem> Manifest,
-        IReadOnlyList<SpineItem> Spine);
+        IReadOnlyList<ManifestItem> ManifestOrder,
+        IReadOnlyList<SpineItem> Spine,
+        string? SpineTocId);
 
     private sealed record XhtmlModel(ManifestItem Item, XDocument Document);
 
-    private sealed class EpubLimitExceededException : Exception
+    private enum NavigationKind
     {
-        internal EpubLimitExceededException(string message)
-            : base(message)
-        {
-        }
+        Epub3,
+        Ncx,
     }
+
+    private sealed record NavigationModel(ManifestItem Item, XDocument Document, NavigationKind Kind);
+
+    private sealed record NavigationEntryModel(
+        ImmutableArray<InlineNode> Label,
+        string Href,
+        int Level,
+        string? LogicalId);
+
+    private sealed record ParsedNavigation(
+        NavigationModel Source,
+        ImmutableArray<InlineNode> Title,
+        ImmutableArray<NavigationEntryModel> Entries);
 
     private sealed class ConversionContext
     {
@@ -684,6 +590,428 @@ public sealed class EpubImporter : IEpubImporter
                 }
             }
         }
+
+        internal TableOfContents? ConvertTableOfContents(
+            IReadOnlyList<NavigationModel> navigationDocuments,
+            string? spineTocId)
+        {
+            var epub3 = navigationDocuments
+                .Where(static item => item.Kind == NavigationKind.Epub3)
+                .SelectMany(ParseEpub3Navigation)
+                .ToArray();
+            var ncx = navigationDocuments
+                .Where(static item => item.Kind == NavigationKind.Ncx)
+                .OrderBy(item => string.Equals(item.Item.Id, spineTocId, StringComparison.Ordinal) ? 0 : 1)
+                .Select(ParseNcxNavigation)
+                .Where(static item => item is not null)
+                .Cast<ParsedNavigation>()
+                .ToArray();
+
+            if (epub3.Length > 1)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.MultipleTableOfContents,
+                    $"The publication contains {epub3.Length} EPUB 3 TOC navigation sections; the first one in manifest/document order was selected.",
+                    epub3[0].Source.Item.Path));
+            }
+
+            if (ncx.Length > 1)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.MultipleTableOfContents,
+                    $"The publication contains {ncx.Length} NCX tables of contents; the package spine TOC is preferred, then manifest order.",
+                    ncx[0].Source.Item.Path));
+            }
+
+            var selected = epub3.FirstOrDefault(static item => !item.Entries.IsEmpty)
+                ?? ncx.FirstOrDefault(static item => !item.Entries.IsEmpty);
+            if (selected is null)
+            {
+                return null;
+            }
+
+            var comparisonNcx = ncx.FirstOrDefault(static item => !item.Entries.IsEmpty);
+            if (epub3.Length > 0 && comparisonNcx is not null
+                && !NavigationSignaturesMatch(epub3[0], comparisonNcx))
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.TableOfContentsConflict,
+                    "EPUB 3 Navigation Document and NCX describe different TOCs; the EPUB 3 Navigation Document takes precedence.",
+                    epub3[0].Source.Item.Path));
+            }
+
+            if (epub3.Length > 0 && selected.Source.Kind == NavigationKind.Ncx)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidTableOfContents,
+                    "No usable entry was found in the EPUB 3 TOC; the importer used the NCX fallback.",
+                    epub3[0].Source.Item.Path));
+            }
+
+            var entries = new List<TableOfContentsEntry>();
+            foreach (var entry in selected.Entries)
+            {
+                var label = entry.Label;
+                if (!HasVisibleText(label))
+                {
+                    diagnostics.Add(Warning(
+                        EpubDiagnosticCodes.EmptyTableOfContentsEntry,
+                        $"A TOC entry for '{entry.Href}' has an empty label; a deterministic fallback label was used.",
+                        selected.Source.Item.Path));
+                    label = [new Text(entry.Href)];
+                }
+
+                if (!TryResolveNavigationTarget(selected.Source.Item.Path, entry.Href, out var anchor, out var circular))
+                {
+                    diagnostics.Add(Warning(
+                        circular
+                            ? EpubDiagnosticCodes.CircularTableOfContentsReference
+                            : EpubDiagnosticCodes.MissingTableOfContentsTarget,
+                        circular
+                            ? $"TOC target '{entry.Href}' refers back to its navigation resource and was ignored."
+                            : $"TOC target '{entry.Href}' does not resolve to imported semantic content and was ignored.",
+                        selected.Source.Item.Path));
+                    continue;
+                }
+
+                entries.Add(new TableOfContentsEntry(label, anchor!, entry.Level));
+            }
+
+            if (entries.Count == 0)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidTableOfContents,
+                    "The selected TOC contains no entry with a resolvable semantic destination.",
+                    selected.Source.Item.Path));
+                return null;
+            }
+
+            ConsumedResourcePaths.Add(selected.Source.Item.Path);
+            var maximumDepth = Math.Max(1, entries.Max(static entry => entry.Level));
+            return new TableOfContents(
+                AllocateId($"toc-{Slug(selected.Source.Item.Id)}"),
+                selected.Title.IsEmpty ? [new Text("Contents")] : selected.Title,
+                entries,
+                maximumDepth);
+        }
+
+        private IEnumerable<ParsedNavigation> ParseEpub3Navigation(NavigationModel source)
+        {
+            if (source.Document.Root?.Name != XhtmlNamespace + "html")
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidTableOfContents,
+                    "An EPUB 3 Navigation Document is not XHTML and was ignored.",
+                    source.Item.Path));
+                yield break;
+            }
+
+            var tocElements = source.Document
+                .Descendants(XhtmlNamespace + "nav")
+                .Where(static nav => HasToken((string?)nav.Attribute(EpubNamespace + "type"), "toc"))
+                .ToArray();
+            if (tocElements.Length == 0)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidTableOfContents,
+                    "The EPUB 3 Navigation Document contains no nav element with epub:type='toc'.",
+                    source.Item.Path));
+                yield break;
+            }
+
+            if (tocElements.Length > 1)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.MultipleTableOfContents,
+                    $"The Navigation Document contains {tocElements.Length} nav elements marked as TOC.",
+                    source.Item.Path));
+            }
+
+            foreach (var toc in tocElements)
+            {
+                var heading = toc.Elements().FirstOrDefault(static element =>
+                    element.Name.Namespace == XhtmlNamespace
+                    && element.Name.LocalName is "h1" or "h2" or "h3" or "h4" or "h5" or "h6");
+                var title = heading is null
+                    ? ImmutableArray<InlineNode>.Empty
+                    : ConvertInline(heading.Nodes(), source.Item.Path).ToImmutableArray();
+                var list = toc.Elements(XhtmlNamespace + "ol").FirstOrDefault();
+                if (list is null)
+                {
+                    diagnostics.Add(Warning(
+                        EpubDiagnosticCodes.InvalidTableOfContents,
+                        "A TOC nav element contains no ordered list.",
+                        source.Item.Path));
+                    yield return new ParsedNavigation(source, title, []);
+                    continue;
+                }
+
+                var entries = new List<NavigationEntryModel>();
+                ParseEpub3List(list, source, level: 1, [], entries);
+                yield return new ParsedNavigation(source, title, entries.ToImmutableArray());
+            }
+        }
+
+        private void ParseEpub3List(
+            XElement list,
+            NavigationModel source,
+            int level,
+            ImmutableHashSet<string> ancestorIds,
+            ICollection<NavigationEntryModel> result)
+        {
+            if (list.Elements(XhtmlNamespace + "ol").Any())
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidTableOfContentsLevel,
+                    "A nested TOC list is not contained by an li entry and cannot define a valid hierarchy.",
+                    source.Item.Path));
+            }
+
+            var effectiveLevel = NormalizeTocLevel(level, source.Item.Path);
+            foreach (var item in list.Elements(XhtmlNamespace + "li"))
+            {
+                var logicalId = (string?)item.Attribute("id");
+                if (!string.IsNullOrEmpty(logicalId) && ancestorIds.Contains(logicalId))
+                {
+                    diagnostics.Add(Warning(
+                        EpubDiagnosticCodes.CircularTableOfContentsReference,
+                        $"Nested TOC entry ID '{logicalId}' repeats an ancestor ID; the circular branch was ignored.",
+                        source.Item.Path));
+                    continue;
+                }
+
+                var anchor = item.Elements()
+                    .TakeWhile(static element => element.Name != XhtmlNamespace + "ol")
+                    .SelectMany(static element => element.DescendantsAndSelf())
+                    .FirstOrDefault(static element => element.Name == XhtmlNamespace + "a");
+                var href = (string?)anchor?.Attribute("href");
+                if (anchor is null || string.IsNullOrWhiteSpace(href))
+                {
+                    diagnostics.Add(Warning(
+                        EpubDiagnosticCodes.InvalidTableOfContents,
+                        "A TOC li entry has no linked destination; its nested entries are still inspected.",
+                        source.Item.Path));
+                }
+                else
+                {
+                    result.Add(new NavigationEntryModel(
+                        ConvertInline(anchor.Nodes(), source.Item.Path).ToImmutableArray(),
+                        href,
+                        effectiveLevel,
+                        logicalId));
+                }
+
+                var nextAncestors = string.IsNullOrEmpty(logicalId) ? ancestorIds : ancestorIds.Add(logicalId);
+                foreach (var nestedList in item.Elements(XhtmlNamespace + "ol"))
+                {
+                    ParseEpub3List(nestedList, source, level + 1, nextAncestors, result);
+                }
+            }
+        }
+
+        private ParsedNavigation? ParseNcxNavigation(NavigationModel source)
+        {
+            if (source.Document.Root?.Name != NcxNamespace + "ncx")
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidTableOfContents,
+                    "An NCX resource does not contain an NCX root and was ignored.",
+                    source.Item.Path));
+                return null;
+            }
+
+            var titleText = NormalizedText(source.Document.Root
+                .Element(NcxNamespace + "docTitle")?
+                .Element(NcxNamespace + "text")?.Value ?? string.Empty);
+            var title = titleText.Length == 0
+                ? ImmutableArray<InlineNode>.Empty
+                : ImmutableArray.Create<InlineNode>(new Text(titleText));
+            var navMap = source.Document.Root.Element(NcxNamespace + "navMap");
+            if (navMap is null)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidTableOfContents,
+                    "The NCX resource contains no navMap.",
+                    source.Item.Path));
+                return new ParsedNavigation(source, title, []);
+            }
+
+            var entries = new List<NavigationEntryModel>();
+            foreach (var point in navMap.Elements(NcxNamespace + "navPoint"))
+            {
+                ParseNcxPoint(point, source, level: 1, [], entries);
+            }
+
+            return new ParsedNavigation(source, title, entries.ToImmutableArray());
+        }
+
+        private void ParseNcxPoint(
+            XElement point,
+            NavigationModel source,
+            int level,
+            ImmutableHashSet<string> ancestorIds,
+            ICollection<NavigationEntryModel> result)
+        {
+            var logicalId = (string?)point.Attribute("id");
+            if (!string.IsNullOrEmpty(logicalId) && ancestorIds.Contains(logicalId))
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.CircularTableOfContentsReference,
+                    $"Nested NCX navPoint ID '{logicalId}' repeats an ancestor ID; the circular branch was ignored.",
+                    source.Item.Path));
+                return;
+            }
+
+            var href = (string?)point.Element(NcxNamespace + "content")?.Attribute("src");
+            if (string.IsNullOrWhiteSpace(href))
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidTableOfContents,
+                    "An NCX navPoint has no content destination; its nested entries are still inspected.",
+                    source.Item.Path));
+            }
+            else
+            {
+                var labelText = point.Element(NcxNamespace + "navLabel")?.Element(NcxNamespace + "text")?.Value ?? string.Empty;
+                var label = NormalizedText(labelText) is { Length: > 0 } normalized
+                    ? ImmutableArray.Create<InlineNode>(new Text(normalized))
+                    : ImmutableArray<InlineNode>.Empty;
+                result.Add(new NavigationEntryModel(label, href, NormalizeTocLevel(level, source.Item.Path), logicalId));
+            }
+
+            var nextAncestors = string.IsNullOrEmpty(logicalId) ? ancestorIds : ancestorIds.Add(logicalId);
+            foreach (var child in point.Elements(NcxNamespace + "navPoint"))
+            {
+                ParseNcxPoint(child, source, level + 1, nextAncestors, result);
+            }
+        }
+
+        private int NormalizeTocLevel(int level, string resourcePath)
+        {
+            if (level is >= 1 and <= 6)
+            {
+                return level;
+            }
+
+            diagnostics.Add(Warning(
+                EpubDiagnosticCodes.InvalidTableOfContentsLevel,
+                $"TOC nesting level {level} is outside Flow's supported range 1..6 and was clamped.",
+                resourcePath));
+            return Math.Clamp(level, 1, 6);
+        }
+
+        private bool TryResolveNavigationTarget(
+            string navigationPath,
+            string href,
+            out DocumentAnchor? anchor,
+            out bool circular)
+        {
+            anchor = null;
+            circular = false;
+            if (!TryBuildReferenceKey(navigationPath, href, out var targetPath, out var key))
+            {
+                return false;
+            }
+
+            circular = string.Equals(targetPath, navigationPath, StringComparison.Ordinal);
+            if (circular || !anchors.TryGetValue(key, out var nodeId))
+            {
+                return false;
+            }
+
+            anchor = DocumentAnchor.Create([nodeId]);
+            return true;
+        }
+
+        private static bool TryBuildReferenceKey(
+            string sourcePath,
+            string href,
+            out string targetPath,
+            out string key)
+        {
+            targetPath = string.Empty;
+            key = string.Empty;
+            if (string.IsNullOrWhiteSpace(href) || Uri.TryCreate(href, UriKind.Absolute, out _))
+            {
+                return false;
+            }
+
+            var parts = href.Split('#', 2);
+            if (parts[0].Length == 0)
+            {
+                targetPath = sourcePath;
+            }
+            else if (!TryNormalizeArchivePath(GetDirectory(sourcePath), parts[0], out targetPath))
+            {
+                return false;
+            }
+
+            if (parts.Length == 1)
+            {
+                key = targetPath;
+                return true;
+            }
+
+            try
+            {
+                var fragment = Uri.UnescapeDataString(parts[1]);
+                if (fragment.Length == 0 || fragment.Any(char.IsControl))
+                {
+                    return false;
+                }
+
+                key = $"{targetPath}#{fragment}";
+                return true;
+            }
+            catch (UriFormatException)
+            {
+                return false;
+            }
+        }
+
+        private static bool NavigationSignaturesMatch(ParsedNavigation left, ParsedNavigation right)
+        {
+            if (left.Entries.Length != right.Entries.Length)
+            {
+                return false;
+            }
+
+            for (var index = 0; index < left.Entries.Length; index++)
+            {
+                var leftEntry = left.Entries[index];
+                var rightEntry = right.Entries[index];
+                if (leftEntry.Level != rightEntry.Level
+                    || !string.Equals(NormalizedText(InlineText(leftEntry.Label)), NormalizedText(InlineText(rightEntry.Label)), StringComparison.Ordinal)
+                    || !TryBuildReferenceKey(left.Source.Item.Path, leftEntry.Href, out _, out var leftKey)
+                    || !TryBuildReferenceKey(right.Source.Item.Path, rightEntry.Href, out _, out var rightKey)
+                    || !string.Equals(leftKey, rightKey, StringComparison.Ordinal))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static bool HasVisibleText(IEnumerable<InlineNode> nodes) =>
+            !string.IsNullOrWhiteSpace(InlineText(nodes));
+
+        private static string InlineText(IEnumerable<InlineNode> nodes) => string.Concat(nodes.Select(static node => node switch
+        {
+            Text text => text.Value,
+            Strong strong => InlineText(strong.Children),
+            Emphasis emphasis => InlineText(emphasis.Children),
+            Underline underline => InlineText(underline.Children),
+            Strikethrough strikethrough => InlineText(strikethrough.Children),
+            InlineCode code => code.Code,
+            Link link => InlineText(link.Children),
+            LineBreak => " ",
+            _ => string.Empty,
+        }));
+
+        private static bool HasToken(string? values, string token) =>
+            values?.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+                .Contains(token, StringComparer.Ordinal) == true;
 
         internal async Task<Chapter> ConvertChapterAsync(XhtmlModel xhtml, CancellationToken cancellationToken)
         {
@@ -1049,23 +1377,8 @@ public sealed class EpubImporter : IEpubImporter
                 return;
             }
 
-            var parts = href.Split('#', 2);
-            if (parts.Length == 2)
-            {
-                try
-                {
-                    parts[1] = Uri.UnescapeDataString(parts[1]);
-                }
-                catch (UriFormatException)
-                {
-                    parts[1] = string.Empty;
-                }
-            }
-            var targetPath = parts[0].Length == 0
-                ? resourcePath
-                : TryNormalizeArchivePath(GetDirectory(resourcePath), parts[0], out var normalized) ? normalized : null;
-            var key = targetPath is null ? null : parts.Length == 2 ? $"{targetPath}#{parts[1]}" : targetPath;
-            if (key is not null && anchors.TryGetValue(key, out var nodeId))
+            if (TryBuildReferenceKey(resourcePath, href, out _, out var key)
+                && anchors.TryGetValue(key, out var nodeId))
             {
                 result.Add(new Link(DocumentAnchor.Create([nodeId]).Value, children));
                 return;
