@@ -26,6 +26,19 @@ public sealed class FlowJsonDocumentSerializerTests
     }
 
     [Fact]
+    public async Task SerializeAsync_PreCancelledTokenWritesNoPartialBytes()
+    {
+        await using var destination = new MemoryStream();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => _serializer.SerializeAsync(CreateCompleteDocument(), destination, cancellation.Token));
+
+        Assert.Equal(0, destination.Length);
+    }
+
+    [Fact]
     public async Task SerializeAsync_WritesUnicodeLiterallyAndEscapesUnsafeJsonText()
     {
         var document = new FlowDocument(

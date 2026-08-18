@@ -21,6 +21,8 @@ flow render <document> --html-book <output-directory> [--ui-language <auto|en|pt
 
 `import` accepts a security-bounded EPUB and writes a deterministic `.flow.json`. Without `--output`, the destination stays beside the source EPUB and receives a portable `snake_case` name derived from the imported title. Accents are folded (`é` becomes `e`), punctuation and repeated whitespace become one underscore, the stem is limited to 96 characters, and an unusable title falls back to the source name or `imported_book`. For example, “Isto é filtro solar: Eclesiastes e a vida debaixo do sol” becomes `isto_e_filtro_solar_eclesiastes_e_a_vida_debaixo_do_sol.flow.json`. An explicit `--output` always wins.
 
+Successful imports print noncanonical timing, archive, asset, spine, node, character, approximate managed-memory, and `.flow.json` size measurements. Timings and sampled memory vary by machine and never enter the document or hash. Pressing `Ctrl+C` produces `FLOWCLI_CANCELLED` and exit code `130`; an existing final output is preserved and temporary output is removed. See [EPUB performance](epub-performance.md).
+
 For example:
 
 ```powershell
@@ -46,7 +48,7 @@ The imported `.flow.json` contains only canonical Flow metadata. Publisher, cont
 
 `render` resolves `ReadingMode.Flow` for the requested logical viewport, writes standalone HTML, and reports the source identity, canonical hash, anchor count, and selected viewport category. Width and height use invariant-culture positive numbers.
 
-`render --html-book` writes the additional multi-file `flow-html-book-0.1` package. It uses a deterministic 1024×768 logical layout, keeps the TOC in `toc.html`, creates one file per semantic chapter, externalizes hash-deduplicated assets and typed CSS, and records canonical identity plus payload hashes in `manifest.json`. The directory is assembled beside the target and then moved into place. An arbitrary existing directory, filesystem root, reparse point, existing file, or directory containing the source document is never replaced. See [HTML book package](html-book-package.md).
+`render --html-book` writes the additional multi-file `flow-html-book-0.1` package. It uses a deterministic 1024×768 logical layout, keeps the TOC in `toc.html`, creates one file per semantic chapter, externalizes hash-deduplicated assets and typed CSS, and records canonical identity plus payload hashes in `manifest.json`. The directory is assembled beside the target and then moved into place. An arbitrary existing directory, filesystem root, reparse point, existing file, or directory containing the source document is never replaced. The CLI reports generated file/byte totals and render/write durations. See [HTML book package](html-book-package.md).
 
 `--ui-language` controls only renderer-generated interface text. Values are `auto`, `en`, `pt-PT`, and `pt-BR`; matching is case-insensitive. `auto` uses `pt-BR` for Brazilian Portuguese publications, `pt-PT` for other Portuguese language tags, and English for all other or missing publication languages. Authored book content and TOC titles are never translated. The resolved UI language is written to `manifest.json` and reported by the CLI.
 

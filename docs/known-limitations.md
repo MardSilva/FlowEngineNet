@@ -37,6 +37,8 @@ Flow 0.1 is a research-grade reference implementation. This list is part of the 
 
 ## EPUB interoperability
 
+- Performance measurements are environment-dependent. The importer samples managed heap only at phase boundaries, still buffers the bounded ZIP, and can temporarily retain XML trees, the semantic document, standalone HTML, and package payloads together. Prompt 17 provides cancellation and evidence collection, not a universal maximum publication size or memory guarantee.
+
 - The EPUB importer is a bounded subset prototype, not an EPUB 3.3 conformance checker or general reading system.
 - EPUB inspection recognizes package-level EPUB 2/3 structure; import maps EPUB 3 TOC navigation and EPUB 2 NCX fallback to Flow anchors, but neither operation validates the full EPUB specification.
 - OPF metadata import maps only title, subtitle, primary language, authors, and description into canonical Flow metadata. Other parsed source properties live only in the noncanonical in-memory `EpubMetadataReport` and are not persisted by `.flow.json` or the CLI.

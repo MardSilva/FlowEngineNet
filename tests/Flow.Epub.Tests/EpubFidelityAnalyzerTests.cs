@@ -6,6 +6,18 @@ namespace Flow.Epub.Tests;
 public sealed class EpubFidelityAnalyzerTests
 {
     [Fact]
+    public async Task Analyze_PreCancelledTokenIsDistinctFromAConversionFinding()
+    {
+        await using var epub = MinimalEpubFactory.Create();
+        var import = await new EpubImporter().ImportAsync(epub);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(
+            () => new EpubFidelityAnalyzer().Analyze(import, cancellation.Token));
+    }
+
+    [Fact]
     public async Task Analyze_MeasuresRichFixtureAndDoesNotChangeCanonicalHash()
     {
         await using var epub = MinimalEpubFactory.Create();

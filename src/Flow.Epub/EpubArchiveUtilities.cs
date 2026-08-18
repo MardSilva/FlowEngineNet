@@ -9,7 +9,8 @@ internal static class EpubArchiveUtilities
     internal static async Task<MemoryStream> CopyWithLimitAsync(
         Stream source,
         long maximumBytes,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<long>? progress = null)
     {
         var result = new MemoryStream();
         var buffer = new byte[81_920];
@@ -30,6 +31,7 @@ internal static class EpubArchiveUtilities
             }
 
             await result.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
+            progress?.Invoke(total);
         }
 
         result.Position = 0;

@@ -494,6 +494,61 @@ public sealed class FlowCliIntegrationTests
     }
 
     [Fact]
+    public async Task CancellationReturnsDistinctExitCodeAndPreservesExistingHtmlBook()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var documentPath = workspace.PathOf("sample.flow.json");
+        var outputDirectory = workspace.PathOf("book");
+        var application = FlowCliApplication.CreateDefault();
+        Assert.Equal(0, (await RunAsync(application, ["sample", documentPath])).ExitCode);
+        Assert.Equal(
+            0,
+            (await RunAsync(application, ["render", documentPath, "--html-book", outputDirectory])).ExitCode);
+        var before = DirectorySnapshot(outputDirectory);
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        var exitCode = await application.RunAsync(
+            ["render", documentPath, "--html-book", outputDirectory],
+            output,
+            error,
+            cancellation.Token);
+
+        Assert.Equal(130, exitCode);
+        Assert.Contains("FLOWCLI_CANCELLED:", error.ToString(), StringComparison.Ordinal);
+        Assert.Equal(before, DirectorySnapshot(outputDirectory));
+        Assert.Empty(Directory.GetDirectories(workspace.Root, ".*.flow-html-book-*.tmp"));
+        Assert.Empty(Directory.GetDirectories(workspace.Root, ".*.flow-html-book-*.backup"));
+    }
+
+    [Fact]
+    public async Task CancelledImportPreservesExistingFlowOutputAndLeavesNoTemporaryFile()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var epubPath = workspace.PathOf("book.epub");
+        var outputPath = workspace.PathOf("book.flow.json");
+        CreateMinimalEpub(epubPath);
+        await File.WriteAllTextAsync(outputPath, "existing-output");
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+
+        var exitCode = await FlowCliApplication.CreateDefault().RunAsync(
+            ["import", epubPath, "--output", outputPath],
+            output,
+            error,
+            cancellation.Token);
+
+        Assert.Equal(130, exitCode);
+        Assert.Contains("FLOWCLI_CANCELLED:", error.ToString(), StringComparison.Ordinal);
+        Assert.Equal("existing-output", await File.ReadAllTextAsync(outputPath));
+        Assert.Empty(Directory.GetFiles(workspace.Root, "*.tmp"));
+    }
+
+    [Fact]
     public async Task Application_ReportsParsingAndFileErrorsWithoutThrowing()
     {
         using var workspace = new TemporaryWorkspace();

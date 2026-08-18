@@ -32,8 +32,14 @@ public sealed class EpubImporter : IEpubImporter
     }
 
     /// <inheritdoc />
+    public Task<EpubImportResult> ImportAsync(
+        Stream source,
+        CancellationToken cancellationToken = default) => ImportAsync(source, null, cancellationToken);
+
+    /// <inheritdoc />
     public async Task<EpubImportResult> ImportAsync(
         Stream source,
+        IProgress<EpubImportProgress>? progress,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -43,27 +49,58 @@ public sealed class EpubImporter : IEpubImporter
         }
 
         var diagnostics = new List<EpubDiagnostic>();
+        var telemetry = new EpubImportTelemetryCollector(progress);
+        EpubImportResult Finish(
+            FlowDocument? document,
+            EpubMetadataReport? metadataReport = null,
+            EpubPackageProcessingReport? processingReport = null,
+            EpubSourceMap? sourceMap = null,
+            EpubFidelitySourceSnapshot? fidelitySource = null)
+        {
+            telemetry.Start(EpubImportPhase.Completed, 1);
+            telemetry.Advance(1, 1);
+            var metrics = telemetry.Finish(document);
+            return new EpubImportResult(
+                document,
+                diagnostics,
+                metadataReport,
+                processingReport,
+                sourceMap,
+                fidelitySource,
+                metrics);
+        }
+
         try
         {
+            var archiveTotal = TryGetRemainingLength(source);
+            telemetry.Start(EpubImportPhase.CopyingArchive, archiveTotal);
             await using var archiveBuffer = await EpubArchiveUtilities.CopyWithLimitAsync(
                 source,
                 limits.MaximumArchiveBytes,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                copied => telemetry.Advance(copied, archiveTotal)).ConfigureAwait(false);
             using var archive = new ZipArchive(archiveBuffer, ZipArchiveMode.Read, leaveOpen: false);
+            telemetry.ArchiveEntryCount = archive.Entries.Count(static entry => !entry.FullName.EndsWith("/", StringComparison.Ordinal));
+            telemetry.CompressedBytes = SaturatingSum(archive.Entries.Select(static entry => entry.CompressedLength));
+            telemetry.UncompressedBytes = SaturatingSum(archive.Entries.Select(static entry => entry.Length));
+            telemetry.Start(EpubImportPhase.IndexingArchive, archive.Entries.Count);
             var entries = IndexArchive(archive, diagnostics);
+            telemetry.Advance(archive.Entries.Count, archive.Entries.Count);
             if (HasErrors(diagnostics))
             {
-                return new EpubImportResult(null, diagnostics);
+                return Finish(null);
             }
 
+            telemetry.Start(EpubImportPhase.ReadingContainer, 1, ContainerPath);
             if (!entries.TryGetValue(ContainerPath, out var containerEntry))
             {
                 diagnostics.Add(Error(EpubDiagnosticCodes.MissingContainer, $"Required resource '{ContainerPath}' was not found."));
-                return new EpubImportResult(null, diagnostics);
+                return Finish(null);
             }
 
             var container = await LoadXmlAsync(containerEntry, ContainerPath, diagnostics, cancellationToken)
                 .ConfigureAwait(false);
+            telemetry.Advance(1, 1, ContainerPath);
             var packagePath = ReadPackagePath(container, diagnostics);
             if (packagePath is null || !entries.TryGetValue(packagePath, out var packageEntry))
             {
@@ -75,27 +112,30 @@ public sealed class EpubImporter : IEpubImporter
                         packagePath));
                 }
 
-                return new EpubImportResult(null, diagnostics);
+                return Finish(null);
             }
 
+            telemetry.Start(EpubImportPhase.ReadingPackage, 1, packagePath);
             var package = await LoadXmlAsync(packageEntry, packagePath, diagnostics, cancellationToken)
                 .ConfigureAwait(false);
+            telemetry.Advance(1, 1, packagePath);
             if (package is null)
             {
-                return new EpubImportResult(null, diagnostics);
+                return Finish(null);
             }
 
+            telemetry.Start(EpubImportPhase.ProcessingManifest, 1, packagePath);
             var model = ReadPackage(package, packagePath, entries, diagnostics);
+            telemetry.Advance(1, 1, packagePath);
             if (model is null)
             {
-                return new EpubImportResult(null, diagnostics);
+                return Finish(null);
             }
 
-            var conversion = await ConvertPackageAsync(model, entries, diagnostics, cancellationToken)
+            var conversion = await ConvertPackageAsync(model, entries, diagnostics, telemetry, cancellationToken)
                 .ConfigureAwait(false);
-            return new EpubImportResult(
+            return Finish(
                 conversion.Document,
-                diagnostics,
                 conversion.MetadataReport ?? model.MetadataReport,
                 conversion.ProcessingReport,
                 conversion.SourceMap,
@@ -108,15 +148,43 @@ public sealed class EpubImporter : IEpubImporter
         catch (EpubLimitExceededException exception)
         {
             diagnostics.Add(Error(EpubDiagnosticCodes.ArchiveLimitExceeded, exception.Message));
-            return new EpubImportResult(null, diagnostics);
+            return Finish(null);
         }
         catch (Exception exception) when (exception is InvalidDataException or IOException or XmlException)
         {
             diagnostics.Add(Error(
                 EpubDiagnosticCodes.InvalidArchive,
                 $"The EPUB could not be processed safely: {exception.Message}"));
-            return new EpubImportResult(null, diagnostics);
+            return Finish(null);
         }
+    }
+
+    private static long? TryGetRemainingLength(Stream source)
+    {
+        if (!source.CanSeek)
+        {
+            return null;
+        }
+
+        try
+        {
+            return Math.Max(0, source.Length - source.Position);
+        }
+        catch (Exception exception) when (exception is IOException or NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static long SaturatingSum(IEnumerable<long> values)
+    {
+        long total = 0;
+        foreach (var value in values)
+        {
+            total = value > long.MaxValue - total ? long.MaxValue : total + value;
+        }
+
+        return total;
     }
 
     private Dictionary<string, ZipArchiveEntry> IndexArchive(
@@ -463,59 +531,75 @@ public sealed class EpubImporter : IEpubImporter
         PackageModel package,
         IReadOnlyDictionary<string, ZipArchiveEntry> entries,
         List<EpubDiagnostic> diagnostics,
+        EpubImportTelemetryCollector telemetry,
         CancellationToken cancellationToken)
     {
         var xhtmlDocuments = new List<XhtmlModel>();
         var spineDecisions = new List<EpubSpineProcessingDecision>(package.Spine.Count);
-        foreach (var spineItem in package.Spine)
+        telemetry.Start(EpubImportPhase.ProcessingSpine, package.Spine.Count);
+        for (var spineIndex = 0; spineIndex < package.Spine.Count; spineIndex++)
         {
-            var resolution = ResolveSpineItem(spineItem, package.Manifest, diagnostics);
-            var decision = resolution.Decision;
-            if (resolution.Selected is null)
+            cancellationToken.ThrowIfCancellationRequested();
+            var spineItem = package.Spine[spineIndex];
+            try
             {
-                spineDecisions.Add(decision);
-                continue;
-            }
-
-            var selected = resolution.Selected;
-            if (!entries.TryGetValue(selected.Path, out var entry))
-            {
-                spineDecisions.Add(decision with
+                var resolution = ResolveSpineItem(spineItem, package.Manifest, diagnostics);
+                var decision = resolution.Decision;
+                if (resolution.Selected is null)
                 {
-                    Disposition = EpubSpineDisposition.Excluded,
-                    Reason = EpubSpineDecisionReason.MissingArchiveResource,
-                    SelectedItemId = null,
-                    SelectedResourcePath = null,
-                });
-                continue;
-            }
-
-            var xhtml = await LoadXmlAsync(entry, selected.Path, diagnostics, cancellationToken)
-                .ConfigureAwait(false);
-            if (xhtml?.Root?.Name != XhtmlNamespace + "html"
-                || xhtml.Root.Element(XhtmlNamespace + "body") is null)
-            {
-                if (xhtml is not null)
-                {
-                    diagnostics.Add(Error(
-                        EpubDiagnosticCodes.InvalidXml,
-                        "The selected spine resource must be XHTML in the XHTML namespace and contain a body.",
-                        selected.Path));
+                    spineDecisions.Add(decision);
+                    continue;
                 }
 
-                spineDecisions.Add(decision with
+                var selected = resolution.Selected;
+                if (!entries.TryGetValue(selected.Path, out var entry))
                 {
-                    Disposition = EpubSpineDisposition.Excluded,
-                    Reason = EpubSpineDecisionReason.InvalidXhtml,
-                    SelectedItemId = null,
-                    SelectedResourcePath = null,
-                });
-                continue;
-            }
+                    spineDecisions.Add(decision with
+                    {
+                        Disposition = EpubSpineDisposition.Excluded,
+                        Reason = EpubSpineDecisionReason.MissingArchiveResource,
+                        SelectedItemId = null,
+                        SelectedResourcePath = null,
+                    });
+                    continue;
+                }
 
-            xhtmlDocuments.Add(new XhtmlModel(selected, xhtml, spineItem.StableIdentity));
-            spineDecisions.Add(decision);
+                var xhtml = await LoadXmlAsync(entry, selected.Path, diagnostics, cancellationToken)
+                    .ConfigureAwait(false);
+                if (xhtml?.Root?.Name != XhtmlNamespace + "html"
+                    || xhtml.Root.Element(XhtmlNamespace + "body") is null)
+                {
+                    if (xhtml is not null)
+                    {
+                        diagnostics.Add(Error(
+                            EpubDiagnosticCodes.InvalidXml,
+                            "The selected spine resource must be XHTML in the XHTML namespace and contain a body.",
+                            selected.Path));
+                    }
+
+                    spineDecisions.Add(decision with
+                    {
+                        Disposition = EpubSpineDisposition.Excluded,
+                        Reason = EpubSpineDecisionReason.InvalidXhtml,
+                        SelectedItemId = null,
+                        SelectedResourcePath = null,
+                    });
+                    continue;
+                }
+
+                xhtmlDocuments.Add(new XhtmlModel(selected, xhtml, spineItem.StableIdentity));
+                spineDecisions.Add(decision);
+            }
+            finally
+            {
+                telemetry.Advance(
+                    spineIndex + 1,
+                    package.Spine.Count,
+                    spineItem.Item?.Path ?? spineItem.IdRef ?? package.PackagePath);
+            }
         }
+
+        telemetry.SpineDocumentsProcessed = xhtmlDocuments.Count;
 
         var processingReport = new EpubPackageProcessingReport(
             package.ManifestOrder.Select(static item => new EpubManifestResourceDecision(
@@ -538,6 +622,7 @@ public sealed class EpubImporter : IEpubImporter
                 CreateFidelitySource(package, processingReport, [], [], diagnostics));
         }
 
+        telemetry.Start(EpubImportPhase.ConvertingContent, xhtmlDocuments.Count);
         var navigationDocuments = await LoadNavigationDocumentsAsync(
             package,
             entries,
@@ -569,11 +654,15 @@ public sealed class EpubImporter : IEpubImporter
             content.Add(tableOfContents);
         }
 
-        foreach (var xhtml in xhtmlDocuments)
+        for (var xhtmlIndex = 0; xhtmlIndex < xhtmlDocuments.Count; xhtmlIndex++)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            var xhtml = xhtmlDocuments[xhtmlIndex];
             content.Add(await context.ConvertChapterAsync(xhtml, cancellationToken).ConfigureAwait(false));
+            telemetry.Advance(xhtmlIndex + 1, xhtmlDocuments.Count, xhtml.Item.Path);
         }
 
+        telemetry.Start(EpubImportPhase.FinalizingDocument, 1, package.PackagePath);
         var metadataReport = coverAssetId is null || package.MetadataReport.Cover is null
             ? package.MetadataReport
             : package.MetadataReport.WithCover(package.MetadataReport.Cover with { AssetId = coverAssetId });
@@ -613,6 +702,8 @@ public sealed class EpubImporter : IEpubImporter
                     : EpubDiagnosticSeverity.Warning,
                 $"{validationDiagnostic.Code}: {validationDiagnostic.Message}"));
         }
+
+        telemetry.Advance(1, 1, package.PackagePath);
 
         return new PackageConversionResult(
             document,

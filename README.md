@@ -47,7 +47,8 @@ Implemented:
 - a typed, deterministic EPUB fidelity sidecar with explicit preserved/transformed/approximated/unsupported/lost evidence;
 - small, medium, and large viewport profiles;
 - responsive figures, semantic ID preservation, and typed layout intentions;
-- unit and semantic-conformance tests.
+- unit and semantic-conformance tests;
+- typed EPUB progress and runtime metrics, cooperative cancellation, and atomic cancellation-safe CLI outputs.
 
 Not implemented yet:
 
@@ -202,7 +203,7 @@ The real EPUB cycle now follows these increments:
 4. validate fidelity and performance against legal real-world publications;
 5. pass the large-book gate before beginning the PDF importer.
 
-The first four increments now have executable implementations, including the package's book-like appearance and accessibility structure. The next work is measurable performance, cancellation, and corpus gates; this does not yet justify a universal EPUB-support or accessibility-conformance claim.
+The first five increments now have executable implementations, including measured progress and cancellation behavior. The next work is a legal reproducible corpus and the large-publication gate; this does not yet justify a universal EPUB-support, performance, or accessibility-conformance claim. See [EPUB performance, progress, and cancellation](docs/epub-performance.md).
 
 A document can only be considered end-to-end usable when an EPUB can be imported without silent semantic loss, represented as a valid `FlowDocument`, laid out, rendered, inspected, and round-tripped through the supported Flow format. The repository has not reached that point yet.
 

@@ -8,12 +8,18 @@ namespace Flow.Epub;
 public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
 {
     /// <inheritdoc />
-    public EpubFidelityReport Analyze(EpubImportResult importResult)
+    public EpubFidelityReport Analyze(EpubImportResult importResult) => Analyze(importResult, default);
+
+    /// <inheritdoc />
+    public EpubFidelityReport Analyze(
+        EpubImportResult importResult,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(importResult);
+        cancellationToken.ThrowIfCancellationRequested();
 
         var source = importResult.FidelitySource?.Items ?? [];
-        var destination = CountDestination(importResult);
+        var destination = CountDestination(importResult, cancellationToken);
         var measurements = Enum.GetValues<EpubFidelityMetric>()
             .Select(metric => CreateMeasurement(
                 metric,
@@ -21,8 +27,9 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
                 destination.GetValueOrDefault(metric)))
             .ToArray();
 
-        var findings = CreateDiagnosticFindings(importResult).ToList();
-        AddMeasurementFindings(measurements, source, importResult, findings);
+        cancellationToken.ThrowIfCancellationRequested();
+        var findings = CreateDiagnosticFindings(importResult, cancellationToken).ToList();
+        AddMeasurementFindings(measurements, source, importResult, findings, cancellationToken);
 
         var sourceTotal = measurements.Sum(static item => item.SourceCount);
         var preserved = measurements.Sum(static item => item.PreservedCount);
@@ -91,7 +98,9 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
         or EpubFidelityMetric.TableOfContentsEntries
         or EpubFidelityMetric.ManifestResources;
 
-    private static Dictionary<EpubFidelityMetric, long> CountDestination(EpubImportResult import)
+    private static Dictionary<EpubFidelityMetric, long> CountDestination(
+        EpubImportResult import,
+        CancellationToken cancellationToken)
     {
         var counts = Enum.GetValues<EpubFidelityMetric>().ToDictionary(static metric => metric, static _ => 0L);
         var document = import.Document;
@@ -102,6 +111,7 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
 
         foreach (var location in document.Index.Locations)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             switch (location.Node)
             {
                 case Chapter:
@@ -112,14 +122,14 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
                     break;
                 case Heading heading:
                     counts[EpubFidelityMetric.Headings]++;
-                    CountInline(heading.Content, counts);
+                    CountInline(heading.Content, counts, cancellationToken);
                     break;
                 case Paragraph paragraph:
                     counts[EpubFidelityMetric.Paragraphs]++;
-                    CountInline(paragraph.Content, counts);
+                    CountInline(paragraph.Content, counts, cancellationToken);
                     break;
                 case Caption caption:
-                    CountInline(caption.Content, counts);
+                    CountInline(caption.Content, counts, cancellationToken);
                     break;
                 case CodeBlock code:
                     counts[EpubFidelityMetric.SignificantCharacters] += CountSignificant(code.Code);
@@ -171,10 +181,12 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
 
     private static void CountInline(
         IEnumerable<InlineNode> nodes,
-        IDictionary<EpubFidelityMetric, long> counts)
+        IDictionary<EpubFidelityMetric, long> counts,
+        CancellationToken cancellationToken)
     {
         foreach (var node in nodes)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             switch (node)
             {
                 case Text text:
@@ -187,14 +199,14 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
                     counts[DocumentAnchor.TryParse(link.Target, out _)
                         ? EpubFidelityMetric.InternalLinks
                         : EpubFidelityMetric.ExternalLinks]++;
-                    CountInline(link.Children, counts);
+                    CountInline(link.Children, counts, cancellationToken);
                     break;
                 case FootnoteReference reference:
                     counts[EpubFidelityMetric.NoteReferences]++;
-                    CountInline(reference.Label, counts);
+                    CountInline(reference.Label, counts, cancellationToken);
                     break;
                 case InlineContainerNode container:
-                    CountInline(container.Children, counts);
+                    CountInline(container.Children, counts, cancellationToken);
                     break;
             }
         }
@@ -204,7 +216,9 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
         .EnumerateRunes()
         .LongCount(static rune => !Rune.IsWhiteSpace(rune));
 
-    private static IEnumerable<EpubFidelityFinding> CreateDiagnosticFindings(EpubImportResult import)
+    private static IEnumerable<EpubFidelityFinding> CreateDiagnosticFindings(
+        EpubImportResult import,
+        CancellationToken cancellationToken)
     {
         foreach (var group in import.Diagnostics.GroupBy(diagnostic => new
         {
@@ -214,6 +228,7 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
             diagnostic.Severity,
         }))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var classification = Classify(group.Key.Code, group.Key.Severity);
             var location = FindLocation(import, group.Key.Resource);
             yield return new EpubFidelityFinding(
@@ -284,10 +299,12 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
         IEnumerable<EpubFidelityMeasurement> measurements,
         IEnumerable<EpubFidelitySourceCount> source,
         EpubImportResult import,
-        ICollection<EpubFidelityFinding> findings)
+        ICollection<EpubFidelityFinding> findings,
+        CancellationToken cancellationToken)
     {
         foreach (var measurement in measurements)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (measurement.ApproximatedCount > 0)
             {
                 AddByResource(measurement, measurement.ApproximatedCount, EpubFidelityStatus.Approximated);
@@ -330,6 +347,7 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
 
             foreach (var item in sources)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 if (remaining == 0)
                 {
                     break;

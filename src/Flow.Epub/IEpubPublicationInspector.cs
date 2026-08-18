@@ -7,4 +7,10 @@ public interface IEpubPublicationInspector
     public Task<EpubPublicationInspection> InspectAsync(
         Stream source,
         CancellationToken cancellationToken = default);
+
+    /// <summary>Inspects an EPUB while reporting isolated, noncanonical progress observations.</summary>
+    public Task<EpubPublicationInspection> InspectAsync(
+        Stream source,
+        IProgress<EpubImportProgress>? progress,
+        CancellationToken cancellationToken = default) => InspectAsync(source, cancellationToken);
 }

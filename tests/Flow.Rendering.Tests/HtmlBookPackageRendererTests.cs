@@ -457,6 +457,27 @@ public sealed class HtmlBookPackageRendererTests
     }
 
     [Fact]
+    public void Render_PreCancelledTokenDoesNotProduceAPackage()
+    {
+        var document = CreateTwoChapterDocument();
+        var preferences = new UserReadingPreferences();
+        var layout = new AdaptiveLayoutEngine().Layout(
+            document,
+            new LayoutContext(1024, 768, userPreferences: preferences));
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        Assert.Throws<OperationCanceledException>(
+            () => renderer.Render(
+                document,
+                layout,
+                preferences,
+                Integrity,
+                new HtmlBookPackageOptions(),
+                cancellation.Token));
+    }
+
+    [Fact]
     public void Render_PreservesLongTextAndDoesNotAllowThemeOverrideOfHighContrastSafety()
     {
         var longText = string.Concat(Enumerable.Repeat("Texto longo sem perda. ", 600));

@@ -6,6 +6,8 @@
 
 `IEpubImporter.ImportAsync` accepts a readable EPUB stream and returns an `EpubImportResult`. The result contains an optional document plus immutable diagnostics. `IsSuccess` is true only when a document was produced and no error diagnostic occurred. A document may still be returned with errors when recoverable content exists, allowing callers to inspect the partial result without treating it as a successful import.
 
+The progress overload reports typed noncanonical phases and the reference result includes optional `EpubImportMetrics`. Progress, runtime measurements, cancellation, memory caveats, host limits, and the optional external load gate are documented in [EPUB performance](epub-performance.md). These observations cannot alter stable IDs, reading order, diagnostics, serialization, or hashes.
+
 `IEpubPublicationInspector.InspectAsync` is the non-converting entry point. It returns an immutable `EpubPublicationInspection` containing `EpubPackageInfo`, normalized manifest/spine entries, detected EPUB 3 Navigation Documents or EPUB 2 NCX resources, aggregate archive/resource sizes, media-type counts, and diagnostics. It deliberately does not parse spine XHTML or construct a `FlowDocument`.
 
 The prototype reads:

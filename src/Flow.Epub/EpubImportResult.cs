@@ -22,7 +22,8 @@ public sealed record EpubImportResult
         EpubMetadataReport? metadataReport,
         EpubPackageProcessingReport? processingReport,
         EpubSourceMap? sourceMap,
-        EpubFidelitySourceSnapshot? fidelitySource)
+        EpubFidelitySourceSnapshot? fidelitySource,
+        EpubImportMetrics? metrics = null)
     {
         ArgumentNullException.ThrowIfNull(diagnostics);
         Document = document;
@@ -31,6 +32,7 @@ public sealed record EpubImportResult
         ProcessingReport = processingReport;
         SourceMap = sourceMap;
         FidelitySource = fidelitySource;
+        Metrics = metrics;
     }
 
     /// <summary>Gets the imported document, including a recoverable partial result when available.</summary>
@@ -47,6 +49,9 @@ public sealed record EpubImportResult
 
     /// <summary>Gets noncanonical traceability from EPUB resources and fragments to semantic node IDs.</summary>
     public EpubSourceMap? SourceMap { get; }
+
+    /// <summary>Gets optional noncanonical runtime measurements produced by the reference importer.</summary>
+    public EpubImportMetrics? Metrics { get; }
 
     internal EpubFidelitySourceSnapshot? FidelitySource { get; }
 

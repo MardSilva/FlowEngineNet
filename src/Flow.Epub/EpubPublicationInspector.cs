@@ -23,8 +23,14 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
     }
 
     /// <inheritdoc />
+    public Task<EpubPublicationInspection> InspectAsync(
+        Stream source,
+        CancellationToken cancellationToken = default) => InspectAsync(source, null, cancellationToken);
+
+    /// <inheritdoc />
     public async Task<EpubPublicationInspection> InspectAsync(
         Stream source,
+        IProgress<EpubImportProgress>? progress,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -34,19 +40,45 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
         }
 
         var diagnostics = new List<EpubDiagnostic>();
+        var telemetry = new EpubImportTelemetryCollector(progress);
+        EpubPublicationInspection Finish(EpubPublicationInspection inspection)
+        {
+            telemetry.Start(EpubImportPhase.Completed, 1);
+            telemetry.Advance(1, 1);
+            _ = telemetry.Finish(null);
+            return inspection;
+        }
+
         try
         {
+            long? archiveTotal = null;
+            if (source.CanSeek)
+            {
+                try
+                {
+                    archiveTotal = Math.Max(0, source.Length - source.Position);
+                }
+                catch (Exception exception) when (exception is IOException or NotSupportedException)
+                {
+                    archiveTotal = null;
+                }
+            }
+
+            telemetry.Start(EpubImportPhase.CopyingArchive, archiveTotal);
             await using var archiveBuffer = await EpubArchiveUtilities.CopyWithLimitAsync(
                 source,
                 limits.MaximumArchiveBytes,
-                cancellationToken).ConfigureAwait(false);
+                cancellationToken,
+                copied => telemetry.Advance(copied, archiveTotal)).ConfigureAwait(false);
             using var archive = new ZipArchive(archiveBuffer, ZipArchiveMode.Read, leaveOpen: false);
             var archiveEntries = archive.Entries
                 .Where(static entry => !entry.FullName.EndsWith("/", StringComparison.Ordinal))
                 .ToArray();
             var compressedBytes = SaturatingSum(archiveEntries.Select(static entry => entry.CompressedLength));
             var uncompressedBytes = SaturatingSum(archiveEntries.Select(static entry => entry.Length));
+            telemetry.Start(EpubImportPhase.IndexingArchive, archive.Entries.Count);
             var entries = EpubArchiveUtilities.IndexArchive(archive, limits, diagnostics);
+            telemetry.Advance(archive.Entries.Count, archive.Entries.Count);
             var archiveOnlySummary = CreateSummary(
                 archiveEntries.Length,
                 compressedBytes,
@@ -55,15 +87,16 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
 
             if (HasErrors(diagnostics))
             {
-                return EmptyInspection(archiveOnlySummary, diagnostics);
+                return Finish(EmptyInspection(archiveOnlySummary, diagnostics));
             }
 
+            telemetry.Start(EpubImportPhase.ReadingContainer, 1, ContainerPath);
             if (!entries.TryGetValue(ContainerPath, out var containerEntry))
             {
                 diagnostics.Add(Error(
                     EpubDiagnosticCodes.MissingContainer,
                     $"Required resource '{ContainerPath}' was not found."));
-                return EmptyInspection(archiveOnlySummary, diagnostics);
+                return Finish(EmptyInspection(archiveOnlySummary, diagnostics));
             }
 
             var container = await EpubArchiveUtilities.LoadXmlAsync(
@@ -72,6 +105,7 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
                 limits,
                 diagnostics,
                 cancellationToken).ConfigureAwait(false);
+            telemetry.Advance(1, 1, ContainerPath);
             var packagePath = ReadPackagePath(container, diagnostics);
             if (packagePath is null || !entries.TryGetValue(packagePath, out var packageEntry))
             {
@@ -83,24 +117,28 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
                         packagePath));
                 }
 
-                return EmptyInspection(archiveOnlySummary, diagnostics);
+                return Finish(EmptyInspection(archiveOnlySummary, diagnostics));
             }
 
+            telemetry.Start(EpubImportPhase.ReadingPackage, 1, packagePath);
             var packageDocument = await EpubArchiveUtilities.LoadXmlAsync(
                 packageEntry,
                 packagePath,
                 limits,
                 diagnostics,
                 cancellationToken).ConfigureAwait(false);
+            telemetry.Advance(1, 1, packagePath);
             if (packageDocument is null)
             {
-                return EmptyInspection(archiveOnlySummary, diagnostics);
+                return Finish(EmptyInspection(archiveOnlySummary, diagnostics));
             }
 
+            telemetry.Start(EpubImportPhase.ProcessingManifest, 1, packagePath);
             var parsed = ReadPackage(packageDocument, packagePath, entries, diagnostics);
+            telemetry.Advance(1, 1, packagePath);
             if (parsed is null)
             {
-                return EmptyInspection(archiveOnlySummary, diagnostics);
+                return Finish(EmptyInspection(archiveOnlySummary, diagnostics));
             }
 
             var summary = CreateSummary(
@@ -108,14 +146,14 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
                 compressedBytes,
                 uncompressedBytes,
                 parsed.Manifest);
-            return new EpubPublicationInspection(
+            return Finish(new EpubPublicationInspection(
                 ContainerPath,
                 parsed.Package,
                 parsed.Manifest,
                 parsed.Spine,
                 parsed.NavigationDocumentPaths,
                 summary,
-                diagnostics);
+                diagnostics));
         }
         catch (OperationCanceledException)
         {
@@ -124,14 +162,14 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
         catch (EpubLimitExceededException exception)
         {
             diagnostics.Add(Error(EpubDiagnosticCodes.ArchiveLimitExceeded, exception.Message));
-            return EmptyInspection(EpubResourceSummary.Empty, diagnostics);
+            return Finish(EmptyInspection(EpubResourceSummary.Empty, diagnostics));
         }
         catch (Exception exception) when (exception is InvalidDataException or IOException or XmlException)
         {
             diagnostics.Add(Error(
                 EpubDiagnosticCodes.InvalidArchive,
                 $"The EPUB could not be inspected safely: {exception.Message}"));
-            return EmptyInspection(EpubResourceSummary.Empty, diagnostics);
+            return Finish(EmptyInspection(EpubResourceSummary.Empty, diagnostics));
         }
     }
 

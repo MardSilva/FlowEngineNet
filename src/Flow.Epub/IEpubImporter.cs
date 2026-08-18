@@ -8,4 +8,10 @@ public interface IEpubImporter
     /// <param name="cancellationToken">A token that can cancel asynchronous I/O.</param>
     /// <returns>A result containing an optional document, typed source and processing reports, and diagnostics.</returns>
     public Task<EpubImportResult> ImportAsync(Stream source, CancellationToken cancellationToken = default);
+
+    /// <summary>Imports an EPUB while reporting isolated, noncanonical progress observations.</summary>
+    public Task<EpubImportResult> ImportAsync(
+        Stream source,
+        IProgress<EpubImportProgress>? progress,
+        CancellationToken cancellationToken = default) => ImportAsync(source, cancellationToken);
 }

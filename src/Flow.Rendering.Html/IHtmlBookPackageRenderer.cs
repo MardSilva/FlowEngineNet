@@ -29,4 +29,17 @@ public interface IHtmlBookPackageRenderer
 
         return Render(document, layout, userPreferences, integrity);
     }
+
+    /// <summary>Renders with explicit options and cooperative cancellation.</summary>
+    public HtmlBookPackage Render(
+        FlowDocument document,
+        LayoutDocument layout,
+        UserReadingPreferences userPreferences,
+        HtmlBookIntegrity integrity,
+        HtmlBookPackageOptions options,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        return Render(document, layout, userPreferences, integrity, options);
+    }
 }

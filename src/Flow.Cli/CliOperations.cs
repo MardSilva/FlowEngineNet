@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Globalization;
 using System.Text.Json;
 using Flow.Documents;
@@ -260,7 +261,8 @@ public sealed class CliOperations
         }
 
         await using var source = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var import = await _epubImporter.ImportAsync(source, cancellationToken).ConfigureAwait(false);
+        var import = await _epubImporter.ImportAsync(source, progress: null, cancellationToken).ConfigureAwait(false);
+        var pipelineMetrics = import.Metrics;
 
         if (import.Document is not null && outputPath is null)
         {
@@ -297,7 +299,11 @@ public sealed class CliOperations
 
         if (fidelityPath is not null)
         {
-            var fidelity = _epubFidelityAnalyzer.Analyze(import);
+            var fidelityStarted = Stopwatch.GetTimestamp();
+            var fidelity = _epubFidelityAnalyzer.Analyze(import, cancellationToken);
+            pipelineMetrics = pipelineMetrics?.AddPhaseTiming(
+                EpubImportPhase.AnalyzingFidelity,
+                Stopwatch.GetElapsedTime(fidelityStarted));
             EnsureParentDirectory(fidelityPath);
             await WriteFidelityReportAtomicallyAsync(fidelity, fidelityPath, cancellationToken)
                 .ConfigureAwait(false);
@@ -308,6 +314,7 @@ public sealed class CliOperations
 
         if (!import.IsSuccess || import.Document is null)
         {
+            await WriteImportMetricsAsync(pipelineMetrics, output).ConfigureAwait(false);
             await error.WriteLineAsync("FLOWCLI_EPUB_IMPORT_FAILED: No complete Flow document was written.")
                 .ConfigureAwait(false);
             return 1;
@@ -335,7 +342,11 @@ public sealed class CliOperations
         }
 
         EnsureParentDirectory(outputPath);
+        var serializationStarted = Stopwatch.GetTimestamp();
         await WriteDocumentAtomicallyAsync(import.Document, outputPath, cancellationToken).ConfigureAwait(false);
+        pipelineMetrics = pipelineMetrics?
+            .AddPhaseTiming(EpubImportPhase.SerializingDocument, Stopwatch.GetElapsedTime(serializationStarted))
+            .WithOutputSizes(new FileInfo(outputPath).Length, null, null);
 
         var hash = _integrityService.ComputeHash(import.Document);
         await output.WriteLineAsync($"Imported EPUB: {sourcePath}").ConfigureAwait(false);
@@ -349,6 +360,7 @@ public sealed class CliOperations
                 $"Assets: {import.Document.Assets.Count.ToString(CultureInfo.InvariantCulture)}")
             .ConfigureAwait(false);
         await WriteHashAsync(output, hash).ConfigureAwait(false);
+        await WriteImportMetricsAsync(pipelineMetrics, output).ConfigureAwait(false);
         return 0;
     }
 
@@ -483,14 +495,19 @@ public sealed class CliOperations
             document,
             new LayoutContext(width, height, GetDeviceClass(width), ReadingMode.Flow, userPreferences: preferences));
         var hash = _integrityService.ComputeHash(document);
+        var renderingStarted = Stopwatch.GetTimestamp();
         var package = _htmlBookRenderer.Render(
             document,
             layout,
             preferences,
             new HtmlBookIntegrity(hash.Algorithm, hash.Hash, hash.CanonicalizationVersion),
-            new HtmlBookPackageOptions(command.UiLanguage));
+            new HtmlBookPackageOptions(command.UiLanguage),
+            cancellationToken);
+        var renderingDuration = Stopwatch.GetElapsedTime(renderingStarted);
 
+        var writingStarted = Stopwatch.GetTimestamp();
         await WriteHtmlBookPackageAtomicallyAsync(package, outputDirectory, cancellationToken).ConfigureAwait(false);
+        var writingDuration = Stopwatch.GetElapsedTime(writingStarted);
         await output.WriteLineAsync($"HTML book: {outputDirectory}").ConfigureAwait(false);
         await output.WriteLineAsync($"Entry: {Path.Combine(outputDirectory, "index.html")}").ConfigureAwait(false);
         await output.WriteLineAsync($"UI language: {UiLanguageName(command.UiLanguage, document.Metadata.Language)}")
@@ -503,8 +520,54 @@ public sealed class CliOperations
         await output.WriteLineAsync(
                 $"Chapters: {package.Files.Count(static file => file.Path.StartsWith("chapters/", StringComparison.Ordinal)).ToString(CultureInfo.InvariantCulture)}")
             .ConfigureAwait(false);
+        await output.WriteLineAsync(
+                $"HTML bytes: {package.Files.Sum(static file => (long)file.Content.Length).ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync($"Render duration ms: {Milliseconds(renderingDuration)}").ConfigureAwait(false);
+        await output.WriteLineAsync($"Write duration ms: {Milliseconds(writingDuration)}").ConfigureAwait(false);
         return 0;
     }
+
+    private static async Task WriteImportMetricsAsync(EpubImportMetrics? metrics, TextWriter output)
+    {
+        if (metrics is null)
+        {
+            return;
+        }
+
+        await output.WriteLineAsync("Import metrics (noncanonical):").ConfigureAwait(false);
+        await output.WriteLineAsync($"  Total duration ms: {Milliseconds(metrics.TotalDuration)}").ConfigureAwait(false);
+        await output.WriteLineAsync($"  Archive entries: {metrics.ArchiveEntryCount.ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync($"  Compressed bytes: {metrics.CompressedBytes.ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync($"  Uncompressed bytes: {metrics.UncompressedBytes.ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync($"  Asset bytes: {metrics.AssetBytes.ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync($"  Spine documents: {metrics.SpineDocumentsProcessed.ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync($"  Nodes: {metrics.NodesProduced.ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync($"  Characters: {metrics.CharactersProduced.ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(
+                $"  Approximate peak managed bytes: {metrics.ApproximatePeakManagedBytes.ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        if (metrics.FlowJsonBytes is not null)
+        {
+            await output.WriteLineAsync($"  Flow JSON bytes: {metrics.FlowJsonBytes.Value.ToString(CultureInfo.InvariantCulture)}")
+                .ConfigureAwait(false);
+        }
+
+        foreach (var timing in metrics.PhaseTimings)
+        {
+            await output.WriteLineAsync($"  Phase {timing.Phase}: {Milliseconds(timing.Duration)} ms")
+                .ConfigureAwait(false);
+        }
+    }
+
+    private static string Milliseconds(TimeSpan value) => value.TotalMilliseconds.ToString("0.###", CultureInfo.InvariantCulture);
 
     private static string UiLanguageName(HtmlBookUiLanguage language, string? publicationLanguage)
     {
@@ -690,7 +753,7 @@ public sealed class CliOperations
                 }
 
                 await using var stream = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None);
-                await stream.WriteAsync(file.Content.ToArray(), cancellationToken).ConfigureAwait(false);
+                await stream.WriteAsync(file.Content.AsMemory(), cancellationToken).ConfigureAwait(false);
             }
 
             cancellationToken.ThrowIfCancellationRequested();

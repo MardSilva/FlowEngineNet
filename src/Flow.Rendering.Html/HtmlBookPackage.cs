@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Runtime.InteropServices;
 
 namespace Flow.Rendering.Html;
 
@@ -34,11 +35,25 @@ public sealed record HtmlBookFile
         Content = ImmutableArray.CreateRange(content.ToArray());
     }
 
+    private HtmlBookFile(string path, string mediaType, ImmutableArray<byte> content)
+    {
+        Path = NormalizeAndValidatePath(path);
+        ArgumentException.ThrowIfNullOrWhiteSpace(mediaType);
+        MediaType = mediaType;
+        Content = content;
+    }
+
     public string Path { get; }
 
     public string MediaType { get; }
 
     public ImmutableArray<byte> Content { get; }
+
+    internal static HtmlBookFile FromOwnedBytes(string path, string mediaType, byte[] content)
+    {
+        ArgumentNullException.ThrowIfNull(content);
+        return new HtmlBookFile(path, mediaType, ImmutableCollectionsMarshal.AsImmutableArray(content));
+    }
 
     internal static string NormalizeAndValidatePath(string path)
     {

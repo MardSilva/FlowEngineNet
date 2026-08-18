@@ -30,13 +30,24 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
         LayoutDocument layout,
         UserReadingPreferences userPreferences,
         HtmlBookIntegrity integrity,
-        HtmlBookPackageOptions options)
+        HtmlBookPackageOptions options) =>
+        Render(document, layout, userPreferences, integrity, options, default);
+
+    /// <inheritdoc />
+    public HtmlBookPackage Render(
+        FlowDocument document,
+        LayoutDocument layout,
+        UserReadingPreferences userPreferences,
+        HtmlBookIntegrity integrity,
+        HtmlBookPackageOptions options,
+        CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(layout);
         ArgumentNullException.ThrowIfNull(userPreferences);
         ArgumentNullException.ThrowIfNull(integrity);
         ArgumentNullException.ThrowIfNull(options);
+        cancellationToken.ThrowIfCancellationRequested();
 
         // Reuse the established renderer as the single semantic HTML mapping and validation authority.
         var standalone = new HtmlDocumentRenderer().RenderToString(document, layout, userPreferences);
@@ -47,8 +58,8 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
             ?? throw new InvalidOperationException("The standalone renderer did not produce its required typed CSS.");
         var ui = BookUiText.For(options.UiLanguage, document.Metadata.Language);
 
-        var assetPlan = CreateAssetPlan(document);
-        var pagePlan = CreatePagePlan(layout);
+        var assetPlan = CreateAssetPlan(document, cancellationToken);
+        var pagePlan = CreatePagePlan(layout, cancellationToken);
         var elementsById = sourceArticle
             .DescendantsAndSelf()
             .Where(static element => element.Attribute("id") is not null)
@@ -56,26 +67,29 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
         var originalPageByNodeId = pagePlan.Pages
             .SelectMany(static page => page.NodeIds.Select(id => (id.Value, page.Path)))
             .ToDictionary(static item => item.Value, static item => item.Path, StringComparer.Ordinal);
-        var footnotePlan = CreateFootnotePlan(sourceArticle, pagePlan, originalPageByNodeId);
+        var footnotePlan = CreateFootnotePlan(sourceArticle, pagePlan, originalPageByNodeId, cancellationToken);
         pagePlan = AddFootnoteBackMatterPage(pagePlan, footnotePlan);
         var pageByNodeId = new Dictionary<string, string>(originalPageByNodeId, StringComparer.Ordinal);
         foreach (var ownership in footnotePlan.OwnershipByNodeId)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             pageByNodeId[ownership.Key] = ownership.Value;
         }
 
         var files = new List<HtmlBookFile>();
-        files.Add(new HtmlBookFile(
+        files.Add(HtmlBookFile.FromOwnedBytes(
             "styles/book.css",
             "text/css; charset=utf-8",
             Utf8WithoutBom.GetBytes(CreateSharedCss(sharedCss))));
         foreach (var asset in assetPlan.Files)
         {
-            files.Add(new HtmlBookFile(asset.Path, asset.MediaType, asset.Content));
+            cancellationToken.ThrowIfCancellationRequested();
+            files.Add(HtmlBookFile.FromOwnedBytes(asset.Path, asset.MediaType, asset.Content));
         }
 
         foreach (var page in pagePlan.Pages)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var roots = GetPageRoots(page, pagePlan, elementsById);
             if (page.Kind == HtmlBookPageKind.Index)
             {
@@ -104,6 +118,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
 
             foreach (var root in roots)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 PruneNodesOwnedByOtherPages(root, page.Path, pageByNodeId);
                 RewriteLinks(root, page.Path, pageByNodeId);
                 RewriteAssets(root, page.Path, document, assetPlan);
@@ -117,18 +132,18 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
                 roots,
                 layout.ReadingStyle.Theme,
                 ui);
-            files.Add(new HtmlBookFile(page.Path, "text/html; charset=utf-8", pageBytes));
+            files.Add(HtmlBookFile.FromOwnedBytes(page.Path, "text/html; charset=utf-8", pageBytes));
         }
 
         var payloadFiles = files.OrderBy(static file => file.Path, StringComparer.Ordinal).ToArray();
-        files.Add(new HtmlBookFile(
+        files.Add(HtmlBookFile.FromOwnedBytes(
             "manifest.json",
             "application/json; charset=utf-8",
-            CreateManifest(document, integrity, pagePlan.Pages, payloadFiles, ui)));
+            CreateManifest(document, integrity, pagePlan.Pages, payloadFiles, ui, cancellationToken)));
         return new HtmlBookPackage(files);
     }
 
-    private static PagePlan CreatePagePlan(LayoutDocument layout)
+    private static PagePlan CreatePagePlan(LayoutDocument layout, CancellationToken cancellationToken)
     {
         var pages = new List<PageBuilder>
         {
@@ -140,9 +155,10 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
         var chapterNumber = 0;
         foreach (var topLevel in layout.Nodes)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             if (topLevel.SemanticNode is TableOfContents)
             {
-                AssignTree(topLevel, tableOfContentsOwner, tableOfContentsOwner);
+                AssignTree(topLevel, tableOfContentsOwner, tableOfContentsOwner, cancellationToken);
                 continue;
             }
 
@@ -157,7 +173,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
             }
 
             owner.RootNodeIds.Add(topLevel.SemanticId);
-            AssignTree(topLevel, owner, tableOfContentsOwner);
+            AssignTree(topLevel, owner, tableOfContentsOwner, cancellationToken);
         }
 
         return new PagePlan(pages.Select(static page => page.Build()).ToArray());
@@ -165,8 +181,10 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
         static void AssignTree(
             LayoutNode node,
             PageBuilder inheritedOwner,
-            PageBuilder tableOfContentsOwner)
+            PageBuilder tableOfContentsOwner,
+            CancellationToken cancellationToken)
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var actualOwner = node.SemanticNode is TableOfContents
                 ? tableOfContentsOwner
                 : inheritedOwner;
@@ -179,7 +197,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
             actualOwner.NodeIds.Add(node.SemanticId);
             foreach (var child in node.Children)
             {
-                AssignTree(child, actualOwner, tableOfContentsOwner);
+                AssignTree(child, actualOwner, tableOfContentsOwner, cancellationToken);
             }
         }
     }
@@ -187,7 +205,8 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
     private static FootnotePlan CreateFootnotePlan(
         XElement sourceArticle,
         PagePlan pagePlan,
-        IReadOnlyDictionary<string, string> originalPageByNodeId)
+        IReadOnlyDictionary<string, string> originalPageByNodeId,
+        CancellationToken cancellationToken)
     {
         const string backMatterPath = "backmatter/notes.html";
         var chapterPaths = pagePlan.Pages
@@ -199,6 +218,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
                      .Descendants("a")
                      .Where(static element => (string?)element.Attribute("role") == "doc-noteref"))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var href = (string?)reference.Attribute("href");
             if (href is null || !href.StartsWith('#') || href.Length == 1)
             {
@@ -230,6 +250,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
                      .DescendantsAndSelf()
                      .Where(static element => (string?)element.Attribute("role") == "doc-footnote"))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var footnoteId = (string?)footnote.Attribute("id")
                 ?? throw new InvalidOperationException("A rendered footnote did not preserve its semantic ID.");
             var targetPage = referencePagesByFootnoteId.TryGetValue(footnoteId, out var referencePages)
@@ -947,7 +968,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
         _ => throw new ArgumentOutOfRangeException(nameof(theme)),
     };
 
-    private static AssetPlan CreateAssetPlan(FlowDocument document)
+    private static AssetPlan CreateAssetPlan(FlowDocument document, CancellationToken cancellationToken)
     {
         var paths = new Dictionary<AssetId, string>();
         var files = new List<AssetFile>();
@@ -955,12 +976,14 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
                      .OrderBy(static asset => asset.Id.Value, StringComparer.Ordinal)
                      .GroupBy(static asset => Sha256(asset.Data.AsSpan()), StringComparer.Ordinal))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             var mediaType = group.Select(static asset => asset.MediaType).Order(StringComparer.Ordinal).First();
             var path = $"assets/{group.Key.ToLowerInvariant()}{Extension(mediaType)}";
             var first = group.First();
             files.Add(new AssetFile(path, mediaType, first.Data.ToArray()));
             foreach (var asset in group)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 paths.Add(asset.Id, path);
             }
         }
@@ -973,7 +996,8 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
         HtmlBookIntegrity integrity,
         IReadOnlyList<HtmlBookPage> readingOrder,
         IEnumerable<HtmlBookFile> payloadFiles,
-        BookUiText ui)
+        BookUiText ui,
+        CancellationToken cancellationToken)
     {
         using var buffer = new MemoryStream();
         using (var writer = new Utf8JsonWriter(
@@ -1003,6 +1027,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
             writer.WriteStartArray();
             foreach (var page in readingOrder)
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 writer.WriteStartObject();
                 writer.WriteString("path", page.Path);
                 writer.WriteString("kind", PageKind(page.Kind));
@@ -1016,6 +1041,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
             writer.WriteStartArray();
             foreach (var file in payloadFiles.OrderBy(static file => file.Path, StringComparer.Ordinal))
             {
+                cancellationToken.ThrowIfCancellationRequested();
                 writer.WriteStartObject();
                 writer.WriteString("path", file.Path);
                 writer.WriteString("mediaType", file.MediaType);
