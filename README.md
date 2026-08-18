@@ -41,6 +41,7 @@ Implemented:
 - deterministic standalone HTML5 rendering with embedded CSS and assets;
 - the five-chapter “The Flow Experiment” reference book;
 - a lightweight CLI for sampling, inspection, validation, hashing, and HTML rendering;
+- readable UTF-8 JSON output, deterministic EPUB diagnostic reports, and title-derived portable `.flow.json` names;
 - small, medium, and large viewport profiles;
 - responsive figures, semantic ID preservation, and typed layout intentions;
 - unit and semantic-conformance tests.
@@ -188,7 +189,7 @@ To reproduce the pipeline from the semantic source:
 
 ```powershell
 dotnet run --project src/Flow.Cli -- epub-inspect path/to/book.epub --json epub-report.json
-dotnet run --project src/Flow.Cli -- import path/to/book.epub --output book.flow.json
+dotnet run --project src/Flow.Cli -- import path/to/book.epub --diagnostics-json import-report.json
 dotnet run --project src/Flow.Cli -- inspect samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- validate samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- hash samples/SampleBook/sample.flow.json

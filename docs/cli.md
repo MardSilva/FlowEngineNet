@@ -8,7 +8,7 @@ The help output identifies the CLI and `.flow.json` representation as experiment
 
 ```text
 flow sample [output]
-flow import <book.epub> [--output <book.flow.json>]
+flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>]
 flow epub-inspect <book.epub> [--json <report.json>]
 flow inspect <document>
 flow validate <document>
@@ -18,7 +18,9 @@ flow render <document> --html <output> --width <n> --height <n>
 
 `sample` writes “The Flow Experiment” to the optional output path or to `sample.flow.json` in the current directory. The command serializes the same typed sample factory used to generate the committed reference document.
 
-`import` accepts a security-bounded EPUB and writes a deterministic `.flow.json`. Without `--output`, the destination is the source path with `.epub` replaced by `.flow.json`. Warnings and errors use stable `EPUB*`/`FLOWCLI_*` diagnostics. The command validates before writing, uses an atomic replacement, reports the imported identity and hash, and never leaves a partial output after a failed import.
+`import` accepts a security-bounded EPUB and writes a deterministic `.flow.json`. Without `--output`, the destination stays beside the source EPUB and receives a portable `snake_case` name derived from the imported title. Accents are folded (`é` becomes `e`), punctuation and repeated whitespace become one underscore, the stem is limited to 96 characters, and an unusable title falls back to the source name or `imported_book`. For example, “Isto é filtro solar: Eclesiastes e a vida debaixo do sol” becomes `isto_e_filtro_solar_eclesiastes_e_a_vida_debaixo_do_sol.flow.json`. An explicit `--output` always wins.
+
+Warnings and errors use stable `EPUB*`/`FLOWCLI_*` diagnostics. `--diagnostics-json` writes the deterministic `flow-epub-import-diagnostics-0.1` report, including success, document summary, severity totals, and every EPUB diagnostic. It contains no timestamps, shell metadata, stack traces, or PowerShell capture artifacts. Both readable JSON formats use UTF-8 without BOM and LF line endings; ordinary Unicode such as Portuguese accents, Japanese, and Arabic remains literal, while JSON controls and security-sensitive characters remain escaped. The command validates before writing, uses atomic replacement, reports the imported identity and hash, and never leaves a partial Flow document after a failed import. A requested diagnostics report is still written for a failed import when the destination itself is usable.
 
 The imported `.flow.json` contains only canonical Flow metadata. Publisher, contributors, extra languages, subjects, dates, rights, cover declarations, accessibility properties, and OPF refinements are available to API callers through the noncanonical `EpubImportResult.MetadataReport`; the CLI does not persist that source report yet.
 
@@ -39,7 +41,7 @@ During development, invoke the executable through the project:
 ```powershell
 dotnet run --project src/Flow.Cli -- sample sample.flow.json
 dotnet run --project src/Flow.Cli -- epub-inspect book.epub --json inspection.json
-dotnet run --project src/Flow.Cli -- import book.epub --output book.flow.json
+dotnet run --project src/Flow.Cli -- import book.epub --diagnostics-json import-report.json
 dotnet run --project src/Flow.Cli -- validate sample.flow.json
 dotnet run --project src/Flow.Cli -- render sample.flow.json --html sample.html --width 390 --height 844
 ```

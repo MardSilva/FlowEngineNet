@@ -122,21 +122,85 @@ public sealed class FlowCliIntegrationTests
     }
 
     [Fact]
+    public async Task Import_WithoutOutputUsesPortableTitleAndWritesCleanUnicodeDiagnosticsJson()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var epubPath = workspace.PathOf("source-name.epub");
+        var diagnosticsPath = workspace.PathOf("diagnósticos.json");
+        const string title = "Isto é filtro solar: Eclesiastes e a vida debaixo do sol";
+        CreateMinimalEpub(epubPath, title);
+        var application = FlowCliApplication.CreateDefault();
+
+        var first = await RunAsync(
+            application,
+            ["import", epubPath, "--diagnostics-json", diagnosticsPath]);
+        var expectedDocumentPath = workspace.PathOf(
+            "isto_e_filtro_solar_eclesiastes_e_a_vida_debaixo_do_sol.flow.json");
+
+        Assert.Equal(0, first.ExitCode);
+        Assert.True(File.Exists(expectedDocumentPath));
+        Assert.True(File.Exists(diagnosticsPath));
+        Assert.Contains($"Flow document: {expectedDocumentPath}", first.Output, StringComparison.Ordinal);
+        Assert.Contains($"Title: {title}", first.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("CategoryInfo", first.Output + first.Error, StringComparison.Ordinal);
+        Assert.DoesNotContain("FullyQualifiedErrorId", first.Output + first.Error, StringComparison.Ordinal);
+
+        var documentBytes = await File.ReadAllBytesAsync(expectedDocumentPath);
+        var diagnosticsBytes = await File.ReadAllBytesAsync(diagnosticsPath);
+        var documentJson = Encoding.UTF8.GetString(documentBytes);
+        var diagnosticsJson = Encoding.UTF8.GetString(diagnosticsBytes);
+        Assert.False(documentBytes.AsSpan().StartsWith(Encoding.UTF8.Preamble));
+        Assert.False(diagnosticsBytes.AsSpan().StartsWith(Encoding.UTF8.Preamble));
+        Assert.Contains(title, documentJson, StringComparison.Ordinal);
+        Assert.Contains(title, diagnosticsJson, StringComparison.Ordinal);
+        Assert.DoesNotContain("\\u00E9", documentJson, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\\u00E9", diagnosticsJson, StringComparison.OrdinalIgnoreCase);
+
+        var escapedPath = workspace.PathOf("escaped.flow.json");
+        await File.WriteAllTextAsync(
+            escapedPath,
+            documentJson.Replace("é", "\\u00e9", StringComparison.Ordinal),
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+        var readableHash = await RunAsync(application, ["hash", expectedDocumentPath]);
+        var escapedHash = await RunAsync(application, ["hash", escapedPath]);
+        Assert.Equal(OutputValue(readableHash.Output, "Hash: "), OutputValue(escapedHash.Output, "Hash: "));
+
+        var firstDiagnostics = diagnosticsBytes;
+        var second = await RunAsync(
+            application,
+            ["import", epubPath, "--diagnostics-json", diagnosticsPath]);
+        Assert.Equal(0, second.ExitCode);
+        Assert.Equal(firstDiagnostics, await File.ReadAllBytesAsync(diagnosticsPath));
+    }
+
+    [Fact]
     public async Task Import_InvalidEpubReportsDiagnosticsAndDoesNotWritePartialOutput()
     {
         using var workspace = new TemporaryWorkspace();
         var epubPath = workspace.PathOf("invalid.epub");
         var documentPath = workspace.PathOf("invalid.flow.json");
+        var diagnosticsPath = workspace.PathOf("invalid-diagnostics.json");
         await File.WriteAllTextAsync(epubPath, "not a ZIP archive");
 
         var result = await RunAsync(
             FlowCliApplication.CreateDefault(),
-            ["import", epubPath, "--output", documentPath]);
+            [
+                "import",
+                epubPath,
+                "--output",
+                documentPath,
+                "--diagnostics-json",
+                diagnosticsPath,
+            ]);
 
         Assert.Equal(1, result.ExitCode);
         Assert.False(File.Exists(documentPath));
+        Assert.True(File.Exists(diagnosticsPath));
         Assert.Contains("EPUB001", result.Error, StringComparison.Ordinal);
         Assert.Contains("FLOWCLI_EPUB_IMPORT_FAILED", result.Error, StringComparison.Ordinal);
+        using var report = JsonDocument.Parse(await File.ReadAllBytesAsync(diagnosticsPath));
+        Assert.False(report.RootElement.GetProperty("success").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, report.RootElement.GetProperty("document").ValueKind);
     }
 
     [Fact]
@@ -146,7 +210,7 @@ public sealed class FlowCliIntegrationTests
         var epubPath = workspace.PathOf("inspection.epub");
         var firstReportPath = workspace.PathOf("inspection-one.json");
         var secondReportPath = workspace.PathOf("inspection-two.json");
-        CreateMinimalEpub(epubPath);
+        CreateMinimalEpub(epubPath, "Inspeção é 日本語");
         var application = FlowCliApplication.CreateDefault();
 
         var first = await RunAsync(
@@ -167,6 +231,9 @@ public sealed class FlowCliIntegrationTests
 
         var reportBytes = await File.ReadAllBytesAsync(firstReportPath);
         Assert.DoesNotContain((byte)'\r', reportBytes);
+        Assert.False(reportBytes.AsSpan().StartsWith(Encoding.UTF8.Preamble));
+        Assert.Contains("Inspeção é 日本語", Encoding.UTF8.GetString(reportBytes), StringComparison.Ordinal);
+        Assert.DoesNotContain("\\u00E9", Encoding.UTF8.GetString(reportBytes), StringComparison.OrdinalIgnoreCase);
         using var report = JsonDocument.Parse(reportBytes);
         Assert.Equal("flow-epub-inspection-0.1", report.RootElement.GetProperty("format").GetString());
         Assert.Equal("epub3", report.RootElement.GetProperty("package").GetProperty("versionFamily").GetString());
@@ -313,7 +380,7 @@ public sealed class FlowCliIntegrationTests
         output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Single(line => line.StartsWith(prefix, StringComparison.Ordinal))[prefix.Length..].Trim();
 
-    private static void CreateMinimalEpub(string path)
+    private static void CreateMinimalEpub(string path, string title = "Livro real mínimo")
     {
         using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
         AddText(archive, "mimetype", "application/epub+zip", CompressionLevel.NoCompression);
@@ -336,7 +403,7 @@ public sealed class FlowCliIntegrationTests
             <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id">
               <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
                 <dc:identifier id="book-id">urn:flow:test:real-epub</dc:identifier>
-                <dc:title>Livro real mínimo</dc:title>
+                <dc:title>{{TITLE}}</dc:title>
                 <dc:language>pt-PT</dc:language>
                 <dc:creator>Flow contributors</dc:creator>
               </metadata>
@@ -345,7 +412,7 @@ public sealed class FlowCliIntegrationTests
               </manifest>
               <spine><itemref idref="chapter" /></spine>
             </package>
-            """);
+            """.Replace("{{TITLE}}", title, StringComparison.Ordinal));
         AddText(
             archive,
             "EPUB/text/chapter.xhtml",

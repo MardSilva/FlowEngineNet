@@ -4,6 +4,8 @@
 
 Flow 0.1 uses the experimental canonicalization profile `flow-c14n-0.1`. This profile is versioned independently from the human-readable interchange format `flow-json-0.1`.
 
+The human-readable escaping chosen by `.flow.json`, EPUB inspection reports, or import diagnostic reports is not canonicalization. For example, literal `é` and its valid JSON escape `\u00e9` deserialize to the same semantic value and therefore produce the same `flow-c14n-0.1` bytes and document hash. The readable serializers may improve Unicode presentation without changing this profile.
+
 The `.flow.json` representation is not a standardized file format. It is a deterministic, indented development format that can round-trip the current document model, including optional presentation and stored integrity metadata.
 
 ## Canonical byte rules

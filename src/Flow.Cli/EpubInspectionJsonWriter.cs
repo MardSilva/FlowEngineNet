@@ -1,4 +1,6 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Unicode;
 using Flow.Epub;
 
 namespace Flow.Cli;
@@ -14,7 +16,13 @@ internal static class EpubInspectionJsonWriter
         ArgumentNullException.ThrowIfNull(destination);
 
         await using var buffer = new MemoryStream();
-        await using (var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Indented = true }))
+        await using (var writer = new Utf8JsonWriter(
+                         buffer,
+                         new JsonWriterOptions
+                         {
+                             Indented = true,
+                             Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
+                         }))
         {
             writer.WriteStartObject();
             writer.WriteString("format", "flow-epub-inspection-0.1");

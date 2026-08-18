@@ -26,6 +26,36 @@ public sealed class FlowJsonDocumentSerializerTests
     }
 
     [Fact]
+    public async Task SerializeAsync_WritesUnicodeLiterallyAndEscapesUnsafeJsonText()
+    {
+        var document = new FlowDocument(
+            new DocumentIdentity(new DocumentId("urn:test:readable-unicode")),
+            new DocumentMetadata("Isto é 日本語 العربية 😀"),
+            new DocumentContent(
+            [
+                new Paragraph(
+                    new NodeId("unicode"),
+                    [new Text("aspas \" e linha\nnova <script>alert('x')</script>")]),
+            ]));
+
+        var bytes = await SerializeAsync(document);
+        var json = Encoding.UTF8.GetString(bytes);
+
+        Assert.False(bytes.AsSpan().StartsWith(Encoding.UTF8.Preamble));
+        Assert.Contains("Isto é", json, StringComparison.Ordinal);
+        Assert.Contains("日本語", json, StringComparison.Ordinal);
+        Assert.Contains("العربية", json, StringComparison.Ordinal);
+        Assert.Contains("\\uD83D\\uDE00", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\\u00E9", json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("\\u003Cscript\\u003E", json, StringComparison.Ordinal);
+        Assert.Contains("\\n", json, StringComparison.Ordinal);
+
+        await using var source = new MemoryStream(bytes);
+        var restored = await _serializer.DeserializeAsync(source);
+        Assert.Equal(document.Metadata.Title, restored.Metadata.Title);
+    }
+
+    [Fact]
     public async Task RoundTrip_PreservesCompleteDocumentRepresentation()
     {
         var originalBytes = await SerializeAsync(CreateCompleteDocument());

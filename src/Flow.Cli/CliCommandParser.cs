@@ -31,24 +31,43 @@ public sealed class CliCommandParser
 
     private static CommandParseResult ParseImport(IReadOnlyList<string> arguments)
     {
-        if (arguments.Count == 2)
+        if (arguments.Count < 2)
         {
-            return CommandParseResult.Success(
-                new ImportEpubCommand(arguments[1], DefaultImportOutputPath(arguments[1])));
+            return CommandParseResult.Failure($"FLOWCLI_USAGE: {ImportUsage}");
         }
 
-        if (arguments.Count == 4 && arguments[2] == "--output" && !string.IsNullOrWhiteSpace(arguments[3]))
+        string? outputPath = null;
+        string? diagnosticsJsonOutputPath = null;
+        for (var index = 2; index < arguments.Count; index += 2)
         {
-            return CommandParseResult.Success(new ImportEpubCommand(arguments[1], arguments[3]));
+            if (index + 1 >= arguments.Count || string.IsNullOrWhiteSpace(arguments[index + 1]))
+            {
+                return CommandParseResult.Failure(
+                    $"FLOWCLI_USAGE: Option '{arguments[index]}' requires a value. {ImportUsage}");
+            }
+
+            var option = arguments[index];
+            var value = arguments[index + 1];
+            switch (option)
+            {
+                case "--output" when outputPath is null:
+                    outputPath = value;
+                    break;
+                case "--diagnostics-json" when diagnosticsJsonOutputPath is null:
+                    diagnosticsJsonOutputPath = value;
+                    break;
+                case "--output" or "--diagnostics-json":
+                    return CommandParseResult.Failure(
+                        $"FLOWCLI_DUPLICATE_OPTION: Option '{option}' was specified more than once.");
+                default:
+                    return CommandParseResult.Failure(
+                        $"FLOWCLI_UNKNOWN_OPTION: Unknown import option '{option}'. {ImportUsage}");
+            }
         }
 
-        return CommandParseResult.Failure($"FLOWCLI_USAGE: {ImportUsage}");
+        return CommandParseResult.Success(
+            new ImportEpubCommand(arguments[1], outputPath, diagnosticsJsonOutputPath));
     }
-
-    private static string DefaultImportOutputPath(string sourcePath) =>
-        sourcePath.EndsWith(".epub", StringComparison.OrdinalIgnoreCase)
-            ? $"{sourcePath[..^5]}.flow.json"
-            : $"{sourcePath}.flow.json";
 
     private static CommandParseResult ParseEpubInspect(IReadOnlyList<string> arguments) =>
         arguments.Count switch
@@ -144,7 +163,8 @@ public sealed class CliCommandParser
     private const string RenderUsage =
         "Usage: flow render <document> --html <output> --width <n> --height <n>";
 
-    private const string ImportUsage = "Usage: flow import <book.epub> [--output <book.flow.json>]";
+    private const string ImportUsage =
+        "Usage: flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>]";
 
     private const string EpubInspectUsage = "Usage: flow epub-inspect <book.epub> [--json <report.json>]";
 }

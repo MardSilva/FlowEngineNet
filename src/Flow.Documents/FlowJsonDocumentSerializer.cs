@@ -1,4 +1,6 @@
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Unicode;
 
 namespace Flow.Documents;
 
@@ -17,7 +19,11 @@ public sealed class FlowJsonDocumentSerializer : IFlowDocumentSerializer
         await using var buffer = new MemoryStream();
         await using (var writer = new Utf8JsonWriter(
                          buffer,
-                         new JsonWriterOptions { Indented = true }))
+                         new JsonWriterOptions
+                         {
+                             Indented = true,
+                             Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
+                         }))
         {
             FlowJsonWriter.Write(writer, document);
             await writer.FlushAsync(cancellationToken).ConfigureAwait(false);

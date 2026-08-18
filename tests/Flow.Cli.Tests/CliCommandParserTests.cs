@@ -11,11 +11,21 @@ public sealed class CliCommandParserTests
     {
         Assert.IsType<SampleCommand>(_parser.Parse(["sample"]).Command);
         var import = Assert.IsType<ImportEpubCommand>(_parser.Parse(["import", "book.epub"]).Command);
-        Assert.Equal("book.flow.json", import.OutputPath);
+        Assert.Null(import.OutputPath);
+        Assert.Null(import.DiagnosticsJsonOutputPath);
 
         var importWithOutput = Assert.IsType<ImportEpubCommand>(
-            _parser.Parse(["import", "book.epub", "--output", "library/book.flow.json"]).Command);
+            _parser.Parse(
+            [
+                "import",
+                "book.epub",
+                "--diagnostics-json",
+                "import-report.json",
+                "--output",
+                "library/book.flow.json",
+            ]).Command);
         Assert.Equal("library/book.flow.json", importWithOutput.OutputPath);
+        Assert.Equal("import-report.json", importWithOutput.DiagnosticsJsonOutputPath);
         var epubInspect = Assert.IsType<InspectEpubCommand>(
             _parser.Parse(["epub-inspect", "book.epub", "--json", "report.json"]).Command);
         Assert.Equal("report.json", epubInspect.JsonOutputPath);
@@ -63,8 +73,14 @@ public sealed class CliCommandParserTests
         Assert.StartsWith("FLOWCLI_UNKNOWN_COMMAND:", _parser.Parse(["unknown"]).Error, StringComparison.Ordinal);
         Assert.StartsWith("FLOWCLI_USAGE:", _parser.Parse(["inspect"]).Error, StringComparison.Ordinal);
         Assert.StartsWith(
-            "FLOWCLI_USAGE:",
+            "FLOWCLI_UNKNOWN_OPTION:",
             _parser.Parse(["import", "book.epub", "--unknown", "book.flow.json"]).Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_DUPLICATE_OPTION:",
+            _parser.Parse(
+                ["import", "book.epub", "--output", "one.json", "--output", "two.json"])
+                .Error,
             StringComparison.Ordinal);
         Assert.StartsWith(
             "FLOWCLI_USAGE:",

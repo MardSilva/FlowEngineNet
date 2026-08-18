@@ -78,7 +78,11 @@ public sealed class CliOperations
         await output.WriteLineAsync("Commands:").ConfigureAwait(false);
         await output.WriteLineAsync("  flow sample [output]                         Create the reference .flow.json book.")
             .ConfigureAwait(false);
-        await output.WriteLineAsync("  flow import <book.epub> [--output <book.flow.json>]")
+        await output.WriteLineAsync(
+                "  flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>]")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(
+                "    Without --output, the file name is derived from the imported book title.")
             .ConfigureAwait(false);
         await output.WriteLineAsync("  flow epub-inspect <book.epub> [--json <report.json>]")
             .ConfigureAwait(false);
@@ -187,7 +191,10 @@ public sealed class CliOperations
         CancellationToken cancellationToken)
     {
         var sourcePath = Path.GetFullPath(command.SourcePath);
-        var outputPath = Path.GetFullPath(command.OutputPath);
+        var outputPath = command.OutputPath is null ? null : Path.GetFullPath(command.OutputPath);
+        var diagnosticsPath = command.DiagnosticsJsonOutputPath is null
+            ? null
+            : Path.GetFullPath(command.DiagnosticsJsonOutputPath);
         if (!string.Equals(Path.GetExtension(sourcePath), ".epub", StringComparison.OrdinalIgnoreCase))
         {
             await error.WriteLineAsync("FLOWCLI_UNSUPPORTED_INPUT: The import command currently accepts only .epub files.")
@@ -195,15 +202,55 @@ public sealed class CliOperations
             return 1;
         }
 
-        if (PathsEqual(sourcePath, outputPath))
+        if (outputPath is not null && PathsEqual(sourcePath, outputPath))
         {
             await error.WriteLineAsync("FLOWCLI_INVALID_OUTPUT: The output path must differ from the EPUB source path.")
                 .ConfigureAwait(false);
             return 1;
         }
 
+        if (diagnosticsPath is not null && PathsEqual(sourcePath, diagnosticsPath))
+        {
+            await error.WriteLineAsync(
+                    "FLOWCLI_INVALID_OUTPUT: The diagnostics report path must differ from the EPUB source path.")
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        if (outputPath is not null && diagnosticsPath is not null && PathsEqual(outputPath, diagnosticsPath))
+        {
+            await error.WriteLineAsync(
+                    "FLOWCLI_INVALID_OUTPUT: The Flow document and diagnostics report must use different paths.")
+                .ConfigureAwait(false);
+            return 1;
+        }
+
         await using var source = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         var import = await _epubImporter.ImportAsync(source, cancellationToken).ConfigureAwait(false);
+
+        if (import.Document is not null && outputPath is null)
+        {
+            outputPath = Path.Combine(
+                Path.GetDirectoryName(sourcePath) ?? Directory.GetCurrentDirectory(),
+                PortableBookFileName.FromTitle(import.Document.Metadata.Title, sourcePath));
+        }
+
+        if (outputPath is not null && diagnosticsPath is not null && PathsEqual(outputPath, diagnosticsPath))
+        {
+            await error.WriteLineAsync(
+                    "FLOWCLI_INVALID_OUTPUT: The Flow document and diagnostics report must use different paths.")
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        if (diagnosticsPath is not null)
+        {
+            EnsureParentDirectory(diagnosticsPath);
+            await WriteImportDiagnosticsAtomicallyAsync(import, diagnosticsPath, cancellationToken)
+                .ConfigureAwait(false);
+            await output.WriteLineAsync($"Diagnostics JSON: {diagnosticsPath}").ConfigureAwait(false);
+        }
+
         await WriteEpubDiagnosticsAsync(import.Diagnostics, output, error).ConfigureAwait(false);
 
         if (!import.IsSuccess || import.Document is null)
@@ -211,6 +258,11 @@ public sealed class CliOperations
             await error.WriteLineAsync("FLOWCLI_EPUB_IMPORT_FAILED: No complete Flow document was written.")
                 .ConfigureAwait(false);
             return 1;
+        }
+
+        if (outputPath is null)
+        {
+            throw new InvalidOperationException("A successful EPUB import did not produce an output path.");
         }
 
         var validation = _validator.Validate(import.Document);
@@ -414,6 +466,35 @@ public sealed class CliOperations
                              FileShare.None))
             {
                 await EpubInspectionJsonWriter.WriteAsync(inspection, destination, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            File.Move(temporaryPath, outputPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
+        }
+    }
+
+    private static async Task WriteImportDiagnosticsAtomicallyAsync(
+        EpubImportResult import,
+        string outputPath,
+        CancellationToken cancellationToken)
+    {
+        var temporaryPath = $"{outputPath}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            await using (var destination = new FileStream(
+                             temporaryPath,
+                             FileMode.CreateNew,
+                             FileAccess.Write,
+                             FileShare.None))
+            {
+                await EpubImportDiagnosticsJsonWriter.WriteAsync(import, destination, cancellationToken)
                     .ConfigureAwait(false);
             }
 
