@@ -176,6 +176,7 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
             WriteRoleStyle("pre, code", TypographyRole.Code);
             Line("nav, blockquote { break-inside: avoid; }");
             Line("figure { margin-inline: auto; }");
+            Line("figure[data-publication-role=\"cover\"] { break-inside: avoid; max-width: 100%; }");
             Line("figure img { display: block; height: auto; max-width: 100%; width: 100%; }");
             Line("figcaption { margin-top: 0.5rem; }");
             Line("pre { max-width: 100%; overflow-x: auto; }");
@@ -396,8 +397,11 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
             };
             var style = $"max-width: {CssLength(intent.MaximumWidth)};{keepStyle}{placementStyle}";
             var source = $"data:{SafeMediaType(asset.MediaType)};base64,{Convert.ToBase64String(asset.Data.AsSpan())}";
+            var publicationRole = _document.Presentation?.Cover?.FigureId == figure.Id
+                ? " data-publication-role=\"cover\""
+                : string.Empty;
 
-            Line($"<figure id=\"{Id(figure.Id)}\"{StyleAttribute(layoutNode, style)}>");
+            Line($"<figure id=\"{Id(figure.Id)}\"{publicationRole}{StyleAttribute(layoutNode, style)}>");
             Line(
                 $"<img src=\"{Attribute(source)}\" alt=\"{Attribute(figure.AlternativeText ?? string.Empty)}\" />");
             foreach (var child in layoutNode.Children)

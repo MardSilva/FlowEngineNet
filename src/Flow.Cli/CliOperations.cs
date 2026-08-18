@@ -17,6 +17,7 @@ public sealed class CliOperations
     private readonly IDocumentIntegrityService _integrityService;
     private readonly ILayoutEngine _layoutEngine;
     private readonly IDocumentRenderer _htmlRenderer;
+    private readonly IEpubFidelityAnalyzer _epubFidelityAnalyzer;
 
     public CliOperations(
         IFlowDocumentSerializer serializer,
@@ -25,7 +26,8 @@ public sealed class CliOperations
         DocumentValidator validator,
         IDocumentIntegrityService integrityService,
         ILayoutEngine layoutEngine,
-        IDocumentRenderer htmlRenderer)
+        IDocumentRenderer htmlRenderer,
+        IEpubFidelityAnalyzer? epubFidelityAnalyzer = null)
     {
         ArgumentNullException.ThrowIfNull(serializer);
         ArgumentNullException.ThrowIfNull(epubImporter);
@@ -42,6 +44,7 @@ public sealed class CliOperations
         _integrityService = integrityService;
         _layoutEngine = layoutEngine;
         _htmlRenderer = htmlRenderer;
+        _epubFidelityAnalyzer = epubFidelityAnalyzer ?? new EpubFidelityAnalyzer();
     }
 
     /// <summary>Executes a parsed command and writes its normal output.</summary>
@@ -79,7 +82,7 @@ public sealed class CliOperations
         await output.WriteLineAsync("  flow sample [output]                         Create the reference .flow.json book.")
             .ConfigureAwait(false);
         await output.WriteLineAsync(
-                "  flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>]")
+                "  flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>] [--fidelity-report <fidelity.json>]")
             .ConfigureAwait(false);
         await output.WriteLineAsync(
                 "    Without --output, the file name is derived from the imported book title.")
@@ -195,6 +198,9 @@ public sealed class CliOperations
         var diagnosticsPath = command.DiagnosticsJsonOutputPath is null
             ? null
             : Path.GetFullPath(command.DiagnosticsJsonOutputPath);
+        var fidelityPath = command.FidelityReportOutputPath is null
+            ? null
+            : Path.GetFullPath(command.FidelityReportOutputPath);
         if (!string.Equals(Path.GetExtension(sourcePath), ".epub", StringComparison.OrdinalIgnoreCase))
         {
             await error.WriteLineAsync("FLOWCLI_UNSUPPORTED_INPUT: The import command currently accepts only .epub files.")
@@ -217,10 +223,28 @@ public sealed class CliOperations
             return 1;
         }
 
+        if (fidelityPath is not null && PathsEqual(sourcePath, fidelityPath))
+        {
+            await error.WriteLineAsync(
+                    "FLOWCLI_INVALID_OUTPUT: The fidelity report path must differ from the EPUB source path.")
+                .ConfigureAwait(false);
+            return 1;
+        }
+
         if (outputPath is not null && diagnosticsPath is not null && PathsEqual(outputPath, diagnosticsPath))
         {
             await error.WriteLineAsync(
                     "FLOWCLI_INVALID_OUTPUT: The Flow document and diagnostics report must use different paths.")
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        if (fidelityPath is not null
+            && ((outputPath is not null && PathsEqual(outputPath, fidelityPath))
+                || (diagnosticsPath is not null && PathsEqual(diagnosticsPath, fidelityPath))))
+        {
+            await error.WriteLineAsync(
+                    "FLOWCLI_INVALID_OUTPUT: The fidelity report must use a path different from every other output.")
                 .ConfigureAwait(false);
             return 1;
         }
@@ -243,12 +267,31 @@ public sealed class CliOperations
             return 1;
         }
 
+        if (fidelityPath is not null
+            && ((outputPath is not null && PathsEqual(outputPath, fidelityPath))
+                || (diagnosticsPath is not null && PathsEqual(diagnosticsPath, fidelityPath))))
+        {
+            await error.WriteLineAsync(
+                    "FLOWCLI_INVALID_OUTPUT: The fidelity report must use a path different from every other output.")
+                .ConfigureAwait(false);
+            return 1;
+        }
+
         if (diagnosticsPath is not null)
         {
             EnsureParentDirectory(diagnosticsPath);
             await WriteImportDiagnosticsAtomicallyAsync(import, diagnosticsPath, cancellationToken)
                 .ConfigureAwait(false);
             await output.WriteLineAsync($"Diagnostics JSON: {diagnosticsPath}").ConfigureAwait(false);
+        }
+
+        if (fidelityPath is not null)
+        {
+            var fidelity = _epubFidelityAnalyzer.Analyze(import);
+            EnsureParentDirectory(fidelityPath);
+            await WriteFidelityReportAtomicallyAsync(fidelity, fidelityPath, cancellationToken)
+                .ConfigureAwait(false);
+            await output.WriteLineAsync($"Fidelity report: {fidelityPath}").ConfigureAwait(false);
         }
 
         await WriteEpubDiagnosticsAsync(import.Diagnostics, output, error).ConfigureAwait(false);
@@ -495,6 +538,35 @@ public sealed class CliOperations
                              FileShare.None))
             {
                 await EpubImportDiagnosticsJsonWriter.WriteAsync(import, destination, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            File.Move(temporaryPath, outputPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
+        }
+    }
+
+    private static async Task WriteFidelityReportAtomicallyAsync(
+        EpubFidelityReport report,
+        string outputPath,
+        CancellationToken cancellationToken)
+    {
+        var temporaryPath = $"{outputPath}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            await using (var destination = new FileStream(
+                             temporaryPath,
+                             FileMode.CreateNew,
+                             FileAccess.Write,
+                             FileShare.None))
+            {
+                await EpubFidelityJsonWriter.WriteAsync(report, destination, cancellationToken)
                     .ConfigureAwait(false);
             }
 

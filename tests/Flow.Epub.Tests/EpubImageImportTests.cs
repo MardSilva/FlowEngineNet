@@ -1,6 +1,7 @@
 using Flow.Documents;
 using Flow.Layout;
 using Flow.Rendering.Html;
+using Flow.Security;
 
 namespace Flow.Epub.Tests;
 
@@ -40,6 +41,196 @@ public sealed class EpubImageImportTests
         (byte)'V', (byte)'P', (byte)'8', (byte)'X', 10, 0, 0, 0,
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     ];
+
+    [Theory]
+    [InlineData(true, false, "image/png", "cover.png")]
+    [InlineData(false, true, "image/jpeg", "cover.jpg")]
+    public async Task ImportAsync_ConvertsEpubCoverSvgImageToPersistentFigure(
+        bool epub3,
+        bool legacyXlink,
+        string mediaType,
+        string fileName)
+    {
+        var imageBytes = mediaType == "image/png" ? Png : Jpeg;
+        var package = CoverPackage(epub3, fileName, mediaType);
+        var referenceAttribute = legacyXlink
+            ? $"xlink:href=\"../images/{fileName.Replace(".", "%2E", StringComparison.Ordinal)}\""
+            : $"href=\"../images/./{fileName}\"";
+        var body = $"""
+            <div class="cover-wrapper">
+              <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+                   id="cover-svg" viewBox="0 0 100 160" width="100" height="160">
+                <title>Solar cover</title>
+                <desc>Yellow publication artwork</desc>
+                <image id="cover-raster" {referenceAttribute} width="100" height="160" />
+              </svg>
+            </div>
+            """;
+
+        var result = await ImportAsync(
+            package,
+            body,
+            new Dictionary<string, byte[]> { [$"EPUB/images/{fileName}"] = imageBytes });
+
+        var document = Assert.IsType<FlowDocument>(result.Document);
+        var figure = Assert.Single(document.Index.Locations.Select(static item => item.Node).OfType<Figure>());
+        Assert.Equal(mediaType, Assert.Single(document.Assets).Value.MediaType);
+        Assert.Equal(figure.Id, document.Presentation?.Cover?.FigureId);
+        Assert.Contains("Solar cover", figure.AlternativeText, StringComparison.Ordinal);
+        Assert.Contains("Yellow publication artwork", figure.AlternativeText, StringComparison.Ordinal);
+        Assert.Equal(figure.AssetId, Assert.IsType<EpubCoverMetadata>(result.MetadataReport!.Cover).AssetId);
+        Assert.True(result.SourceMap!.TryResolve("EPUB/text/chapter-1.xhtml", "cover-svg", out var svgNodeId));
+        Assert.True(result.SourceMap.TryResolve("EPUB/text/chapter-1.xhtml", "cover-raster", out var imageNodeId));
+        Assert.Equal(figure.Id, svgNodeId);
+        Assert.Equal(figure.Id, imageNodeId);
+        Assert.True(new DocumentValidator().Validate(document).IsValid);
+
+        var hashService = new Sha256DocumentIntegrityService(new FlowDocumentCanonicalizer());
+        var hash = hashService.ComputeHash(document);
+        await using var serialized = new MemoryStream();
+        await new FlowJsonDocumentSerializer().SerializeAsync(document, serialized);
+        serialized.Position = 0;
+        var restored = await new FlowJsonDocumentSerializer().DeserializeAsync(serialized);
+        Assert.Equal(figure.Id, restored.Presentation?.Cover?.FigureId);
+        Assert.Equal(hash, hashService.ComputeHash(restored));
+
+        var withoutCoverIntent = new FlowDocument(
+            document.Identity,
+            document.Metadata,
+            document.Content,
+            document.Assets.Values,
+            document.Presentation is null
+                ? null
+                : new DocumentPresentation(nodeTypography: document.Presentation.NodeTypography));
+        Assert.Equal(hash, hashService.ComputeHash(withoutCoverIntent));
+
+        foreach (var (width, height, device) in new[]
+                 {
+                     (390d, 844d, DeviceClass.Phone),
+                     (1600d, 1000d, DeviceClass.Desktop),
+                 })
+        {
+            var preferences = new UserReadingPreferences();
+            var layout = new AdaptiveLayoutEngine().Layout(
+                restored,
+                new LayoutContext(width, height, device, userPreferences: preferences));
+            var html = new HtmlDocumentRenderer().RenderToString(restored, layout, preferences);
+            Assert.Contains(
+                $"<figure id=\"{figure.Id.Value}\" data-publication-role=\"cover\"",
+                html,
+                StringComparison.Ordinal);
+            Assert.Contains($"data:{mediaType};base64,", html, StringComparison.Ordinal);
+            Assert.DoesNotContain("viewBox", html, StringComparison.OrdinalIgnoreCase);
+            Assert.DoesNotContain("xlink:href", html, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public async Task ImportAsync_UsesSafeXhtmlFallbackAndRejectsActiveOrExternalSvgContent()
+    {
+        var package = CoverPackage(epub3: true, "cover.png", "image/png");
+        const string body = """
+            <figure id="cover-figure">
+              <svg xmlns="http://www.w3.org/2000/svg" onload="steal()">
+                <script>steal()</script>
+                <image href="https://example.invalid/remote.png" />
+                <image href="https://example.invalid/remote.png" />
+              </svg>
+              <img src="../images/cover.png" alt="Safe raster fallback" />
+              <figcaption>Publication cover</figcaption>
+            </figure>
+            """;
+
+        var result = await ImportAsync(
+            package,
+            body,
+            new Dictionary<string, byte[]> { ["EPUB/images/cover.png"] = Png });
+
+        var document = Assert.IsType<FlowDocument>(result.Document);
+        var figure = Assert.Single(document.Index.Locations.Select(static item => item.Node).OfType<Figure>());
+        Assert.Equal("Safe raster fallback", figure.AlternativeText);
+        Assert.Equal(figure.Id, document.Presentation?.Cover?.FigureId);
+        Assert.Contains(result.Diagnostics, static item => item.Code == EpubDiagnosticCodes.UnsafeSvg);
+        Assert.Contains(result.Diagnostics, static item =>
+            item.Code == EpubDiagnosticCodes.InvalidSvgImageReference
+            && item.Message.Contains("2 times", StringComparison.Ordinal));
+        Assert.Contains(result.Diagnostics, static item => item.Code == EpubDiagnosticCodes.SvgImageFallbackUsed);
+
+        var preferences = new UserReadingPreferences();
+        var layout = new AdaptiveLayoutEngine().Layout(
+            document,
+            new LayoutContext(390, 844, DeviceClass.Phone, userPreferences: preferences));
+        var html = new HtmlDocumentRenderer().RenderToString(document, layout, preferences);
+        Assert.DoesNotContain("steal", html, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("example.invalid", html, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("Safe raster fallback", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ImportAsync_DetectsFalseMimeAndCircularFallbackFromSvgReference()
+    {
+        var package = Package("""
+            <item id="false-cover" href="images/cover.jpg" media-type="image/jpeg" properties="cover-image" />
+            <item id="cycle-a" href="images/a.bin" media-type="image/avif" fallback="cycle-b" />
+            <item id="cycle-b" href="images/b.bin" media-type="image/avif" fallback="cycle-a" />
+            """);
+        const string body = """
+            <svg xmlns="http://www.w3.org/2000/svg"><image href="../images/cover.jpg" alt="Detected PNG" /></svg>
+            <svg xmlns="http://www.w3.org/2000/svg"><image href="../images/a.bin" alt="Circular unavailable" /></svg>
+            """;
+
+        var result = await ImportAsync(
+            package,
+            body,
+            new Dictionary<string, byte[]>
+            {
+                ["EPUB/images/cover.jpg"] = Png,
+                ["EPUB/images/a.bin"] = [1, 2, 3],
+                ["EPUB/images/b.bin"] = [4, 5, 6],
+            });
+
+        var document = Assert.IsType<FlowDocument>(result.Document);
+        Assert.Equal("image/png", Assert.Single(document.Assets).Value.MediaType);
+        Assert.Contains(result.Diagnostics, static item => item.Code == EpubDiagnosticCodes.ImageMediaTypeMismatch);
+        Assert.Contains(result.Diagnostics, static item => item.Code == EpubDiagnosticCodes.CircularFallback);
+        Assert.Contains(result.Diagnostics, static item => item.Code == EpubDiagnosticCodes.InvalidSvgImageReference);
+        Assert.Contains(
+            document.Index.Locations.Select(static item => item.Node).OfType<Paragraph>(),
+            static paragraph => paragraph.Content.OfType<Text>().Any(static text => text.Value == "Circular unavailable"));
+    }
+
+    [Fact]
+    public async Task ImportAsync_DeduplicatesCoverSvgAndContentImageAndDiagnosesBrokenAssociation()
+    {
+        var package = CoverPackage(epub3: true, "cover.png", "image/png");
+        const string body = """
+            <svg xmlns="http://www.w3.org/2000/svg" id="cover">
+              <image href="../images/cover.png" alt="Cover" />
+            </svg>
+            <img id="repeat" src="../images/cover.png" alt="Repeated cover bytes" />
+            <svg xmlns="http://www.w3.org/2000/svg" id="broken">
+              <image href="../images/missing.png" alt="Missing diagram" />
+            </svg>
+            """;
+
+        var result = await ImportAsync(
+            package,
+            body,
+            new Dictionary<string, byte[]> { ["EPUB/images/cover.png"] = Png });
+
+        var document = Assert.IsType<FlowDocument>(result.Document);
+        var figures = document.Index.Locations.Select(static item => item.Node).OfType<Figure>().ToArray();
+        Assert.Equal(2, figures.Length);
+        Assert.Single(document.Assets);
+        Assert.Equal(figures[0].AssetId, figures[1].AssetId);
+        Assert.Equal(figures[0].Id, document.Presentation?.Cover?.FigureId);
+        Assert.Contains(result.Diagnostics, static item =>
+            item.Code == EpubDiagnosticCodes.InvalidSvgImageReference
+            && item.Resource == "EPUB/text/chapter-1.xhtml");
+        Assert.Contains(
+            document.Index.Locations.Select(static item => item.Node).OfType<Paragraph>(),
+            static paragraph => paragraph.Content.OfType<Text>().Any(static text => text.Value == "Missing diagram"));
+    }
 
     [Theory]
     [InlineData("image/jpeg", "image/jpeg", "cover.jpg")]
@@ -275,6 +466,35 @@ public sealed class EpubImageImportTests
     }
 
     private static string Package(string imageItems) => PackagePrefix + imageItems + PackageSuffix;
+
+    private static string CoverPackage(bool epub3, string fileName, string mediaType) => epub3
+        ? $"""
+            <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id">
+              <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                <dc:identifier id="book-id">urn:flow:test:svg-cover</dc:identifier>
+                <dc:title>Isto é filtro solar</dc:title>
+              </metadata>
+              <manifest>
+                <item id="chapter" href="text/chapter-1.xhtml" media-type="application/xhtml+xml" />
+                <item id="cover-image" href="images/{fileName}" media-type="{mediaType}" properties="cover-image" />
+              </manifest>
+              <spine><itemref idref="chapter" /></spine>
+            </package>
+            """
+        : $"""
+            <package xmlns="http://www.idpf.org/2007/opf" version="2.0" unique-identifier="book-id">
+              <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                <dc:identifier id="book-id">urn:flow:test:svg-cover-epub2</dc:identifier>
+                <dc:title>Isto é filtro solar</dc:title>
+                <meta name="cover" content="cover-image" />
+              </metadata>
+              <manifest>
+                <item id="chapter" href="text/chapter-1.xhtml" media-type="application/xhtml+xml" />
+                <item id="cover-image" href="images/{fileName}" media-type="{mediaType}" />
+              </manifest>
+              <spine><itemref idref="chapter" /></spine>
+            </package>
+            """;
 
     private static async Task<EpubImportResult> ImportAsync(
         string package,

@@ -15,7 +15,8 @@ public sealed record DocumentPresentation
         CodeBlockPresentation? codeBlocks = null,
         TableOfContentsPresentation? tableOfContents = null,
         ReadingTheme? theme = null,
-        IEnumerable<KeyValuePair<NodeId, TypographyStyle>>? nodeTypography = null)
+        IEnumerable<KeyValuePair<NodeId, TypographyStyle>>? nodeTypography = null,
+        CoverPresentation? cover = null)
     {
         PresentationIntentValidation.ValidateEnum(theme, nameof(theme));
 
@@ -28,6 +29,7 @@ public sealed record DocumentPresentation
         CodeBlocks = codeBlocks;
         TableOfContents = tableOfContents;
         Theme = theme;
+        Cover = cover;
         var nodeStyles = ImmutableDictionary.CreateBuilder<NodeId, TypographyStyle>();
         foreach (var pair in nodeTypography ?? [])
         {
@@ -59,6 +61,9 @@ public sealed record DocumentPresentation
     public TableOfContentsPresentation? TableOfContents { get; }
 
     public ReadingTheme? Theme { get; }
+
+    /// <summary>Gets the optional, noncanonical publication-cover intent.</summary>
+    public CoverPresentation? Cover { get; }
 
     /// <summary>Gets optional typed author typography for individual semantic nodes.</summary>
     public ImmutableDictionary<NodeId, TypographyStyle> NodeTypography { get; }

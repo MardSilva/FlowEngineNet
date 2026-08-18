@@ -413,6 +413,14 @@ internal static class FlowJsonWriter
             writer.WriteString("theme", presentation.Theme.Value.ToString());
         }
 
+        if (presentation.Cover is not null)
+        {
+            writer.WritePropertyName("cover");
+            writer.WriteStartObject();
+            writer.WriteString("figureId", presentation.Cover.FigureId.Value);
+            writer.WriteEndObject();
+        }
+
         writer.WritePropertyName("typography");
         writer.WriteStartArray();
         foreach (var pair in presentation.Typography.Styles.OrderBy(static pair => pair.Key))

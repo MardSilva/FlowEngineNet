@@ -31,6 +31,7 @@ Implemented:
 - expanded OPF metadata import with a typed, noncanonical source report;
 - deterministic EPUB resource/fragment traceability to stable Flow node IDs;
 - byte-validated EPUB covers and JPEG/PNG/static-GIF/WebP/SVG assets, with deterministic SVG sanitization and hash deduplication;
+- XHTML/SVG cover wrappers resolved to safe raster `Figure` nodes with a typed, noncanonical cover intent;
 - a safe EPUB CSS subset translated into typed, noncanonical role/node presentation;
 - exact spine-order processing with XHTML fallback chains and typed inclusion decisions;
 - order-preserving XHTML mixed-content conversion with aggregated semantic-loss diagnostics;
@@ -42,6 +43,7 @@ Implemented:
 - the five-chapter “The Flow Experiment” reference book;
 - a lightweight CLI for sampling, inspection, validation, hashing, and HTML rendering;
 - readable UTF-8 JSON output, deterministic EPUB diagnostic reports, and title-derived portable `.flow.json` names;
+- a typed, deterministic EPUB fidelity sidecar with explicit preserved/transformed/approximated/unsupported/lost evidence;
 - small, medium, and large viewport profiles;
 - responsive figures, semantic ID preservation, and typed layout intentions;
 - unit and semantic-conformance tests.
@@ -158,6 +160,7 @@ The final clean-directory review passes 134 tests with zero build warnings; see 
 - [Canonicalization and hashing](docs/canonicalization.md)
 - [Experimental document signatures](docs/signatures.md)
 - [Experimental EPUB import](docs/epub-import.md)
+- [EPUB fidelity report](docs/epub-fidelity.md)
 - [0.1 conformance profile](docs/conformance.md)
 - [Known limitations](docs/known-limitations.md)
 - [0.1 release review](docs/0.1-release-review.md)
@@ -189,7 +192,7 @@ To reproduce the pipeline from the semantic source:
 
 ```powershell
 dotnet run --project src/Flow.Cli -- epub-inspect path/to/book.epub --json epub-report.json
-dotnet run --project src/Flow.Cli -- import path/to/book.epub --diagnostics-json import-report.json
+dotnet run --project src/Flow.Cli -- import path/to/book.epub --diagnostics-json import-report.json --fidelity-report fidelity.json
 dotnet run --project src/Flow.Cli -- inspect samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- validate samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- hash samples/SampleBook/sample.flow.json

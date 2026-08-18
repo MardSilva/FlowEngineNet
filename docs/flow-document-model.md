@@ -124,7 +124,7 @@ Chapters must be document-root children, sections belong to chapters or other se
 
 ## Presentation and typography
 
-`DocumentPresentation` is optional. A document with `Presentation == null` remains complete and usable. When present, it contains a `TypographySet`, an optional immutable `NodeTypography` map keyed by stable `NodeId`, plus small typed presentation intentions for headings, paragraphs, figures, captions, footnotes, code blocks, and the table of contents. Per-node typography allows an importer to preserve a class/ID-specific author intention without widening it to every node sharing a role.
+`DocumentPresentation` is optional. A document with `Presentation == null` remains complete and usable. When present, it contains a `TypographySet`, an optional immutable `NodeTypography` map keyed by stable `NodeId`, plus small typed presentation intentions for headings, paragraphs, figures, captions, footnotes, code blocks, the table of contents, and an optional `CoverPresentation` pointing to one semantic `Figure`. Per-node typography allows an importer to preserve a class/ID-specific author intention without widening it to every node sharing a role. Cover validation requires that the target be one unique figure. The cover intent has no dimensions or coordinates and, like all presentation, is excluded from canonicalization.
 
 `TypographySet` maps independent `TypographyRole` values to partial `TypographyStyle` values. The supported roles are body, chapter title, headings 1 through 6, subtitle, TOC title and levels 1 through 3, caption, footnote, block quote, and code. A missing style or property means “unspecified”, allowing defaults and future user preferences to participate in the cascade without mutating the document.
 

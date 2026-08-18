@@ -9,7 +9,8 @@ public sealed record SampleCommand(string OutputPath) : CliCommand;
 public sealed record ImportEpubCommand(
     string SourcePath,
     string? OutputPath,
-    string? DiagnosticsJsonOutputPath) : CliCommand;
+    string? DiagnosticsJsonOutputPath,
+    string? FidelityReportOutputPath = null) : CliCommand;
 
 public sealed record InspectEpubCommand(string SourcePath, string? JsonOutputPath) : CliCommand;
 

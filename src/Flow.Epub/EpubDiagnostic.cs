@@ -72,6 +72,9 @@ public static class EpubDiagnosticCodes
     public const string InvalidTextDirection = "EPUB064";
     public const string ConflictingInlineLanguage = "EPUB065";
     public const string InvalidRubyStructure = "EPUB066";
+    public const string InvalidSvgImageReference = "EPUB067";
+    public const string SvgImageFallbackUsed = "EPUB068";
+    public const string SvgImageSemanticLoss = "EPUB069";
     public const string InvalidCssValue = "EPUB050";
     public const string ExternalStylesheetBlocked = "EPUB051";
     public const string CssTargetNotRepresentable = "EPUB052";

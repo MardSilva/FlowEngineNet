@@ -68,6 +68,7 @@ public sealed class FlowJsonDocumentSerializerTests
         Assert.Equal("The Flow Experiment", restored.Metadata.Title);
         Assert.Equal(2, restored.Assets.Count);
         Assert.Equal(ReadingTheme.Dark, restored.Presentation?.Theme);
+        Assert.Equal(new NodeId("figure-one"), restored.Presentation?.Cover?.FigureId);
         Assert.Equal("ABC123", restored.Integrity?.Hash);
         Assert.IsType<Chapter>(Assert.Single(restored.Content.Children));
     }
@@ -256,7 +257,8 @@ public sealed class FlowJsonDocumentSerializerTests
             new FootnotePresentation(FootnotePresentationMode.EndOfSection),
             new CodeBlockPresentation(true, true),
             new TableOfContentsPresentation(true, TableOfContentsLeaderStyle.Dots),
-            ReadingTheme.Dark);
+            ReadingTheme.Dark,
+            cover: new CoverPresentation(new NodeId("figure-one")));
 
         return new FlowDocument(
             new DocumentIdentity(

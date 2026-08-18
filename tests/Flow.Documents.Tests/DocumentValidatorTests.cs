@@ -7,6 +7,22 @@ public sealed class DocumentValidatorTests
     private readonly DocumentValidator _validator = new();
 
     [Fact]
+    public void Validate_ReportsCoverIntentThatDoesNotReferenceAFigure()
+    {
+        var paragraphId = new NodeId("not-a-figure");
+        var document = new FlowDocument(
+            new DocumentIdentity(new DocumentId("urn:flow:test:invalid-cover")),
+            new DocumentMetadata("Invalid cover"),
+            new DocumentContent([new Paragraph(paragraphId, [new Text("Text")])]),
+            presentation: new DocumentPresentation(cover: new CoverPresentation(paragraphId)));
+
+        var result = _validator.Validate(document);
+
+        Assert.Contains(result.Diagnostics, static diagnostic =>
+            diagnostic.Code == ValidationDiagnosticCodes.InvalidCoverFigure);
+    }
+
+    [Fact]
     public void Validate_AcceptsAConsistentDocument()
     {
         var footnoteId = new NodeId("footnote-one");

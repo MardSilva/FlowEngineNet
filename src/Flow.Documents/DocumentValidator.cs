@@ -19,12 +19,31 @@ public sealed class DocumentValidator
         ValidateHierarchy(document, diagnostics);
         ValidateHeadingLevels(document, diagnostics);
         ValidateFigures(document, diagnostics);
+        ValidatePresentation(document, diagnostics);
         ValidateReferences(document, diagnostics);
         ValidateTables(document, diagnostics);
         ValidateTableOfContents(document, diagnostics);
         ValidateInternationalization(document, diagnostics);
 
         return new ValidationResult(diagnostics);
+    }
+
+    private static void ValidatePresentation(
+        FlowDocument document,
+        ImmutableArray<ValidationDiagnostic>.Builder diagnostics)
+    {
+        if (document.Presentation?.Cover is not { } cover)
+        {
+            return;
+        }
+
+        if (!document.Index.TryGetUniqueNode(cover.FigureId, out var node) || node is not Figure)
+        {
+            diagnostics.Add(Error(
+                ValidationDiagnosticCodes.InvalidCoverFigure,
+                $"Cover intent references '{cover.FigureId}', which is not one unique figure in the document.",
+                cover.FigureId));
+        }
     }
 
     private static void ValidateIds(

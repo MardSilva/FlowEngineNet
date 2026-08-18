@@ -138,7 +138,8 @@ public sealed class TypographyTests
             codeBlocks: new CodeBlockPresentation(avoidSplit: true, preserveWhitespace: true),
             tableOfContents: new TableOfContentsPresentation(
                 generateFromDocumentStructure: true,
-                TableOfContentsLeaderStyle.Dots));
+                TableOfContentsLeaderStyle.Dots),
+            cover: new CoverPresentation(new NodeId("cover-figure")));
 
         Assert.Same(typography, presentation.Typography);
         Assert.True(presentation.Headings?.KeepWithNext);
@@ -149,6 +150,7 @@ public sealed class TypographyTests
         Assert.Equal(FootnotePresentationMode.EndOfSection, presentation.Footnotes?.PreferredPresentation);
         Assert.True(presentation.CodeBlocks?.PreserveWhitespace);
         Assert.Equal(TableOfContentsLeaderStyle.Dots, presentation.TableOfContents?.LeaderStyle);
+        Assert.Equal(new NodeId("cover-figure"), presentation.Cover?.FigureId);
     }
 
     [Fact]
@@ -161,6 +163,7 @@ public sealed class TypographyTests
         var presentationTypes = new[]
         {
             typeof(DocumentPresentation),
+            typeof(CoverPresentation),
             typeof(HeadingPresentation),
             typeof(ParagraphPresentation),
             typeof(FigurePresentation),

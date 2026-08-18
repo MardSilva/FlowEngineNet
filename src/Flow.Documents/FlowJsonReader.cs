@@ -451,7 +451,20 @@ internal static class FlowJsonReader
             ReadCodeBlockPresentation(element, path),
             ReadTableOfContentsPresentation(element, path),
             OptionalEnum<ReadingTheme>(element, "theme", $"{path}.theme"),
-            ReadNodeTypography(element, path));
+            ReadNodeTypography(element, path),
+            ReadCoverPresentation(element, path));
+    }
+
+    private static CoverPresentation? ReadCoverPresentation(JsonElement parent, string path)
+    {
+        if (!parent.TryGetProperty("cover", out var element))
+        {
+            return null;
+        }
+
+        RequireKind(element, JsonValueKind.Object, $"{path}.cover");
+        return new CoverPresentation(
+            new Flow.Core.NodeId(RequiredString(element, "figureId", $"{path}.cover.figureId")));
     }
 
     private static IEnumerable<KeyValuePair<Flow.Core.NodeId, TypographyStyle>> ReadNodeTypography(

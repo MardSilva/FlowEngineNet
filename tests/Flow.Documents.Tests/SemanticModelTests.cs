@@ -135,6 +135,7 @@ public sealed class SemanticModelTests
             typeof(Emphasis), typeof(Underline), typeof(Strikethrough), typeof(InlineCode),
             typeof(Link), typeof(FootnoteReference), typeof(LineBreak),
             typeof(TypographyStyle), typeof(TypographySet),
+            typeof(CoverPresentation),
             typeof(HeadingPresentation), typeof(ParagraphPresentation),
             typeof(FigurePresentation), typeof(CaptionPresentation),
             typeof(FootnotePresentation), typeof(CodeBlockPresentation),

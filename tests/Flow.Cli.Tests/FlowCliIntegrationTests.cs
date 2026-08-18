@@ -204,6 +204,81 @@ public sealed class FlowCliIntegrationTests
     }
 
     [Fact]
+    public async Task Import_WritesDeterministicFidelityReportAlongsideDiagnostics()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var epubPath = workspace.PathOf("fidelity.epub");
+        var documentPath = workspace.PathOf("fidelity.flow.json");
+        var diagnosticsPath = workspace.PathOf("diagnostics.json");
+        var firstReportPath = workspace.PathOf("fidelity-one.json");
+        var secondReportPath = workspace.PathOf("fidelity-two.json");
+        CreateMinimalEpub(epubPath);
+        var application = FlowCliApplication.CreateDefault();
+
+        var first = await RunAsync(
+            application,
+            [
+                "import",
+                epubPath,
+                "--output",
+                documentPath,
+                "--diagnostics-json",
+                diagnosticsPath,
+                "--fidelity-report",
+                firstReportPath,
+            ]);
+        var second = await RunAsync(
+            application,
+            [
+                "import",
+                epubPath,
+                "--output",
+                documentPath,
+                "--fidelity-report",
+                secondReportPath,
+            ]);
+
+        Assert.Equal(0, first.ExitCode);
+        Assert.Equal(0, second.ExitCode);
+        Assert.True(File.Exists(diagnosticsPath));
+        Assert.Equal(await File.ReadAllBytesAsync(firstReportPath), await File.ReadAllBytesAsync(secondReportPath));
+        var bytes = await File.ReadAllBytesAsync(firstReportPath);
+        Assert.False(bytes.AsSpan().StartsWith(Encoding.UTF8.Preamble));
+        Assert.DoesNotContain((byte)'\r', bytes);
+        using var report = JsonDocument.Parse(bytes);
+        Assert.Equal("flow-epub-fidelity-0.1", report.RootElement.GetProperty("format").GetString());
+        Assert.True(report.RootElement.GetProperty("importSucceeded").GetBoolean());
+        Assert.False(report.RootElement.GetProperty("summary").GetProperty("partial").GetBoolean());
+        Assert.Contains("not a claim", report.RootElement.GetProperty("scope").GetString(), StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task Import_FailedInputStillWritesPartialFidelityReportAtomically()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var epubPath = workspace.PathOf("invalid.epub");
+        var reportPath = workspace.PathOf("partial-fidelity.json");
+        await File.WriteAllTextAsync(epubPath, "not a ZIP archive");
+
+        var result = await RunAsync(
+            FlowCliApplication.CreateDefault(),
+            ["import", epubPath, "--fidelity-report", reportPath]);
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.True(File.Exists(reportPath));
+        Assert.Empty(Directory.GetFiles(workspace.Root, "*.tmp"));
+        using var report = JsonDocument.Parse(await File.ReadAllBytesAsync(reportPath));
+        Assert.False(report.RootElement.GetProperty("importSucceeded").GetBoolean());
+        Assert.True(report.RootElement.GetProperty("summary").GetProperty("partial").GetBoolean());
+        Assert.Equal(
+            JsonValueKind.Null,
+            report.RootElement.GetProperty("summary").GetProperty("preservationPercentage").ValueKind);
+        Assert.Contains(
+            report.RootElement.GetProperty("findings").EnumerateArray(),
+            static finding => finding.GetProperty("relatedDiagnosticCode").GetString() == "EPUB001");
+    }
+
+    [Fact]
     public async Task EpubInspect_ReportsStructureAndWritesDeterministicJsonWithoutImporting()
     {
         using var workspace = new TemporaryWorkspace();

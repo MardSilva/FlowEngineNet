@@ -12,6 +12,17 @@ public sealed record EpubImportResult
         EpubMetadataReport? metadataReport = null,
         EpubPackageProcessingReport? processingReport = null,
         EpubSourceMap? sourceMap = null)
+        : this(document, diagnostics, metadataReport, processingReport, sourceMap, null)
+    {
+    }
+
+    internal EpubImportResult(
+        FlowDocument? document,
+        IEnumerable<EpubDiagnostic> diagnostics,
+        EpubMetadataReport? metadataReport,
+        EpubPackageProcessingReport? processingReport,
+        EpubSourceMap? sourceMap,
+        EpubFidelitySourceSnapshot? fidelitySource)
     {
         ArgumentNullException.ThrowIfNull(diagnostics);
         Document = document;
@@ -19,6 +30,7 @@ public sealed record EpubImportResult
         MetadataReport = metadataReport;
         ProcessingReport = processingReport;
         SourceMap = sourceMap;
+        FidelitySource = fidelitySource;
     }
 
     /// <summary>Gets the imported document, including a recoverable partial result when available.</summary>
@@ -35,6 +47,8 @@ public sealed record EpubImportResult
 
     /// <summary>Gets noncanonical traceability from EPUB resources and fragments to semantic node IDs.</summary>
     public EpubSourceMap? SourceMap { get; }
+
+    internal EpubFidelitySourceSnapshot? FidelitySource { get; }
 
     /// <summary>Gets whether a document was produced without error diagnostics.</summary>
     public bool IsSuccess => Document is not null && Diagnostics.All(

@@ -19,6 +19,8 @@ public sealed class EpubImporter : IEpubImporter
     private static readonly XNamespace EpubNamespace = "http://www.idpf.org/2007/ops";
     private static readonly XNamespace NcxNamespace = "http://www.daisy.org/z3986/2005/ncx/";
     private static readonly XNamespace MathMlNamespace = "http://www.w3.org/1998/Math/MathML";
+    private static readonly XNamespace SvgNamespace = "http://www.w3.org/2000/svg";
+    private static readonly XNamespace XLinkNamespace = "http://www.w3.org/1999/xlink";
 
     private readonly EpubImportLimits limits;
 
@@ -96,7 +98,8 @@ public sealed class EpubImporter : IEpubImporter
                 diagnostics,
                 conversion.MetadataReport ?? model.MetadataReport,
                 conversion.ProcessingReport,
-                conversion.SourceMap);
+                conversion.SourceMap,
+                conversion.FidelitySource);
         }
         catch (OperationCanceledException)
         {
@@ -527,7 +530,12 @@ public sealed class EpubImporter : IEpubImporter
 
         if (xhtmlDocuments.Count == 0)
         {
-            return new PackageConversionResult(null, processingReport, null, package.MetadataReport);
+            return new PackageConversionResult(
+                null,
+                processingReport,
+                null,
+                package.MetadataReport,
+                CreateFidelitySource(package, processingReport, [], [], diagnostics));
         }
 
         var navigationDocuments = await LoadNavigationDocumentsAsync(
@@ -537,7 +545,13 @@ public sealed class EpubImporter : IEpubImporter
             diagnostics,
             cancellationToken).ConfigureAwait(false);
 
-        var context = new ConversionContext(entries, package.Manifest, diagnostics, limits);
+        var context = new ConversionContext(
+            entries,
+            package.Manifest,
+            diagnostics,
+            limits,
+            package.MetadataReport.Cover,
+            package.Title);
         foreach (var xhtml in xhtmlDocuments)
         {
             context.ConsumedResourcePaths.Add(xhtml.Item.Path);
@@ -546,6 +560,8 @@ public sealed class EpubImporter : IEpubImporter
         await context.LoadCssAsync(xhtmlDocuments, cancellationToken).ConfigureAwait(false);
         context.PrepareIds(xhtmlDocuments);
         context.PrepareFootnotes(xhtmlDocuments);
+        var coverAssetId = await context.ImportCoverAsync(package.MetadataReport.Cover, cancellationToken)
+            .ConfigureAwait(false);
         var content = new List<DocumentNode>();
         var tableOfContents = context.ConvertTableOfContents(navigationDocuments, package.SpineTocId);
         if (tableOfContents is not null)
@@ -558,8 +574,6 @@ public sealed class EpubImporter : IEpubImporter
             content.Add(await context.ConvertChapterAsync(xhtml, cancellationToken).ConfigureAwait(false));
         }
 
-        var coverAssetId = await context.ImportCoverAsync(package.MetadataReport.Cover, cancellationToken)
-            .ConfigureAwait(false);
         var metadataReport = coverAssetId is null || package.MetadataReport.Cover is null
             ? package.MetadataReport
             : package.MetadataReport.WithCover(package.MetadataReport.Cover with { AssetId = coverAssetId });
@@ -587,9 +601,7 @@ public sealed class EpubImporter : IEpubImporter
                 package.Description),
             new DocumentContent(content),
             context.Assets.Values,
-            context.NodeTypography.Count == 0
-                ? null
-                : new DocumentPresentation(nodeTypography: context.NodeTypography));
+            context.CreatePresentation());
 
         var validation = new DocumentValidator().Validate(document);
         foreach (var validationDiagnostic in validation.Diagnostics)
@@ -602,8 +614,198 @@ public sealed class EpubImporter : IEpubImporter
                 $"{validationDiagnostic.Code}: {validationDiagnostic.Message}"));
         }
 
-        return new PackageConversionResult(document, processingReport, context.CreateSourceMap(document), metadataReport);
+        return new PackageConversionResult(
+            document,
+            processingReport,
+            context.CreateSourceMap(document),
+            metadataReport,
+            CreateFidelitySource(package, processingReport, xhtmlDocuments, navigationDocuments, diagnostics));
     }
+
+    private static EpubFidelitySourceSnapshot CreateFidelitySource(
+        PackageModel package,
+        EpubPackageProcessingReport processingReport,
+        IEnumerable<XhtmlModel> xhtmlDocuments,
+        IReadOnlyList<NavigationModel> navigationDocuments,
+        IReadOnlyCollection<EpubDiagnostic> diagnostics)
+    {
+        var counts = new List<EpubFidelitySourceCount>();
+        foreach (var spine in processingReport.Spine)
+        {
+            var status = spine.Disposition == EpubSpineDisposition.Excluded
+                ? spine.Reason == EpubSpineDecisionReason.UnsupportedMediaType
+                    ? EpubFidelityStatus.Unsupported
+                    : EpubFidelityStatus.Lost
+                : (EpubFidelityStatus?)null;
+            Add(
+                spine.ReadingRole == EpubSpineReadingRole.Linear
+                    ? EpubFidelityMetric.LinearSpineItems
+                    : EpubFidelityMetric.NonLinearSpineItems,
+                spine.SelectedResourcePath ?? package.PackagePath,
+                1,
+                status);
+        }
+
+        foreach (var manifest in processingReport.Manifest)
+        {
+            var status = !manifest.ExistsInArchive
+                ? EpubFidelityStatus.Lost
+                : diagnostics.Any(diagnostic => diagnostic.Code == EpubDiagnosticCodes.UnsupportedResource
+                                                && string.Equals(
+                                                    diagnostic.Resource,
+                                                    manifest.Path,
+                                                    StringComparison.Ordinal))
+                    ? EpubFidelityStatus.Unsupported
+                    : (EpubFidelityStatus?)null;
+            Add(EpubFidelityMetric.ManifestResources, manifest.Path, 1, status);
+        }
+        Add(EpubFidelityMetric.Covers, package.MetadataReport.Cover?.Path, package.MetadataReport.Cover is null ? 0 : 1);
+
+        foreach (var xhtml in xhtmlDocuments)
+        {
+            var body = xhtml.Document.Root?.Element(XhtmlNamespace + "body");
+            if (body is null)
+            {
+                continue;
+            }
+
+            var elements = body.Descendants().ToArray();
+            Add(
+                EpubFidelityMetric.SignificantCharacters,
+                xhtml.Item.Path,
+                body.DescendantNodes().OfType<XText>().Sum(static text => EpubFidelityAnalyzer.CountSignificant(text.Value)));
+            Add(EpubFidelityMetric.Headings, xhtml.Item.Path, elements.LongCount(IsHeading));
+            Add(EpubFidelityMetric.Paragraphs, xhtml.Item.Path, elements.LongCount(static element => IsXhtml(element, "p")));
+            Add(
+                EpubFidelityMetric.InternalLinks,
+                xhtml.Item.Path,
+                elements.LongCount(static element => IsXhtml(element, "a")
+                                                     && HasHref(element)
+                                                     && !IsTableOfContentsLink(element)
+                                                     && !IsNoteReference(element)
+                                                     && !IsExternalHref(element)));
+            Add(
+                EpubFidelityMetric.ExternalLinks,
+                xhtml.Item.Path,
+                elements.LongCount(static element => IsXhtml(element, "a")
+                                                     && HasHref(element)
+                                                     && !IsTableOfContentsLink(element)
+                                                     && !IsNoteReference(element)
+                                                     && IsExternalHref(element)));
+            Add(
+                EpubFidelityMetric.Images,
+                xhtml.Item.Path,
+                elements.LongCount(static element => IsXhtml(element, "img") || element.Name == SvgNamespace + "image"));
+            Add(EpubFidelityMetric.Notes, xhtml.Item.Path, elements.LongCount(IsNote));
+            Add(EpubFidelityMetric.NoteReferences, xhtml.Item.Path, elements.LongCount(IsNoteReference));
+            Add(EpubFidelityMetric.Tables, xhtml.Item.Path, elements.LongCount(static element => IsXhtml(element, "table")));
+            Add(EpubFidelityMetric.TableRows, xhtml.Item.Path, elements.LongCount(static element => IsXhtml(element, "tr")));
+            Add(
+                EpubFidelityMetric.TableCells,
+                xhtml.Item.Path,
+                elements.LongCount(static element => IsXhtml(element, "td") || IsXhtml(element, "th")));
+            Add(
+                EpubFidelityMetric.UnknownOrUnrepresentableElements,
+                xhtml.Item.Path,
+                elements.LongCount(static element => element.Name.Namespace == XhtmlNamespace
+                                                    && (!SupportedXhtmlElements.Contains(element.Name.LocalName)
+                                                        || KnownUnrepresentableXhtmlElements.Contains(
+                                                            element.Name.LocalName))),
+                EpubFidelityStatus.Approximated);
+        }
+
+        var epub3Tocs = navigationDocuments
+            .Where(static item => item.Kind == NavigationKind.Epub3)
+            .SelectMany(static item => item.Document.Descendants(XhtmlNamespace + "nav"))
+            .Where(static nav => HasAttributeToken((string?)nav.Attribute(EpubNamespace + "type"), "toc"))
+            .ToArray();
+        if (epub3Tocs.Length > 0)
+        {
+            foreach (var navigation in navigationDocuments.Where(static item => item.Kind == NavigationKind.Epub3))
+            {
+                var total = navigation.Document.Descendants(XhtmlNamespace + "nav")
+                    .Where(static nav => HasAttributeToken((string?)nav.Attribute(EpubNamespace + "type"), "toc"))
+                    .Sum(static nav => nav.Descendants(XhtmlNamespace + "a").LongCount());
+                Add(EpubFidelityMetric.TableOfContentsEntries, navigation.Item.Path, total);
+            }
+        }
+        else
+        {
+            foreach (var navigation in navigationDocuments.Where(static item => item.Kind == NavigationKind.Ncx))
+            {
+                Add(
+                    EpubFidelityMetric.TableOfContentsEntries,
+                    navigation.Item.Path,
+                    navigation.Document.Descendants(NcxNamespace + "navPoint").LongCount());
+            }
+        }
+
+        return new EpubFidelitySourceSnapshot(counts);
+
+        void Add(
+            EpubFidelityMetric metric,
+            string? resource,
+            long count,
+            EpubFidelityStatus? status = null)
+        {
+            if (count > 0)
+            {
+                counts.Add(new EpubFidelitySourceCount(metric, resource, count, status));
+            }
+        }
+    }
+
+    private static bool IsXhtml(XElement element, string localName) =>
+        element.Name == XhtmlNamespace + localName;
+
+    private static bool IsHeading(XElement element) =>
+        element.Name.Namespace == XhtmlNamespace
+        && element.Name.LocalName.Length == 2
+        && element.Name.LocalName[0] == 'h'
+        && element.Name.LocalName[1] is >= '1' and <= '6';
+
+    private static bool IsExternalHref(XElement element)
+    {
+        var href = (string?)element.Attribute("href");
+        return href is not null && Uri.TryCreate(href, UriKind.Absolute, out var uri)
+                                && uri.Scheme is "http" or "https" or "mailto" or "tel";
+    }
+
+    private static bool HasHref(XElement element) =>
+        !string.IsNullOrWhiteSpace((string?)element.Attribute("href"));
+
+    private static bool IsTableOfContentsLink(XElement element) => element
+        .Ancestors(XhtmlNamespace + "nav")
+        .Any(static nav => HasAttributeToken((string?)nav.Attribute(EpubNamespace + "type"), "toc"));
+
+    private static bool IsNote(XElement element) =>
+        HasAttributeToken((string?)element.Attribute(EpubNamespace + "type"), "footnote")
+        || HasAttributeToken((string?)element.Attribute(EpubNamespace + "type"), "endnote")
+        || HasAttributeToken((string?)element.Attribute("role"), "doc-footnote");
+
+    private static bool IsNoteReference(XElement element) =>
+        HasAttributeToken((string?)element.Attribute(EpubNamespace + "type"), "noteref")
+        || HasAttributeToken((string?)element.Attribute("role"), "doc-noteref");
+
+    private static bool HasAttributeToken(string? values, string token) =>
+        values?.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
+            .Contains(token, StringComparer.OrdinalIgnoreCase) == true;
+
+    private static readonly HashSet<string> SupportedXhtmlElements = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "a", "abbr", "address", "article", "aside", "b", "bdi", "bdo", "blockquote", "body", "br",
+        "caption", "cite", "code", "dd", "details", "div", "dl", "dt", "em", "figcaption", "figure",
+        "footer", "h1", "h2", "h3", "h4", "h5", "h6", "header", "hr", "i", "img", "li", "main",
+        "mark", "nav", "ol", "p", "picture", "pre", "q", "rp", "rt", "ruby", "s", "section", "small",
+        "source", "span", "strong", "sub", "summary", "sup", "table", "tbody", "td", "tfoot", "th",
+        "thead", "time", "tr", "u", "ul",
+    };
+
+    private static readonly HashSet<string> KnownUnrepresentableXhtmlElements = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "abbr", "address", "article", "aside", "cite", "dd", "details", "div", "dl", "dt", "footer",
+        "header", "main", "mark", "q", "small", "span", "sub", "summary", "sup", "time",
+    };
 
     private static SpineResolution ResolveSpineItem(
         SpineItem spineItem,
@@ -853,7 +1055,8 @@ public sealed class EpubImporter : IEpubImporter
         FlowDocument? Document,
         EpubPackageProcessingReport ProcessingReport,
         EpubSourceMap? SourceMap,
-        EpubMetadataReport? MetadataReport);
+        EpubMetadataReport? MetadataReport,
+        EpubFidelitySourceSnapshot FidelitySource);
 
     private sealed record SpineResolution(
         ManifestItem? Selected,
@@ -884,6 +1087,8 @@ public sealed class EpubImporter : IEpubImporter
         private readonly IReadOnlyDictionary<string, ManifestItem> manifest;
         private readonly List<EpubDiagnostic> diagnostics;
         private readonly EpubImportLimits limits;
+        private readonly EpubCoverMetadata? coverMetadata;
+        private readonly string publicationTitle;
         private readonly Dictionary<XElement, NodeId> elementIds = [];
         private readonly Dictionary<string, NodeId> anchors = new(StringComparer.Ordinal);
         private readonly Dictionary<string, AssetId> assetIds = new(StringComparer.Ordinal);
@@ -893,27 +1098,35 @@ public sealed class EpubImporter : IEpubImporter
         private readonly Dictionary<SourceLocationKey, int> sourceOccurrences = [];
         private readonly Dictionary<UnsupportedElementKey, int> unsupportedElements = [];
         private readonly Dictionary<UnsupportedElementKey, int> mathLosses = [];
+        private readonly Dictionary<SvgImageIssueKey, int> svgImageIssues = [];
         private readonly HashSet<XElement> footnoteElements = [];
         private readonly Dictionary<XElement, NodeId> footnoteReferenceTargets = [];
         private readonly HashSet<XElement> invalidFootnoteReferences = [];
         private IReadOnlyDictionary<XElement, TypographyStyle> cssStyles = new Dictionary<XElement, TypographyStyle>();
+        private AssetId? coverAssetId;
         private int generatedId;
 
         internal ConversionContext(
             IReadOnlyDictionary<string, ZipArchiveEntry> entries,
             IReadOnlyDictionary<string, ManifestItem> manifest,
             List<EpubDiagnostic> diagnostics,
-            EpubImportLimits limits)
+            EpubImportLimits limits,
+            EpubCoverMetadata? coverMetadata,
+            string publicationTitle)
         {
             this.entries = entries;
             this.manifest = manifest;
             this.diagnostics = diagnostics;
             this.limits = limits;
+            this.coverMetadata = coverMetadata;
+            this.publicationTitle = publicationTitle;
         }
 
         internal Dictionary<AssetId, FlowAsset> Assets { get; } = [];
 
         internal Dictionary<NodeId, TypographyStyle> NodeTypography { get; } = [];
+
+        internal NodeId? CoverFigureId { get; private set; }
 
         internal HashSet<string> ConsumedResourcePaths { get; } = new(StringComparer.Ordinal);
 
@@ -941,7 +1154,20 @@ public sealed class EpubImporter : IEpubImporter
 
             var imported = await TryImportImageAssetAsync(cover.Path, "publication cover", cancellationToken)
                 .ConfigureAwait(false);
-            return imported?.AssetId;
+            coverAssetId = imported?.AssetId;
+            return coverAssetId;
+        }
+
+        internal DocumentPresentation? CreatePresentation()
+        {
+            if (NodeTypography.Count == 0 && CoverFigureId is null)
+            {
+                return null;
+            }
+
+            return new DocumentPresentation(
+                nodeTypography: NodeTypography,
+                cover: CoverFigureId is null ? null : new CoverPresentation(CoverFigureId));
         }
 
         internal EpubSourceMap CreateSourceMap(FlowDocument document)
@@ -981,6 +1207,15 @@ public sealed class EpubImporter : IEpubImporter
                 diagnostics.Add(Warning(
                     EpubDiagnosticCodes.MathSemanticLoss,
                     $"{key.Description} occurred {occurrenceText}; safe child content or an available textual fallback was preserved.",
+                    key.ResourcePath));
+            }
+
+            foreach (var (key, count) in svgImageIssues)
+            {
+                var occurrenceText = count == 1 ? "once" : $"{count} times";
+                diagnostics.Add(Warning(
+                    key.Code,
+                    $"{key.Message} This occurred {occurrenceText}.",
                     key.ResourcePath));
             }
         }
@@ -1030,10 +1265,11 @@ public sealed class EpubImporter : IEpubImporter
                             xhtml.Item.Path));
                     }
 
-                    var enclosingFigure = element.Name.LocalName is "img" or "picture"
+                    var visualContainer = IsImageSourceElement(element)
                         ? element.Ancestors(XhtmlNamespace + "figure").FirstOrDefault()
+                          ?? element.Ancestors(SvgNamespace + "svg").FirstOrDefault()
                         : null;
-                    var targetElement = enclosingFigure
+                    var targetElement = visualContainer
                         ?? (IsFootnoteElement(element) || IsRepresentedNode(element)
                             ? element
                             : element.Ancestors().FirstOrDefault(IsRepresentedNode) ?? body);
@@ -1051,7 +1287,10 @@ public sealed class EpubImporter : IEpubImporter
 
                     anchors.TryAdd($"{xhtml.Item.Path}#{htmlId}", nodeId);
                     AddSourceLocation(xhtml.Item.Path, htmlId, nodeId);
-                    if (!ReferenceEquals(targetElement, element))
+                    if (!ReferenceEquals(targetElement, element)
+                        && !(IsImageSourceElement(element)
+                             && targetElement.Name is { } targetName
+                             && (targetName == XhtmlNamespace + "figure" || targetName == SvgNamespace + "svg")))
                     {
                         diagnostics.Add(Warning(
                             EpubDiagnosticCodes.UnsupportedElement,
@@ -1752,6 +1991,29 @@ public sealed class EpubImporter : IEpubImporter
                 return [ConvertBlockMath(element, resourcePath)];
             }
 
+            if (element.Name == SvgNamespace + "svg")
+            {
+                return await ConvertSvgImageAsync(
+                    element,
+                    element,
+                    caption: null,
+                    fallbackImage: null,
+                    resourcePath,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            if (element.Name == SvgNamespace + "image")
+            {
+                return await ConvertSvgImageElementsAsync(
+                    [element],
+                    element,
+                    svg: null,
+                    caption: null,
+                    fallbackImage: null,
+                    resourcePath,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
             if (element.Name.Namespace != XhtmlNamespace)
             {
                 ReportUnsupported(element, resourcePath, $"Foreign element <{element.Name.LocalName}>");
@@ -2407,10 +2669,11 @@ public sealed class EpubImporter : IEpubImporter
             string resourcePath,
             CancellationToken cancellationToken)
         {
+            var svg = element.Descendants(SvgNamespace + "svg").FirstOrDefault();
             var image = element.Element(XhtmlNamespace + "picture")
                 ?? element.DescendantsAndSelf(XhtmlNamespace + "img").FirstOrDefault();
             var captionElement = element.Element(XhtmlNamespace + "figcaption");
-            if (image is null)
+            if (image is null && svg is null)
             {
                 ReportUnsupported(element, resourcePath, "Figure without an image");
                 return await ConvertChildrenAsync(element, resourcePath, cancellationToken).ConfigureAwait(false);
@@ -2422,7 +2685,195 @@ public sealed class EpubImporter : IEpubImporter
                 caption = new Caption(IdFor(captionElement, "caption"), ConvertInlineContent(captionElement, resourcePath));
             }
 
-            return await ConvertImageAsync(image, element, caption, resourcePath, cancellationToken).ConfigureAwait(false);
+            if (svg is not null)
+            {
+                return await ConvertSvgImageAsync(
+                    svg,
+                    element,
+                    caption,
+                    image,
+                    resourcePath,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            return await ConvertImageAsync(image!, element, caption, resourcePath, cancellationToken).ConfigureAwait(false);
+        }
+
+        private async Task<IEnumerable<DocumentNode>> ConvertSvgImageAsync(
+            XElement svg,
+            XElement idSource,
+            Caption? caption,
+            XElement? fallbackImage,
+            string resourcePath,
+            CancellationToken cancellationToken)
+        {
+            ReportUnsafeEmbeddedSvg(svg, resourcePath);
+            var images = svg.Descendants(SvgNamespace + "image").ToArray();
+            if (images.Length == 0)
+            {
+                ReportSvgImageIssue(
+                    EpubDiagnosticCodes.InvalidSvgImageReference,
+                    "Embedded SVG has no image reference that can become a Flow figure",
+                    resourcePath);
+                if (fallbackImage is not null)
+                {
+                    ReportSvgImageIssue(
+                        EpubDiagnosticCodes.SvgImageFallbackUsed,
+                        "Embedded SVG without a usable image used its XHTML img fallback",
+                        resourcePath);
+                    return await ConvertImageAsync(
+                        fallbackImage,
+                        idSource,
+                        caption,
+                        resourcePath,
+                        cancellationToken).ConfigureAwait(false);
+                }
+
+                return AlternativeTextFallback(ReadSvgAlternativeText(svg, null, coverTitle: null), idSource);
+            }
+
+            if (images.Length > 1)
+            {
+                ReportSvgImageIssue(
+                    EpubDiagnosticCodes.SvgImageSemanticLoss,
+                    $"Embedded SVG contains {images.Length} image elements; they were preserved as ordered Flow figures without SVG composition",
+                    resourcePath);
+            }
+
+            return await ConvertSvgImageElementsAsync(
+                images,
+                idSource,
+                svg,
+                caption,
+                fallbackImage,
+                resourcePath,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        private async Task<IEnumerable<DocumentNode>> ConvertSvgImageElementsAsync(
+            IReadOnlyList<XElement> images,
+            XElement idSource,
+            XElement? svg,
+            Caption? caption,
+            XElement? fallbackImage,
+            string resourcePath,
+            CancellationToken cancellationToken)
+        {
+            var result = new List<DocumentNode>();
+            for (var index = 0; index < images.Count; index++)
+            {
+                var image = images[index];
+                var href = (string?)image.Attribute("href");
+                var legacyHref = (string?)image.Attribute(XLinkNamespace + "href");
+                if (!string.IsNullOrWhiteSpace(href)
+                    && !string.IsNullOrWhiteSpace(legacyHref)
+                    && !string.Equals(href, legacyHref, StringComparison.Ordinal))
+                {
+                    ReportSvgImageIssue(
+                        EpubDiagnosticCodes.InvalidSvgImageReference,
+                        $"SVG image declares conflicting href '{href}' and xlink:href '{legacyHref}'; href takes precedence",
+                        resourcePath);
+                }
+
+                var reference = !string.IsNullOrWhiteSpace(href) ? href : legacyHref;
+                if (string.IsNullOrWhiteSpace(reference))
+                {
+                    ReportSvgImageIssue(
+                        EpubDiagnosticCodes.InvalidSvgImageReference,
+                        "SVG image has neither href nor xlink:href",
+                        resourcePath);
+                    continue;
+                }
+
+                if (!TryNormalizeArchivePath(GetDirectory(resourcePath), reference, out var imagePath))
+                {
+                    ReportSvgImageIssue(
+                        EpubDiagnosticCodes.InvalidSvgImageReference,
+                        $"SVG image reference '{reference}' is external, missing, or unsafe and was not loaded",
+                        resourcePath);
+                    continue;
+                }
+
+                var imported = await TryImportImageAssetAsync(
+                    imagePath,
+                    $"SVG image in '{resourcePath}'",
+                    cancellationToken).ConfigureAwait(false);
+                if (imported is null)
+                {
+                    ReportSvgImageIssue(
+                        EpubDiagnosticCodes.InvalidSvgImageReference,
+                        $"SVG image reference '{reference}' did not produce a safe local asset",
+                        resourcePath);
+                    continue;
+                }
+
+                var figureSource = index == 0 ? idSource : image;
+                var alternativeText = ReadSvgAlternativeText(
+                    image,
+                    fallbackImage,
+                    IsPublicationCover(imported.AssetId) ? publicationTitle : null);
+                if (alternativeText is null)
+                {
+                    ReportSvgImageIssue(
+                        EpubDiagnosticCodes.MissingImageAlternativeText,
+                        "SVG image has no title, description, alt text, XHTML fallback, or cover title",
+                        resourcePath);
+                }
+
+                result.Add(CreateFigure(
+                    figureSource,
+                    imported.AssetId,
+                    index == 0 ? caption : null,
+                    alternativeText));
+            }
+
+            if (result.Count > 0)
+            {
+                return result;
+            }
+
+            if (fallbackImage is not null)
+            {
+                ReportSvgImageIssue(
+                    EpubDiagnosticCodes.SvgImageFallbackUsed,
+                    "Embedded SVG did not produce a safe asset and used its XHTML img fallback",
+                    resourcePath);
+                return await ConvertImageAsync(
+                    fallbackImage,
+                    idSource,
+                    caption,
+                    resourcePath,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            return AlternativeTextFallback(
+                ReadSvgAlternativeText(
+                    svg ?? images.FirstOrDefault(),
+                    null,
+                    ReferencesPublicationCover(images, resourcePath) ? publicationTitle : null),
+                idSource);
+        }
+
+        private bool ReferencesPublicationCover(IEnumerable<XElement> images, string resourcePath)
+        {
+            if (coverMetadata is null)
+            {
+                return false;
+            }
+
+            foreach (var image in images)
+            {
+                var reference = (string?)image.Attribute("href")
+                    ?? (string?)image.Attribute(XLinkNamespace + "href");
+                if (!string.IsNullOrWhiteSpace(reference)
+                    && TryNormalizeArchivePath(GetDirectory(resourcePath), reference, out var path)
+                    && string.Equals(path, coverMetadata.Path, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         private async Task<IEnumerable<DocumentNode>> ConvertImageAsync(
@@ -2459,11 +2910,121 @@ public sealed class EpubImporter : IEpubImporter
                     .ConfigureAwait(false);
                 if (imported is not null)
                 {
-                    return [new Figure(IdFor(idSource, "figure"), imported.AssetId, caption, alternativeText)];
+                    return [CreateFigure(idSource, imported.AssetId, caption, alternativeText)];
                 }
             }
 
             return AlternativeTextFallback(alternativeText, idSource);
+        }
+
+        private Figure CreateFigure(
+            XElement idSource,
+            AssetId assetId,
+            Caption? caption,
+            string? alternativeText)
+        {
+            var figure = new Figure(IdFor(idSource, "figure"), assetId, caption, alternativeText);
+            if (CoverFigureId is null && IsPublicationCover(assetId))
+            {
+                CoverFigureId = figure.Id;
+            }
+
+            return figure;
+        }
+
+        private bool IsPublicationCover(AssetId assetId) =>
+            coverMetadata is not null && coverAssetId is not null && coverAssetId == assetId;
+
+        private static string? ReadSvgAlternativeText(
+            XElement? svgOrImage,
+            XElement? fallbackImage,
+            string? coverTitle)
+        {
+            if (svgOrImage is null)
+            {
+                return NormalizeAlternative(coverTitle);
+            }
+
+            var svg = svgOrImage.Name == SvgNamespace + "svg"
+                ? svgOrImage
+                : svgOrImage.Ancestors(SvgNamespace + "svg").FirstOrDefault();
+            var image = svgOrImage.Name == SvgNamespace + "image"
+                ? svgOrImage
+                : svg?.Descendants(SvgNamespace + "image").FirstOrDefault();
+            var candidates = new[]
+            {
+                (string?)image?.Attribute("alt"),
+                (string?)image?.Attribute("aria-label"),
+                (string?)svg?.Attribute("aria-label"),
+                svg?.Element(SvgNamespace + "title")?.Value,
+                svg?.Element(SvgNamespace + "desc")?.Value,
+                (string?)fallbackImage?.Attribute("alt"),
+                string.Concat(svg?.Descendants()
+                    .Where(static element => element.Name.Namespace == XhtmlNamespace
+                        && element.Name.LocalName is not ("script" or "style")
+                        && !element.Ancestors().Any(static ancestor => ancestor.Name.Namespace == XhtmlNamespace))
+                    .Select(static item => item.Value) ?? []),
+                coverTitle,
+            };
+
+            var values = candidates
+                .Select(NormalizeAlternative)
+                .Where(static value => value is not null)
+                .Distinct(StringComparer.Ordinal)
+                .ToArray();
+            return values.Length == 0 ? null : string.Join(" — ", values!);
+        }
+
+        private static string? NormalizeAlternative(string? value)
+        {
+            if (string.IsNullOrWhiteSpace(value))
+            {
+                return null;
+            }
+
+            return string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        }
+
+        private void ReportUnsafeEmbeddedSvg(XElement svg, string resourcePath)
+        {
+            var activeElements = svg.DescendantsAndSelf().Count(static element =>
+                element.Name == SvgNamespace + "script"
+                || element.Name == SvgNamespace + "foreignObject");
+            var eventHandlers = svg.DescendantsAndSelf()
+                .SelectMany(static element => element.Attributes())
+                .Count(static attribute => attribute.Name.NamespaceName.Length == 0
+                    && attribute.Name.LocalName.StartsWith("on", StringComparison.OrdinalIgnoreCase));
+            if (activeElements == 0 && eventHandlers == 0)
+            {
+                ReportUnrepresentedSvgGraphics(svg, resourcePath);
+                return;
+            }
+
+            ReportSvgImageIssue(
+                EpubDiagnosticCodes.UnsafeSvg,
+                $"Embedded SVG active content was ignored ({activeElements} active elements, {eventHandlers} event handlers)",
+                resourcePath);
+            ReportUnrepresentedSvgGraphics(svg, resourcePath);
+        }
+
+        private void ReportUnrepresentedSvgGraphics(XElement svg, string resourcePath)
+        {
+            var unrepresented = svg.Descendants().Count(static element =>
+                element.Name.Namespace == SvgNamespace
+                && element.Name.LocalName is not ("image" or "title" or "desc" or "script" or "foreignObject"));
+            if (unrepresented > 0)
+            {
+                ReportSvgImageIssue(
+                    EpubDiagnosticCodes.SvgImageSemanticLoss,
+                    $"Embedded SVG contains {unrepresented} non-image graphical elements that were not interpreted",
+                    resourcePath);
+            }
+        }
+
+        private void ReportSvgImageIssue(string code, string message, string resourcePath)
+        {
+            var key = new SvgImageIssueKey(code, message, resourcePath);
+            svgImageIssues[key] = svgImageIssues.TryGetValue(key, out var count) ? count + 1 : 1;
         }
 
         private IEnumerable<string> ReadImageReferences(
@@ -3280,12 +3841,23 @@ public sealed class EpubImporter : IEpubImporter
                 return true;
             }
 
+            if (element.Name == SvgNamespace + "svg" || element.Name == SvgNamespace + "image")
+            {
+                return true;
+            }
+
             var name = element.Name.LocalName.ToLowerInvariant();
             return name is "h1" or "h2" or "h3" or "h4" or "h5" or "h6"
                 or "p" or "ol" or "ul" or "li" or "blockquote" or "figure" or "img"
                 or "picture" or "figcaption" or "section" or "article" or "pre" or "hr"
                 or "table" or "caption" or "thead" or "tbody" or "tfoot" or "tr" or "th" or "td";
         }
+
+        private static bool IsImageSourceElement(XElement element) =>
+            element.Name == XhtmlNamespace + "img"
+            || element.Name == XhtmlNamespace + "picture"
+            || element.Name == SvgNamespace + "svg"
+            || element.Name == SvgNamespace + "image";
 
         private static bool IsFootnoteElement(XElement element) =>
             element.Name.Namespace == XhtmlNamespace
@@ -3356,6 +3928,8 @@ public sealed class EpubImporter : IEpubImporter
             string Description);
 
         private readonly record struct SourceLocationKey(string ResourcePath, string? Fragment);
+
+        private readonly record struct SvgImageIssueKey(string Code, string Message, string ResourcePath);
 
         private sealed record ImportedImage(AssetId AssetId, string ResourcePath);
     }

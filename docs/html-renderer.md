@@ -19,6 +19,8 @@ The 0.1 output is a standalone document containing:
 - table-of-contents and footnote links targeting those IDs, with preserved formatted footnote-reference labels when supplied;
 - responsive image and small-viewport rules.
 
+When `DocumentPresentation.Cover` identifies a valid figure, the same safe responsive figure output receives `data-publication-role="cover"`. The marker contains no source SVG, coordinates, dimensions, EPUB path, or CLR type name. It lets the standalone renderer and future multi-file book package distinguish the publication cover without changing canonical content or its hash.
+
 Semantic tables render as `table`, `caption`, `thead`, repeated `tbody`, `tfoot`, `tr`, `th`, and `td`. Stable IDs remain on every addressable table part. Non-default spans become `colspan`/`rowspan`; header scope uses the HTML tokens `row`, `col`, `rowgroup`, or `colgroup`; and `headers` contains the escaped stable IDs of validated header cells. Empty cells remain empty elements. Renderer CSS supplies only safe responsive defaults and does not feed dimensions or a calculated grid back into `FlowDocument`.
 
 No CLR namespace, record name, or internal C# class name is emitted. Typed semantic role names such as `heading-2` may appear in `data-typography` attributes because they are renderer-facing semantics, not implementation type names.

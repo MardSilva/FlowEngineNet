@@ -23,9 +23,12 @@ public sealed class CliCommandParserTests
                 "import-report.json",
                 "--output",
                 "library/book.flow.json",
+                "--fidelity-report",
+                "fidelity.json",
             ]).Command);
         Assert.Equal("library/book.flow.json", importWithOutput.OutputPath);
         Assert.Equal("import-report.json", importWithOutput.DiagnosticsJsonOutputPath);
+        Assert.Equal("fidelity.json", importWithOutput.FidelityReportOutputPath);
         var epubInspect = Assert.IsType<InspectEpubCommand>(
             _parser.Parse(["epub-inspect", "book.epub", "--json", "report.json"]).Command);
         Assert.Equal("report.json", epubInspect.JsonOutputPath);
