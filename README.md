@@ -112,7 +112,7 @@ Console.WriteLine(layout.Profile.ColumnCount);      // 1
 Console.WriteLine(layout.Nodes[0].SemanticId);      // welcome
 ```
 
-The layout operation validates the semantic document first. Invalid IDs, hierarchy, anchors, asset references, footnotes, or table-of-contents destinations prevent a layout from being produced.
+The layout operation validates the semantic document first. Invalid IDs, hierarchy, anchors, asset references, footnotes, or table-of-contents destinations prevent a layout from being produced. EPUB import recognizes cross-document footnotes/endnotes and multiple references, preserves formatted call labels, and reports broken, ambiguous, unreferenced, cyclic, or invalid-backlink relationships explicitly.
 
 ## Solution structure
 
@@ -131,7 +131,7 @@ Dependencies point inward: the document domain does not reference layout or rend
 
 ## Requirements and build
 
-The repository pins **.NET SDK 10.0.302** through `global.json`.
+The repository pins **.NET SDK 10.0.400** through `global.json`.
 
 ```powershell
 dotnet restore Flow.sln

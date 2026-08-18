@@ -109,6 +109,18 @@ public sealed class SemanticModelTests
     }
 
     [Fact]
+    public void FootnoteReference_CopiesItsOptionalInlineLabel()
+    {
+        var source = new List<InlineNode> { new Strong([new Text("12")]) };
+
+        var reference = new FootnoteReference(new NodeId("note-twelve"), source);
+        source.Clear();
+
+        Assert.IsType<Strong>(Assert.Single(reference.Label));
+        Assert.Empty(new FootnoteReference(new NodeId("note-with-renderer-label")).Label);
+    }
+
+    [Fact]
     public void PublicModelPropertiesAreReadOnly()
     {
         Type[] modelTypes =

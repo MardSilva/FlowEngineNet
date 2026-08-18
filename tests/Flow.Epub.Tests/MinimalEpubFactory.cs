@@ -74,7 +74,8 @@ internal static class MinimalEpubFactory
         bool includeSecondChapter = true,
         bool includeImage = true,
         IReadOnlyDictionary<string, string>? additionalTextEntries = null,
-        IReadOnlyDictionary<string, byte[]>? additionalBinaryEntries = null)
+        IReadOnlyDictionary<string, byte[]>? additionalBinaryEntries = null,
+        string? chapterTwo = null)
     {
         var result = new MemoryStream();
         using (var archive = new ZipArchive(result, ZipArchiveMode.Create, leaveOpen: true))
@@ -85,7 +86,7 @@ internal static class MinimalEpubFactory
             AddText(archive, "EPUB/text/chapter-1.xhtml", chapterOne ?? ChapterOne);
             if (includeSecondChapter)
             {
-                AddText(archive, "EPUB/text/chapter-2.xhtml", ChapterTwo);
+                AddText(archive, "EPUB/text/chapter-2.xhtml", chapterTwo ?? ChapterTwo);
             }
 
             if (includeImage)

@@ -54,6 +54,17 @@ public sealed class CanonicalizationTests
     }
 
     [Fact]
+    public void ComputeHash_FootnoteReferenceLabelChangeChangesHash()
+    {
+        var service = CreateIntegrityService();
+
+        var first = service.ComputeHash(CreateFootnoteDocument("1"));
+        var changed = service.ComputeHash(CreateFootnoteDocument("a"));
+
+        Assert.NotEqual(first.Hash, changed.Hash);
+    }
+
+    [Fact]
     public void ComputeHash_CanonicalMetadataAndAssetBytesChangeHash()
     {
         var service = CreateIntegrityService();
@@ -157,4 +168,25 @@ public sealed class CanonicalizationTests
 
     private static FlowAsset Asset(string id, byte[] bytes) =>
         new(new AssetId(id), "application/octet-stream", id, bytes);
+
+    private static FlowDocument CreateFootnoteDocument(string label)
+    {
+        var footnoteId = new NodeId("footnote-one");
+        return new FlowDocument(
+            new DocumentIdentity(new DocumentId("urn:flow:document:canonical-footnote")),
+            new DocumentMetadata("Canonical footnote"),
+            new DocumentContent(
+            [
+                new Chapter(
+                    new NodeId("chapter-one"),
+                    [
+                        new Paragraph(
+                            new NodeId("paragraph-one"),
+                            [new FootnoteReference(footnoteId, [new Text(label)])]),
+                        new Footnote(
+                            footnoteId,
+                            [new Paragraph(new NodeId("footnote-text"), [new Text("Note")])]),
+                    ]),
+            ]));
+    }
 }

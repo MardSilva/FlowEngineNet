@@ -127,7 +127,7 @@ public sealed class FlowJsonDocumentSerializerTests
                         new Strikethrough([new Text("strike")]),
                         new InlineCode("code"),
                         new Link(headingAnchor.Value, [new Text("link")]),
-                        new FootnoteReference(footnoteId),
+                        new FootnoteReference(footnoteId, [new Strong([new Text("1")])]),
                         new LineBreak(),
                     ]),
                 new BlockQuote(

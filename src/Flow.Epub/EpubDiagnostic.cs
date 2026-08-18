@@ -70,4 +70,9 @@ public static class EpubDiagnosticCodes
     public const string InvalidCssValue = "EPUB050";
     public const string ExternalStylesheetBlocked = "EPUB051";
     public const string CssTargetNotRepresentable = "EPUB052";
+    public const string OrphanNoteReference = "EPUB053";
+    public const string UnreferencedNote = "EPUB054";
+    public const string MissingNoteBacklink = "EPUB055";
+    public const string CircularNoteReference = "EPUB056";
+    public const string AmbiguousNoteDestination = "EPUB057";
 }

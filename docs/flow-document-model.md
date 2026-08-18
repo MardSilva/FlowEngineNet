@@ -83,7 +83,7 @@ A figure owns its optional caption relationship directly. Whether an asset exist
 
 Inline content is semantic and never stores raw HTML. The model supports `Text`, `Strong`, `Emphasis`, `Underline`, `Strikethrough`, `InlineCode`, `Link`, `FootnoteReference`, and `LineBreak`.
 
-Formatting nodes contain other inline nodes, allowing nested meaning without an inheritance hierarchy for every combination. A `FootnoteReference` targets a typed `NodeId`; validation requires it to resolve to one unique `Footnote`.
+Formatting nodes contain other inline nodes, allowing nested meaning without an inheritance hierarchy for every combination. A `FootnoteReference` targets a typed `NodeId`; validation requires it to resolve to one unique `Footnote`. Its optional immutable `Label` preserves source-visible inline content such as a superscript number or symbol. The original one-argument constructor remains valid and leaves renderer-generated labeling as a presentation decision.
 
 ## Validation
 

@@ -544,6 +544,7 @@ public sealed class EpubImporter : IEpubImporter
 
         await context.LoadCssAsync(xhtmlDocuments, cancellationToken).ConfigureAwait(false);
         context.PrepareIds(xhtmlDocuments);
+        context.PrepareFootnotes(xhtmlDocuments);
         var content = new List<DocumentNode>();
         var tableOfContents = context.ConvertTableOfContents(navigationDocuments, package.SpineTocId);
         if (tableOfContents is not null)
@@ -890,6 +891,9 @@ public sealed class EpubImporter : IEpubImporter
         private readonly List<EpubSourceLocation> sourceLocations = [];
         private readonly Dictionary<SourceLocationKey, int> sourceOccurrences = [];
         private readonly Dictionary<UnsupportedElementKey, int> unsupportedElements = [];
+        private readonly HashSet<XElement> footnoteElements = [];
+        private readonly Dictionary<XElement, NodeId> footnoteReferenceTargets = [];
+        private readonly HashSet<XElement> invalidFootnoteReferences = [];
         private IReadOnlyDictionary<XElement, TypographyStyle> cssStyles = new Dictionary<XElement, TypographyStyle>();
         private int generatedId;
 
@@ -1019,7 +1023,7 @@ public sealed class EpubImporter : IEpubImporter
                         ? element.Ancestors(XhtmlNamespace + "figure").FirstOrDefault()
                         : null;
                     var targetElement = enclosingFigure
-                        ?? (IsRepresentedNode(element)
+                        ?? (IsFootnoteElement(element) || IsRepresentedNode(element)
                             ? element
                             : element.Ancestors().FirstOrDefault(IsRepresentedNode) ?? body);
                     if (!elementIds.TryGetValue(targetElement, out var nodeId))
@@ -1044,6 +1048,208 @@ public sealed class EpubImporter : IEpubImporter
                             xhtml.Item.Path));
                     }
                 }
+            }
+        }
+
+        internal void PrepareFootnotes(IEnumerable<XhtmlModel> xhtmlDocuments)
+        {
+            var documents = xhtmlDocuments.ToArray();
+            var notesByTarget = new Dictionary<string, List<XElement>>(StringComparer.Ordinal);
+            var referencesByTarget = new Dictionary<string, List<XElement>>(StringComparer.Ordinal);
+            var resourcePaths = new Dictionary<XElement, string>();
+
+            foreach (var xhtml in documents)
+            {
+                var body = xhtml.Document.Root?.Element(XhtmlNamespace + "body");
+                if (body is null)
+                {
+                    continue;
+                }
+
+                foreach (var element in body.DescendantsAndSelf())
+                {
+                    resourcePaths[element] = xhtml.Item.Path;
+                    if (IsFootnoteElement(element))
+                    {
+                        footnoteElements.Add(element);
+                        if ((string?)element.Attribute("id") is { Length: > 0 } noteId)
+                        {
+                            AddTarget(notesByTarget, $"{xhtml.Item.Path}#{noteId}", element);
+                        }
+                    }
+
+                    if (IsFootnoteReferenceElement(element))
+                    {
+                        var href = (string?)element.Attribute("href");
+                        if (!TryBuildReferenceKey(xhtml.Item.Path, href ?? string.Empty, out _, out var key))
+                        {
+                            ReportOrphanReference(element, href, xhtml.Item.Path);
+                            continue;
+                        }
+
+                        AddTarget(referencesByTarget, key, element);
+                    }
+                }
+            }
+
+            // Resolve forward and cross-resource references after every note has been catalogued.
+            foreach (var (key, references) in referencesByTarget)
+            {
+                notesByTarget.TryGetValue(key, out var targets);
+                foreach (var reference in references)
+                {
+                    if (footnoteReferenceTargets.ContainsKey(reference) || invalidFootnoteReferences.Contains(reference))
+                    {
+                        continue;
+                    }
+
+                    var href = (string?)reference.Attribute("href") ?? string.Empty;
+                    var resourcePath = resourcePaths[reference];
+                    if (targets is null)
+                    {
+                        ReportOrphanReference(reference, href, resourcePath);
+                    }
+                    else
+                    {
+                        ResolveFootnoteReference(reference, href, resourcePath, targets);
+                    }
+                }
+            }
+
+            var referencedNoteIds = footnoteReferenceTargets.Values.ToHashSet();
+            foreach (var note in footnoteElements)
+            {
+                if (!elementIds.TryGetValue(note, out var noteId) || !referencedNoteIds.Contains(noteId))
+                {
+                    var sourceId = (string?)note.Attribute("id") ?? "(without source ID)";
+                    diagnostics.Add(Warning(
+                        EpubDiagnosticCodes.UnreferencedNote,
+                        $"EPUB note '{sourceId}' has no valid noteref reference.",
+                        resourcePaths[note]));
+                }
+            }
+
+            ValidateFootnoteBacklinks(resourcePaths);
+            ValidateFootnoteCycles(resourcePaths);
+
+            static void AddTarget(Dictionary<string, List<XElement>> index, string key, XElement element)
+            {
+                if (!index.TryGetValue(key, out var values))
+                {
+                    values = [];
+                    index.Add(key, values);
+                }
+
+                values.Add(element);
+            }
+        }
+
+        private void ResolveFootnoteReference(
+            XElement reference,
+            string href,
+            string resourcePath,
+            IReadOnlyList<XElement> targets)
+        {
+            if (targets.Count != 1)
+            {
+                invalidFootnoteReferences.Add(reference);
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.AmbiguousNoteDestination,
+                    $"Footnote reference target '{href}' resolves to {targets.Count} note elements; its label was preserved without an ambiguous link.",
+                    resourcePath));
+                return;
+            }
+
+            if (!elementIds.TryGetValue(targets[0], out var targetId))
+            {
+                ReportOrphanReference(reference, href, resourcePath);
+                return;
+            }
+
+            footnoteReferenceTargets[reference] = targetId;
+        }
+
+        private void ReportOrphanReference(XElement reference, string? href, string resourcePath)
+        {
+            invalidFootnoteReferences.Add(reference);
+            diagnostics.Add(Warning(
+                EpubDiagnosticCodes.OrphanNoteReference,
+                $"Footnote reference target '{href ?? "(missing)"}' does not resolve to one imported footnote or endnote; its label was preserved.",
+                resourcePath));
+        }
+
+        private void ValidateFootnoteBacklinks(
+            IReadOnlyDictionary<XElement, string> resourcePaths)
+        {
+            var referenceSourceKeys = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var reference in footnoteReferenceTargets.Keys)
+            {
+                if ((string?)reference.Attribute("id") is { Length: > 0 } id)
+                {
+                    referenceSourceKeys.Add($"{resourcePaths[reference]}#{id}");
+                }
+            }
+
+            foreach (var note in footnoteElements)
+            {
+                var resourcePath = resourcePaths[note];
+                foreach (var backlink in note.Descendants(XhtmlNamespace + "a").Where(IsBacklinkElement))
+                {
+                    var href = (string?)backlink.Attribute("href");
+                    if (!TryBuildReferenceKey(resourcePath, href ?? string.Empty, out _, out var key)
+                        || !referenceSourceKeys.Contains(key))
+                    {
+                        diagnostics.Add(Warning(
+                            EpubDiagnosticCodes.MissingNoteBacklink,
+                            $"Note backlink target '{href ?? "(missing)"}' does not resolve to a valid noteref source.",
+                            resourcePath));
+                    }
+                }
+            }
+        }
+
+        private void ValidateFootnoteCycles(IReadOnlyDictionary<XElement, string> resourcePaths)
+        {
+            var edges = footnoteElements.ToDictionary(static note => note, static _ => new List<XElement>());
+            foreach (var (reference, targetId) in footnoteReferenceTargets)
+            {
+                var owner = reference.Ancestors().FirstOrDefault(footnoteElements.Contains);
+                var target = footnoteElements.FirstOrDefault(note => elementIds.TryGetValue(note, out var id) && id == targetId);
+                if (owner is not null && target is not null)
+                {
+                    edges[owner].Add(target);
+                }
+            }
+
+            var state = new Dictionary<XElement, int>();
+            var reported = new HashSet<XElement>();
+            foreach (var note in footnoteElements)
+            {
+                Visit(note);
+            }
+
+            void Visit(XElement note)
+            {
+                if (state.TryGetValue(note, out var current))
+                {
+                    if (current == 1 && reported.Add(note))
+                    {
+                        diagnostics.Add(Warning(
+                            EpubDiagnosticCodes.CircularNoteReference,
+                            "A cycle exists between EPUB notes; references remain linked but renderer navigation may loop.",
+                            resourcePaths[note]));
+                    }
+
+                    return;
+                }
+
+                state[note] = 1;
+                foreach (var target in edges[note])
+                {
+                    Visit(target);
+                }
+
+                state[note] = 2;
             }
         }
 
@@ -1491,6 +1697,7 @@ public sealed class EpubImporter : IEpubImporter
             Strikethrough strikethrough => InlineText(strikethrough.Children),
             InlineCode code => code.Code,
             Link link => InlineText(link.Children),
+            FootnoteReference reference => InlineText(reference.Label),
             LineBreak => " ",
             _ => string.Empty,
         }));
@@ -1524,6 +1731,13 @@ public sealed class EpubImporter : IEpubImporter
             {
                 ReportUnsupported(element, resourcePath, $"Foreign element <{element.Name.LocalName}>");
                 return await ConvertChildrenAsync(element, resourcePath, cancellationToken).ConfigureAwait(false);
+            }
+
+            if (footnoteElements.Contains(element))
+            {
+                return [new Footnote(
+                    IdFor(element, "footnote"),
+                    await ConvertChildrenAsync(element, resourcePath, cancellationToken).ConfigureAwait(false))];
             }
 
             var name = element.Name.LocalName.ToLowerInvariant();
@@ -1664,6 +1878,15 @@ public sealed class EpubImporter : IEpubImporter
             var result = new List<ListItem>();
             foreach (var item in list.Elements(XhtmlNamespace + "li"))
             {
+                if (footnoteElements.Contains(item))
+                {
+                    var note = new Footnote(
+                        IdFor(item, "footnote"),
+                        await ConvertChildrenAsync(item, resourcePath, cancellationToken).ConfigureAwait(false));
+                    result.Add(new ListItem(GeneratedIdFor(item, "list-item"), [note]));
+                    continue;
+                }
+
                 var blockChildren = new List<DocumentNode>();
                 var inlineNodes = item.Nodes().TakeWhile(static node => node is not XElement element
                     || element.Name.LocalName is not ("ol" or "ul" or "p")).ToArray();
@@ -2030,7 +2253,14 @@ public sealed class EpubImporter : IEpubImporter
                         result.Add(new InlineCode(element.Value));
                         break;
                     case "a":
-                        AddLink(result, element, children, resourcePath);
+                        if (IsFootnoteReferenceElement(element))
+                        {
+                            AddFootnoteReference(result, element, children);
+                        }
+                        else
+                        {
+                            AddLink(result, element, children, resourcePath);
+                        }
                         break;
                     case "br":
                         result.Add(new LineBreak());
@@ -2072,6 +2302,23 @@ public sealed class EpubImporter : IEpubImporter
             }
 
             return result;
+        }
+
+        private void AddFootnoteReference(
+            ICollection<InlineNode> result,
+            XElement element,
+            IReadOnlyList<InlineNode> label)
+        {
+            if (footnoteReferenceTargets.TryGetValue(element, out var targetId))
+            {
+                result.Add(new FootnoteReference(targetId, label));
+                return;
+            }
+
+            foreach (var child in label)
+            {
+                result.Add(child);
+            }
         }
 
         private void AddLink(
@@ -2202,6 +2449,22 @@ public sealed class EpubImporter : IEpubImporter
                 or "p" or "ol" or "ul" or "li" or "blockquote" or "figure" or "img"
                 or "picture" or "figcaption" or "section" or "article" or "pre" or "hr";
         }
+
+        private static bool IsFootnoteElement(XElement element) =>
+            element.Name.Namespace == XhtmlNamespace
+            && (HasToken((string?)element.Attribute(EpubNamespace + "type"), "footnote")
+                || HasToken((string?)element.Attribute(EpubNamespace + "type"), "endnote")
+                || HasToken((string?)element.Attribute("role"), "doc-footnote"));
+
+        private static bool IsFootnoteReferenceElement(XElement element) =>
+            element.Name == XhtmlNamespace + "a"
+            && (HasToken((string?)element.Attribute(EpubNamespace + "type"), "noteref")
+                || HasToken((string?)element.Attribute("role"), "doc-noteref"));
+
+        private static bool IsBacklinkElement(XElement element) =>
+            HasToken((string?)element.Attribute(EpubNamespace + "type"), "backlink")
+            || HasToken((string?)element.Attribute("role"), "doc-backlink")
+            || HasToken((string?)element.Attribute("rel"), "backlink");
 
         private static bool IsInlineElement(XElement element)
         {

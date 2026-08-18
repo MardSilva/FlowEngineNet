@@ -7,7 +7,7 @@ Flow 0.1 is a research-grade reference implementation. This list is part of the 
 - All public APIs, `.flow.json` fields, canonicalization rules, renderer output, and diagnostics are experimental and can change during `0.x`.
 - `.flow.json` is a development interchange representation, not a registered media type, standard, archival format, or final Flow container.
 - No NuGet package, executable package, release artifact, schema registry, compatibility guarantee, or migration tool is published.
-- The repository currently pins .NET SDK 10.0.302. Consumers must build from source.
+- The repository currently pins .NET SDK 10.0.400. Consumers must build from source.
 
 ## Semantic model
 
@@ -42,6 +42,7 @@ Flow 0.1 is a research-grade reference implementation. This list is part of the 
 - Fallback chains can select an existing XHTML representation. Non-XHTML fallback content is not converted, and media overlays are reported but never played.
 - Mixed XHTML content preserves text and supported children in source order, but article/aside/header/footer/details/definition-list roles and `abbr`/`cite`/`q`/`sub`/`sup`/`mark`/`time` semantics do not yet have canonical Flow nodes. Their visible content survives with aggregated diagnostics.
 - Repeated spine resources are retained with unique occurrence IDs. An ordinary EPUB path/fragment cannot identify which repeated occurrence it intended, so links resolve deterministically to the first imported occurrence.
+- EPUB footnotes/endnotes and explicit backlinks are resolved across imported XHTML resources, but Flow has no distinct backlink node; valid backlinks are ordinary internal links, and unmarked links are not inferred to be backlinks.
 - EPUB-to-Flow source locations are available only through the in-memory `EpubSourceMap`. The map is intentionally absent from `.flow.json`, canonical bytes, hashes, and current CLI output, so applications that need durable provenance must persist it separately.
 - JPEG, PNG, static GIF, WebP, and passive SVG can become assets. A restricted typed CSS subset supports simple selectors and typography, but not combinators, pseudo-selectors, inline-fragment styling, media queries, `@` rules, variables, generated content, positioning, floats, columns, physical layout, or remote resources. Flow also does not interpret SVG graphical semantics, image maps, AVIF, animated GIF, fixed layout, MathML, tables, audio/video, encryption/DRM, embedded fonts, EPUB CFI, scripts, or complete accessibility metadata.
 - The cover-to-asset association exists in the noncanonical in-memory metadata report because canonical `DocumentMetadata` still has no cover role; `.flow.json` does not preserve that role even though safely imported cover bytes remain assets.

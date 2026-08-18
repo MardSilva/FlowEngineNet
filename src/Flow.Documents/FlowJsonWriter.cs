@@ -234,6 +234,10 @@ internal static class FlowJsonWriter
                 break;
             case FootnoteReference footnoteReference:
                 writer.WriteString("targetId", footnoteReference.TargetId.Value);
+                if (!footnoteReference.Label.IsEmpty)
+                {
+                    WriteInlineProperty(writer, "label", footnoteReference.Label);
+                }
                 break;
             case LineBreak:
                 break;

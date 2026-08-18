@@ -229,6 +229,13 @@ public sealed class DocumentValidator
                     yield return descendant;
                 }
             }
+            else if (root is FootnoteReference reference)
+            {
+                foreach (var descendant in GetInlineDescendants(reference.Label))
+                {
+                    yield return descendant;
+                }
+            }
         }
     }
 
@@ -241,6 +248,13 @@ public sealed class DocumentValidator
             if (root is InlineContainerNode container)
             {
                 foreach (var descendant in GetInlineDescendants(container.Children))
+                {
+                    yield return descendant;
+                }
+            }
+            else if (root is FootnoteReference reference)
+            {
+                foreach (var descendant in GetInlineDescendants(reference.Label))
                 {
                     yield return descendant;
                 }

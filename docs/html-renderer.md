@@ -14,7 +14,7 @@ The 0.1 output is a standalone document containing:
 - images embedded as base64 data URIs;
 - an `article` root and semantic sectioning, headings, paragraphs, figures, captions, quotations, navigation, lists, code, and footnotes;
 - stable semantic `NodeId` values as HTML `id` attributes;
-- table-of-contents and footnote links targeting those IDs;
+- table-of-contents and footnote links targeting those IDs, with preserved formatted footnote-reference labels when supplied;
 - responsive image and small-viewport rules.
 
 No CLR namespace, record name, or internal C# class name is emitted. Typed semantic role names such as `heading-2` may appear in `data-typography` attributes because they are renderer-facing semantics, not implementation type names.

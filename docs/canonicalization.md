@@ -54,7 +54,7 @@ Every node contributes its node-type discriminator and stable `NodeId`, followed
 - inline text and formatting structure;
 - inline code;
 - link target and children;
-- footnote target ID;
+- footnote target ID and, when present, its ordered inline reference label;
 - line-break presence.
 
 ### Assets

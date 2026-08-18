@@ -442,7 +442,20 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
                 case FootnoteReference reference:
                     output.Append("<a href=\"#")
                         .Append(Id(reference.TargetId))
-                        .Append("\" role=\"doc-noteref\" aria-label=\"Footnote\"><sup>note</sup></a>");
+                        .Append("\" role=\"doc-noteref\" aria-label=\"Footnote\"><sup>");
+                    if (reference.Label.IsEmpty)
+                    {
+                        output.Append("note");
+                    }
+                    else
+                    {
+                        foreach (var labelNode in reference.Label)
+                        {
+                            WriteInline(output, labelNode);
+                        }
+                    }
+
+                    output.Append("</sup></a>");
                     break;
                 case LineBreak:
                     output.Append("<br />");

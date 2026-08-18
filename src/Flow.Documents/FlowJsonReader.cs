@@ -249,7 +249,10 @@ internal static class FlowJsonReader
                 RequiredString(element, "target", $"{path}.target"),
                 ReadInlineProperty(element, "children", path)),
             "footnoteReference" => new FootnoteReference(
-                new NodeId(RequiredString(element, "targetId", $"{path}.targetId"))),
+                new NodeId(RequiredString(element, "targetId", $"{path}.targetId")),
+                element.TryGetProperty("label", out _)
+                    ? ReadInlineProperty(element, "label", path)
+                    : []),
             "lineBreak" => new LineBreak(),
             _ => throw Error(
                 FlowSerializationDiagnosticCodes.UnsupportedNode,
