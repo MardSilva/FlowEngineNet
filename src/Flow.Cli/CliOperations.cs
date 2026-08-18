@@ -1,8 +1,10 @@
 using System.Globalization;
+using System.Text.Json;
 using Flow.Documents;
 using Flow.Epub;
 using Flow.Layout;
 using Flow.Rendering;
+using Flow.Rendering.Html;
 using Flow.Security;
 
 namespace Flow.Cli;
@@ -18,6 +20,7 @@ public sealed class CliOperations
     private readonly ILayoutEngine _layoutEngine;
     private readonly IDocumentRenderer _htmlRenderer;
     private readonly IEpubFidelityAnalyzer _epubFidelityAnalyzer;
+    private readonly IHtmlBookPackageRenderer _htmlBookRenderer;
 
     public CliOperations(
         IFlowDocumentSerializer serializer,
@@ -27,7 +30,8 @@ public sealed class CliOperations
         IDocumentIntegrityService integrityService,
         ILayoutEngine layoutEngine,
         IDocumentRenderer htmlRenderer,
-        IEpubFidelityAnalyzer? epubFidelityAnalyzer = null)
+        IEpubFidelityAnalyzer? epubFidelityAnalyzer = null,
+        IHtmlBookPackageRenderer? htmlBookRenderer = null)
     {
         ArgumentNullException.ThrowIfNull(serializer);
         ArgumentNullException.ThrowIfNull(epubImporter);
@@ -45,6 +49,7 @@ public sealed class CliOperations
         _layoutEngine = layoutEngine;
         _htmlRenderer = htmlRenderer;
         _epubFidelityAnalyzer = epubFidelityAnalyzer ?? new EpubFidelityAnalyzer();
+        _htmlBookRenderer = htmlBookRenderer ?? new HtmlBookPackageRenderer();
     }
 
     /// <summary>Executes a parsed command and writes its normal output.</summary>
@@ -70,6 +75,8 @@ public sealed class CliOperations
             ValidateCommand validate => await ValidateAsync(validate, output, cancellationToken).ConfigureAwait(false),
             HashCommand hash => await HashAsync(hash, output, cancellationToken).ConfigureAwait(false),
             RenderHtmlCommand render => await RenderHtmlAsync(render, output, cancellationToken).ConfigureAwait(false),
+            RenderHtmlBookCommand renderBook => await RenderHtmlBookAsync(renderBook, output, cancellationToken)
+                .ConfigureAwait(false),
             _ => throw new ArgumentOutOfRangeException(nameof(command), command, "Unknown CLI command."),
         };
     }
@@ -96,6 +103,8 @@ public sealed class CliOperations
         await output.WriteLineAsync("  flow hash <document>                         Compute the canonical SHA-256 hash.")
             .ConfigureAwait(false);
         await output.WriteLineAsync("  flow render <document> --html <output> --width <n> --height <n>")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync("  flow render <document> --html-book <output-directory>")
             .ConfigureAwait(false);
         await output.WriteLineAsync("Exit codes: 0 success, 1 command/input failure, 2 semantic validation failure.")
             .ConfigureAwait(false);
@@ -456,6 +465,43 @@ public sealed class CliOperations
         return 0;
     }
 
+    private async Task<int> RenderHtmlBookAsync(
+        RenderHtmlBookCommand command,
+        TextWriter output,
+        CancellationToken cancellationToken)
+    {
+        const double width = 1024;
+        const double height = 768;
+        var documentPath = Path.GetFullPath(command.DocumentPath);
+        var outputDirectory = Path.GetFullPath(command.OutputDirectory);
+        ValidateHtmlBookOutputPath(documentPath, outputDirectory);
+
+        var document = await ReadDocumentAsync(documentPath, cancellationToken).ConfigureAwait(false);
+        var preferences = new UserReadingPreferences();
+        var layout = _layoutEngine.Layout(
+            document,
+            new LayoutContext(width, height, GetDeviceClass(width), ReadingMode.Flow, userPreferences: preferences));
+        var hash = _integrityService.ComputeHash(document);
+        var package = _htmlBookRenderer.Render(
+            document,
+            layout,
+            preferences,
+            new HtmlBookIntegrity(hash.Algorithm, hash.Hash, hash.CanonicalizationVersion));
+
+        await WriteHtmlBookPackageAtomicallyAsync(package, outputDirectory, cancellationToken).ConfigureAwait(false);
+        await output.WriteLineAsync($"HTML book: {outputDirectory}").ConfigureAwait(false);
+        await output.WriteLineAsync($"Entry: {Path.Combine(outputDirectory, "index.html")}").ConfigureAwait(false);
+        await output.WriteLineAsync($"Document ID: {document.Identity.Id}").ConfigureAwait(false);
+        await WriteHashAsync(output, hash).ConfigureAwait(false);
+        await output.WriteLineAsync(
+                $"Files: {package.Files.Length.ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(
+                $"Chapters: {package.Files.Count(static file => file.Path.StartsWith("chapters/", StringComparison.Ordinal)).ToString(CultureInfo.InvariantCulture)}")
+            .ConfigureAwait(false);
+        return 0;
+    }
+
     private async Task<FlowDocument> ReadDocumentAsync(string path, CancellationToken cancellationToken)
     {
         await using var stream = new FileStream(
@@ -579,6 +625,176 @@ public sealed class CliOperations
                 File.Delete(temporaryPath);
             }
         }
+    }
+
+    private static async Task WriteHtmlBookPackageAtomicallyAsync(
+        HtmlBookPackage package,
+        string outputDirectory,
+        CancellationToken cancellationToken)
+    {
+        var parent = Path.GetDirectoryName(outputDirectory)
+            ?? throw new ArgumentException("The HTML book output must have a parent directory.", nameof(outputDirectory));
+        Directory.CreateDirectory(parent);
+        if (Directory.Exists(outputDirectory))
+        {
+            ValidateReplaceableHtmlBookDirectory(outputDirectory);
+        }
+
+        var name = Path.GetFileName(outputDirectory);
+        var temporaryDirectory = Path.Combine(parent, $".{name}.flow-html-book-{Guid.NewGuid():N}.tmp");
+        var backupDirectory = Path.Combine(parent, $".{name}.flow-html-book-{Guid.NewGuid():N}.backup");
+        Directory.CreateDirectory(temporaryDirectory);
+        var destinationReplaced = false;
+        try
+        {
+            foreach (var file in package.Files)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var target = ResolvePackageOutputPath(temporaryDirectory, file.Path);
+                var targetParent = Path.GetDirectoryName(target);
+                if (targetParent is not null)
+                {
+                    Directory.CreateDirectory(targetParent);
+                }
+
+                await using var stream = new FileStream(target, FileMode.CreateNew, FileAccess.Write, FileShare.None);
+                await stream.WriteAsync(file.Content.ToArray(), cancellationToken).ConfigureAwait(false);
+            }
+
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!Directory.Exists(outputDirectory))
+            {
+                Directory.Move(temporaryDirectory, outputDirectory);
+                destinationReplaced = true;
+                return;
+            }
+
+            Directory.Move(outputDirectory, backupDirectory);
+            try
+            {
+                Directory.Move(temporaryDirectory, outputDirectory);
+                destinationReplaced = true;
+            }
+            catch
+            {
+                if (!Directory.Exists(outputDirectory) && Directory.Exists(backupDirectory))
+                {
+                    Directory.Move(backupDirectory, outputDirectory);
+                }
+
+                throw;
+            }
+
+            Directory.Delete(backupDirectory, recursive: true);
+        }
+        finally
+        {
+            if (Directory.Exists(temporaryDirectory))
+            {
+                Directory.Delete(temporaryDirectory, recursive: true);
+            }
+
+            if (destinationReplaced && Directory.Exists(backupDirectory))
+            {
+                Directory.Delete(backupDirectory, recursive: true);
+            }
+        }
+    }
+
+    private static void ValidateHtmlBookOutputPath(string documentPath, string outputDirectory)
+    {
+        var root = Path.GetPathRoot(outputDirectory);
+        if (root is not null
+            && PathsEqual(
+                Path.TrimEndingDirectorySeparator(outputDirectory),
+                Path.TrimEndingDirectorySeparator(root)))
+        {
+            throw new ArgumentException("The HTML book output cannot be a filesystem root.", nameof(outputDirectory));
+        }
+
+        if (File.Exists(outputDirectory))
+        {
+            throw new ArgumentException("The HTML book output path points to an existing file.", nameof(outputDirectory));
+        }
+
+        var outputPrefix = Path.TrimEndingDirectorySeparator(outputDirectory) + Path.DirectorySeparatorChar;
+        if (documentPath.StartsWith(
+                outputPrefix,
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+        {
+            throw new ArgumentException("The HTML book output cannot contain its source document.", nameof(outputDirectory));
+        }
+
+        if (Directory.Exists(outputDirectory)
+            && (File.GetAttributes(outputDirectory) & FileAttributes.ReparsePoint) != 0)
+        {
+            throw new ArgumentException("The HTML book output cannot be a symbolic link or reparse point.", nameof(outputDirectory));
+        }
+    }
+
+    private static void ValidateReplaceableHtmlBookDirectory(string outputDirectory)
+    {
+        if (ContainsReparsePoint(outputDirectory))
+        {
+            throw new IOException("An existing HTML book directory contains a symbolic link or reparse point.");
+        }
+
+        var manifestPath = Path.Combine(outputDirectory, "manifest.json");
+        if (!File.Exists(manifestPath))
+        {
+            throw new IOException("An existing output directory is not a replaceable Flow HTML book.");
+        }
+
+        try
+        {
+            using var manifest = JsonDocument.Parse(File.ReadAllBytes(manifestPath));
+            if (manifest.RootElement.GetProperty("format").GetString() != HtmlBookPackage.Format)
+            {
+                throw new IOException("An existing output directory is not a replaceable Flow HTML book.");
+            }
+        }
+        catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException)
+        {
+            throw new IOException("An existing output directory has an invalid Flow HTML book manifest.", exception);
+        }
+    }
+
+    private static bool ContainsReparsePoint(string root)
+    {
+        var pending = new Stack<string>();
+        pending.Push(root);
+        while (pending.Count > 0)
+        {
+            foreach (var path in Directory.EnumerateFileSystemEntries(pending.Pop(), "*", SearchOption.TopDirectoryOnly))
+            {
+                var attributes = File.GetAttributes(path);
+                if ((attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    return true;
+                }
+
+                if ((attributes & FileAttributes.Directory) != 0)
+                {
+                    pending.Push(path);
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private static string ResolvePackageOutputPath(string root, string packagePath)
+    {
+        var target = Path.GetFullPath(Path.Combine(root, packagePath.Replace('/', Path.DirectorySeparatorChar)));
+        var prefix = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root)) + Path.DirectorySeparatorChar;
+        if (!target.StartsWith(
+                prefix,
+                OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+        {
+            throw new IOException($"Unsafe HTML book package path '{packagePath}'.");
+        }
+
+        return target;
     }
 
     private static async Task WriteEpubDiagnosticsAsync(

@@ -398,6 +398,74 @@ public sealed class FlowCliIntegrationTests
     }
 
     [Fact]
+    public async Task RenderHtmlBook_WritesAndSafelyReplacesDeterministicNavigablePackage()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var documentPath = workspace.PathOf("sample.flow.json");
+        var firstDirectory = workspace.PathOf("book-one");
+        var secondDirectory = workspace.PathOf("book-two");
+        var application = FlowCliApplication.CreateDefault();
+        Assert.Equal(0, (await RunAsync(application, ["sample", documentPath])).ExitCode);
+
+        var first = await RunAsync(application, ["render", documentPath, "--html-book", firstDirectory]);
+        var second = await RunAsync(application, ["render", documentPath, "--html-book", secondDirectory]);
+
+        Assert.Equal(0, first.ExitCode);
+        Assert.Equal(0, second.ExitCode);
+        Assert.Equal(string.Empty, first.Error);
+        Assert.True(File.Exists(Path.Combine(firstDirectory, "index.html")));
+        Assert.True(File.Exists(Path.Combine(firstDirectory, "toc.html")));
+        Assert.True(File.Exists(Path.Combine(firstDirectory, "styles", "book.css")));
+        Assert.Equal(5, Directory.GetFiles(Path.Combine(firstDirectory, "chapters"), "*.html").Length);
+        Assert.Equal(DirectorySnapshot(firstDirectory), DirectorySnapshot(secondDirectory));
+
+        using var manifest = JsonDocument.Parse(await File.ReadAllBytesAsync(Path.Combine(firstDirectory, "manifest.json")));
+        Assert.Equal("flow-html-book-0.1", manifest.RootElement.GetProperty("format").GetString());
+        Assert.Equal(
+            OutputValue(first.Output, "Hash: ").Split(':', 2)[1],
+            manifest.RootElement.GetProperty("canonicalIntegrity").GetProperty("hash").GetString());
+        Assert.Equal(
+            ["index.html", "toc.html", "chapters/chapter-001.html", "chapters/chapter-002.html", "chapters/chapter-003.html", "chapters/chapter-004.html", "chapters/chapter-005.html"],
+            manifest.RootElement.GetProperty("readingOrder").EnumerateArray()
+                .Select(static item => item.GetProperty("path").GetString()!)
+                .ToArray());
+
+        await File.WriteAllTextAsync(Path.Combine(firstDirectory, "stale.txt"), "old");
+        var replacement = await RunAsync(application, ["render", documentPath, "--html-book", firstDirectory]);
+        Assert.Equal(0, replacement.ExitCode);
+        Assert.False(File.Exists(Path.Combine(firstDirectory, "stale.txt")));
+        Assert.Equal(DirectorySnapshot(firstDirectory), DirectorySnapshot(secondDirectory));
+    }
+
+    [Fact]
+    public async Task RenderHtmlBook_RejectsUnsafeExistingDirectoryAndSourceContainingOutput()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var documentPath = workspace.PathOf("sample.flow.json");
+        var unrelatedDirectory = workspace.PathOf("unrelated");
+        Directory.CreateDirectory(unrelatedDirectory);
+        var marker = Path.Combine(unrelatedDirectory, "keep.txt");
+        await File.WriteAllTextAsync(marker, "keep");
+        var application = FlowCliApplication.CreateDefault();
+        Assert.Equal(0, (await RunAsync(application, ["sample", documentPath])).ExitCode);
+
+        var unrelated = await RunAsync(
+            application,
+            ["render", documentPath, "--html-book", unrelatedDirectory]);
+        var containingSource = await RunAsync(
+            application,
+            ["render", documentPath, "--html-book", workspace.Root]);
+
+        Assert.Equal(1, unrelated.ExitCode);
+        Assert.Contains("not a replaceable Flow HTML book", unrelated.Error, StringComparison.Ordinal);
+        Assert.Equal("keep", await File.ReadAllTextAsync(marker));
+        Assert.Equal(1, containingSource.ExitCode);
+        Assert.Contains("cannot contain its source document", containingSource.Error, StringComparison.Ordinal);
+        Assert.True(File.Exists(documentPath));
+        Assert.Empty(Directory.GetDirectories(workspace.Root, ".*.flow-html-book-*.tmp"));
+    }
+
+    [Fact]
     public async Task Application_ReportsParsingAndFileErrorsWithoutThrowing()
     {
         using var workspace = new TemporaryWorkspace();
@@ -454,6 +522,15 @@ public sealed class FlowCliIntegrationTests
     private static string OutputValue(string output, string prefix) =>
         output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Single(line => line.StartsWith(prefix, StringComparison.Ordinal))[prefix.Length..].Trim();
+
+    private static string[] DirectorySnapshot(string root) => Directory.GetFiles(root, "*", SearchOption.AllDirectories)
+        .Select(path =>
+        {
+            var relative = Path.GetRelativePath(root, path).Replace('\\', '/');
+            return $"{relative}:{Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(path)))}";
+        })
+        .Order(StringComparer.Ordinal)
+        .ToArray();
 
     private static void CreateMinimalEpub(string path, string title = "Livro real mínimo")
     {

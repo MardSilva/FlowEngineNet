@@ -32,6 +32,7 @@ Flow 0.1 is a research-grade reference implementation. This list is part of the 
 - `LayoutDocument` carries constraints and intentions; it does not measure glyphs, boxes, line breaks, coordinates, pages, widows/orphans, floats, or print output.
 - HTML is the only renderer. There is no Reader application, native UI renderer, PDF renderer, production pagination, or print pipeline.
 - The standalone HTML renderer has deterministic tests and semantic markup tests, but no full browser matrix, WCAG 2.2 conformance audit, screen-reader audit, localization audit, or right-to-left/vertical-writing validation.
+- The multi-file HTML book is a logical `file://` package, not EPUB export or a standardized Web Publication. It has no search, persistent progress, service worker, JavaScript enhancement, theme selector, full browser/file-URL matrix, or accessibility certification. Its manifest excludes its own recursively undefined hash while hashing every payload file.
 - Font names are suggestions. Fonts are not embedded, so appearance depends on fonts available to the browser.
 
 ## EPUB interoperability
@@ -55,7 +56,7 @@ Flow 0.1 is a research-grade reference implementation. This list is part of the 
 
 ## CLI and operations
 
-- The CLI inspects/imports the documented EPUB subset and exposes sample, inspect, validate, hash, and HTML render commands.
+- The CLI inspects/imports the documented EPUB subset and exposes sample, inspect, validate, hash, standalone HTML, and multi-file HTML-book commands.
 - It has no signing, verification, EPUB export, preference/theme flags, streaming pipeline, batch mode, or interactive prompts. Typed metadata and package-processing reports are currently API-only; the fidelity report is an optional noncanonical sidecar.
 - Output paths are replaced when commands succeed; callers should use copies for experiments.
 - CI validates Windows and Linux only. macOS and alternative .NET SDK/runtime implementations are not in the matrix.

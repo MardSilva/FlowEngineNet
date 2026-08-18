@@ -14,6 +14,7 @@ flow inspect <document>
 flow validate <document>
 flow hash <document>
 flow render <document> --html <output> --width <n> --height <n>
+flow render <document> --html-book <output-directory>
 ```
 
 `sample` writes “The Flow Experiment” to the optional output path or to `sample.flow.json` in the current directory. The command serializes the same typed sample factory used to generate the committed reference document.
@@ -36,6 +37,8 @@ The imported `.flow.json` contains only canonical Flow metadata. Publisher, cont
 
 `render` resolves `ReadingMode.Flow` for the requested logical viewport, writes standalone HTML, and reports the source identity, canonical hash, anchor count, and selected viewport category. Width and height use invariant-culture positive numbers.
 
+`render --html-book` writes the additional multi-file `flow-html-book-0.1` package. It uses a deterministic 1024×768 logical layout, keeps the TOC in `toc.html`, creates one file per semantic chapter, externalizes hash-deduplicated assets and typed CSS, and records canonical identity plus payload hashes in `manifest.json`. The directory is assembled beside the target and then moved into place. An arbitrary existing directory, filesystem root, reparse point, existing file, or directory containing the source document is never replaced. See [HTML book package](html-book-package.md).
+
 The CLI imports the currently supported EPUB subset and reads `.flow.json`; it does not yet expose signing, verification, reader-preference switches, PDF, or paged output. Successful `sample`, `import`, and `render` operations replace their target files.
 
 During development, invoke the executable through the project:
@@ -46,6 +49,7 @@ dotnet run --project src/Flow.Cli -- epub-inspect book.epub --json inspection.js
 dotnet run --project src/Flow.Cli -- import book.epub --diagnostics-json import-report.json
 dotnet run --project src/Flow.Cli -- validate sample.flow.json
 dotnet run --project src/Flow.Cli -- render sample.flow.json --html sample.html --width 390 --height 844
+dotnet run --project src/Flow.Cli -- render sample.flow.json --html-book sample-book
 ```
 
 ## Separation and testing

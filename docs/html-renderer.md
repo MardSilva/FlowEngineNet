@@ -2,6 +2,8 @@
 
 `HtmlDocumentRenderer` is the first adapter that consumes a validated `FlowDocument`, its matching `LayoutDocument`, and the active `UserReadingPreferences`. It produces deterministic UTF-8 HTML5 bytes or writes those same bytes to a `.html` file.
 
+`HtmlBookPackageRenderer` is a second, additive output in the same adapter. It preserves the standalone renderer and splits a book into `index.html`, a logical TOC page, one file per chapter, shared assets/CSS, and a deterministic integrity manifest. Its profile and content-placement rules are documented in [HTML book package](html-book-package.md).
+
 The `LayoutDocument` is authoritative for the resolved typography, theme, margins, columns, and node intentions. Reader preferences are an explicit renderer input so the complete runtime state remains visible at the boundary, but the renderer does not recompute the cascade and therefore cannot discard renderer safety constraints already applied by the layout engine.
 
 ## Output profile

@@ -104,6 +104,13 @@ public sealed class CliCommandParser
             return CommandParseResult.Failure($"FLOWCLI_USAGE: {RenderUsage}");
         }
 
+        if (arguments.Count == 4
+            && arguments[2] == "--html-book"
+            && !string.IsNullOrWhiteSpace(arguments[3]))
+        {
+            return CommandParseResult.Success(new RenderHtmlBookCommand(arguments[1], arguments[3]));
+        }
+
         string? outputPath = null;
         double? width = null;
         double? height = null;
@@ -165,7 +172,7 @@ public sealed class CliCommandParser
         && dimension > 0;
 
     private const string RenderUsage =
-        "Usage: flow render <document> --html <output> --width <n> --height <n>";
+        "Usage: flow render <document> (--html <output> --width <n> --height <n> | --html-book <output-directory>)";
 
     private const string ImportUsage =
         "Usage: flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>] [--fidelity-report <fidelity.json>]";

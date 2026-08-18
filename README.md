@@ -40,6 +40,7 @@ Implemented:
 - canonical inline language ranges, typed bidirectional embedding/isolation/override, and Japanese ruby annotations imported from XHTML;
 - renderer-independent adaptive layout for `ReadingMode.Flow`;
 - deterministic standalone HTML5 rendering with embedded CSS and assets;
+- deterministic, script-free HTML book packages with their own TOC, chapter files, deduplicated assets, shared CSS, and integrity manifest;
 - the five-chapter “The Flow Experiment” reference book;
 - a lightweight CLI for sampling, inspection, validation, hashing, and HTML rendering;
 - readable UTF-8 JSON output, deterministic EPUB diagnostic reports, and title-derived portable `.flow.json` names;
@@ -50,7 +51,7 @@ Implemented:
 
 Not implemented yet:
 
-- renderers other than standalone HTML;
+- renderers other than HTML;
 - broad EPUB interoperability and EPUB export;
 - paged and print layout modes;
 - reader or editor applications;
@@ -129,7 +130,7 @@ The layout operation validates the semantic document first. Invalid IDs, hierarc
 | `Flow.Layout` | Style cascade and adaptive Flow layout | Implemented for 0.1 |
 | `Flow.Security` | Canonicalization, hashing, and local RSA signature proof of concept | Implemented for 0.1 |
 | `Flow.Rendering` | Renderer contracts and immutable rendered output | Implemented for 0.1 |
-| `Flow.Rendering.Html` | Deterministic standalone semantic HTML adapter | Implemented for 0.1 |
+| `Flow.Rendering.Html` | Deterministic standalone HTML and multi-file HTML book adapter | Expanded in 0.2 alpha |
 | `Flow.Epub` | Package inspection and diagnostic-first EPUB-to-`FlowDocument` adapter | Expanded subset in 0.2 alpha |
 | `Flow.Cli` | EPUB inspection/import, sample, inspect, validate, hash, and HTML rendering commands | EPUB CLI integration in 0.2 alpha |
 
@@ -156,6 +157,7 @@ The final clean-directory review passes 134 tests with zero build warnings; see 
 - [Semantic document model](docs/flow-document-model.md)
 - [Adaptive layout](docs/adaptive-layout.md)
 - [Standalone HTML renderer](docs/html-renderer.md)
+- [HTML book package](docs/html-book-package.md)
 - [Command-line interface](docs/cli.md)
 - [Canonicalization and hashing](docs/canonicalization.md)
 - [Experimental document signatures](docs/signatures.md)
@@ -177,6 +179,8 @@ The real EPUB cycle now follows these increments:
 4. validate fidelity and performance against legal real-world publications;
 5. pass the large-book gate before beginning the PDF importer.
 
+The first three increments now have executable implementations. The next work is appearance/accessibility refinement, followed by measurable performance and corpus gates; this does not yet justify a universal EPUB-support claim.
+
 A document can only be considered end-to-end usable when an EPUB can be imported without silent semantic loss, represented as a valid `FlowDocument`, laid out, rendered, inspected, and round-tripped through the supported Flow format. The repository has not reached that point yet.
 
 ## CLI quick start
@@ -197,6 +201,7 @@ dotnet run --project src/Flow.Cli -- inspect samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- validate samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- hash samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- render samples/SampleBook/sample.flow.json --html sample.html --width 390 --height 844
+dotnet run --project src/Flow.Cli -- render samples/SampleBook/sample.flow.json --html-book sample-book
 ```
 
 The detailed [sample walkthrough](samples/SampleBook/README.md) explains prerequisites, expected output, what to compare, safe experiments, limitations, and how the committed evidence is verified.

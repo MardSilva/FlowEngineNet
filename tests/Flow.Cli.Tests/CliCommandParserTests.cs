@@ -53,6 +53,10 @@ public sealed class CliCommandParserTests
         Assert.Equal("mobile.html", render.OutputPath);
         Assert.Equal(390, render.ViewportWidth);
         Assert.Equal(844, render.ViewportHeight);
+        var htmlBook = Assert.IsType<RenderHtmlBookCommand>(
+            _parser.Parse(["render", "book.flow.json", "--html-book", "book-directory"]).Command);
+        Assert.Equal("book.flow.json", htmlBook.DocumentPath);
+        Assert.Equal("book-directory", htmlBook.OutputDirectory);
     }
 
     [Theory]

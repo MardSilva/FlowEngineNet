@@ -26,6 +26,8 @@ public sealed record RenderHtmlCommand(
     double ViewportWidth,
     double ViewportHeight) : CliCommand;
 
+public sealed record RenderHtmlBookCommand(string DocumentPath, string OutputDirectory) : CliCommand;
+
 public sealed record CommandParseResult
 {
     private CommandParseResult(CliCommand? command, string? error)
