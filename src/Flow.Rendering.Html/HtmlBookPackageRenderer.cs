@@ -21,12 +21,22 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
         FlowDocument document,
         LayoutDocument layout,
         UserReadingPreferences userPreferences,
-        HtmlBookIntegrity integrity)
+        HtmlBookIntegrity integrity) =>
+        Render(document, layout, userPreferences, integrity, new HtmlBookPackageOptions());
+
+    /// <inheritdoc />
+    public HtmlBookPackage Render(
+        FlowDocument document,
+        LayoutDocument layout,
+        UserReadingPreferences userPreferences,
+        HtmlBookIntegrity integrity,
+        HtmlBookPackageOptions options)
     {
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(layout);
         ArgumentNullException.ThrowIfNull(userPreferences);
         ArgumentNullException.ThrowIfNull(integrity);
+        ArgumentNullException.ThrowIfNull(options);
 
         // Reuse the established renderer as the single semantic HTML mapping and validation authority.
         var standalone = new HtmlDocumentRenderer().RenderToString(document, layout, userPreferences);
@@ -35,7 +45,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
             ?? throw new InvalidOperationException("The standalone renderer did not produce its required article.");
         var sharedCss = source.Root?.Element("head")?.Element("style")?.Value
             ?? throw new InvalidOperationException("The standalone renderer did not produce its required typed CSS.");
-        var ui = BookUiText.For(document.Metadata.Language);
+        var ui = BookUiText.For(options.UiLanguage, document.Metadata.Language);
 
         var assetPlan = CreateAssetPlan(document);
         var pagePlan = CreatePagePlan(layout);
@@ -114,7 +124,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
         files.Add(new HtmlBookFile(
             "manifest.json",
             "application/json; charset=utf-8",
-            CreateManifest(document, integrity, pagePlan.Pages, payloadFiles)));
+            CreateManifest(document, integrity, pagePlan.Pages, payloadFiles, ui)));
         return new HtmlBookPackage(files);
     }
 
@@ -587,12 +597,14 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
             new XAttribute("data-document-version", document.Identity.Version ?? string.Empty),
             new XAttribute("data-canonical-hash", integrity.Hash),
             new XAttribute("data-page-kind", PageKind(page.Kind)),
-            new XAttribute("data-publication-role", PublicationRole(document, page, pages)),
+            new XAttribute("data-publication-role", PublicationRole(document, page, pages, ui)),
+            document.Metadata.Language is null ? null : new XAttribute("lang", document.Metadata.Language),
             rootElements);
         var progress = LogicalProgress(document, page, pages, ui);
         var shell = new XElement(
             "div",
             new XAttribute("class", "book-shell"),
+            new XAttribute("lang", ui.LanguageTag),
             new XElement(
                 "header",
                 new XAttribute("class", "book-masthead"),
@@ -600,6 +612,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
                     "a",
                     new XAttribute("class", "book-home-link"),
                     new XAttribute("href", RelativeReference(page.Path, "index.html")),
+                    document.Metadata.Language is null ? null : new XAttribute("lang", document.Metadata.Language),
                     document.Metadata.Title),
                 new XElement(
                     "p",
@@ -622,7 +635,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
         var html = new XElement(
             "html",
             new XAttribute("data-default-theme", ThemeName(defaultTheme)),
-            document.Metadata.Language is null ? null : new XAttribute("lang", document.Metadata.Language),
+            new XAttribute("lang", document.Metadata.Language ?? ui.LanguageTag),
             new XElement(
                 "head",
                 new XElement("meta", new XAttribute("charset", "utf-8")),
@@ -642,6 +655,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
                     "a",
                     new XAttribute("class", "skip-link"),
                     new XAttribute("href", $"#{mainId}"),
+                    new XAttribute("lang", ui.LanguageTag),
                     ui.SkipToBookContent),
                 shell));
         var htmlDocument = new XDocument(new XDocumentType("html", null, null, null), html);
@@ -958,7 +972,8 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
         FlowDocument document,
         HtmlBookIntegrity integrity,
         IReadOnlyList<HtmlBookPage> readingOrder,
-        IEnumerable<HtmlBookFile> payloadFiles)
+        IEnumerable<HtmlBookFile> payloadFiles,
+        BookUiText ui)
     {
         using var buffer = new MemoryStream();
         using (var writer = new Utf8JsonWriter(
@@ -971,6 +986,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
         {
             writer.WriteStartObject();
             writer.WriteString("format", HtmlBookPackage.Format);
+            writer.WriteString("uiLanguage", ui.LanguageTag);
             writer.WritePropertyName("identity");
             writer.WriteStartObject();
             writer.WriteString("id", document.Identity.Id.Value);
@@ -990,7 +1006,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
                 writer.WriteStartObject();
                 writer.WriteString("path", page.Path);
                 writer.WriteString("kind", PageKind(page.Kind));
-                writer.WriteString("publicationRole", PublicationRole(document, page, readingOrder));
+                writer.WriteString("publicationRole", PublicationRole(document, page, readingOrder, ui));
                 WriteNullableString(writer, "chapterId", page.ChapterId?.Value);
                 writer.WriteEndObject();
             }
@@ -1074,7 +1090,8 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
     private static string PublicationRole(
         FlowDocument document,
         HtmlBookPage page,
-        IReadOnlyList<HtmlBookPage> pages)
+        IReadOnlyList<HtmlBookPage> pages,
+        BookUiText ui)
     {
         if (page.Kind == HtmlBookPageKind.Index)
         {
@@ -1096,7 +1113,6 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
             return "cover";
         }
 
-        var ui = BookUiText.For(document.Metadata.Language);
         var title = ChapterPageTitle(document, page, ui);
         if (title == ui.FrontMatter)
         {
@@ -1114,19 +1130,26 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
 
     private sealed record BookUiText
     {
-        private static readonly BookUiText English = new();
-        private static readonly BookUiText Portuguese = new()
+        private static readonly BookUiText English = new()
         {
-            IsPortuguese = true,
-            TableOfContents = "Sumário",
-            OpenContents = "Abrir sumário",
-            Contents = "Sumário",
+            LanguageTag = "en",
+            ChapterWord = "Chapter",
+            OfWord = "of",
+        };
+        private static readonly BookUiText PortuguesePortugal = new()
+        {
+            LanguageTag = "pt-PT",
+            ChapterWord = "Capítulo",
+            OfWord = "de",
+            TableOfContents = "Índice",
+            OpenContents = "Abrir índice",
+            Contents = "Índice",
             Credits = "Créditos",
             Author = "Autor",
             Authors = "Autores",
-            BookOpening = "Abertura do livro",
+            BookOpening = "Início do livro",
             Cover = "Capa",
-            FrontMatter = "Matéria pré-textual",
+            FrontMatter = "Elementos pré-textuais",
             Notes = "Notas",
             LogicalReadingPosition = "Posição lógica de leitura",
             PrimaryBookNavigation = "Navegação principal do livro",
@@ -1134,26 +1157,44 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
             PreviousLogicalReadingPosition = "Posição lógica anterior",
             NextLogicalReadingPosition = "Próxima posição lógica",
             Previous = "Anterior",
-            Next = "Próximo",
+            Next = "Seguinte",
             SkipToBookContent = "Ir para o conteúdo do livro",
             ReadingPreferences = "Preferências de leitura",
-            ReadingAppearance = "Aparência da leitura",
+            ReadingAppearance = "Aspeto da leitura",
             Theme = "Tema",
-            Font = "Fonte",
+            Font = "Tipo de letra",
             TextSize = "Tamanho do texto",
-            Book = "Livro",
+            Book = "Original",
             Light = "Claro",
             Dark = "Escuro",
             Sepia = "Sépia",
-            BookFont = "Fonte do livro",
-            Serif = "Serifada",
-            SansSerif = "Sem serifa",
-            BookSize = "Tamanho do livro",
+            BookFont = "Do livro",
+            Serif = "Com serifas",
+            SansSerif = "Sem serifas",
+            BookSize = "Original",
             Large = "Grande",
             Larger = "Maior",
         };
+        private static readonly BookUiText PortugueseBrazil = PortuguesePortugal with
+        {
+            LanguageTag = "pt-BR",
+            TableOfContents = "Sumário",
+            OpenContents = "Abrir sumário",
+            Contents = "Sumário",
+            FrontMatter = "Parte pré-textual",
+            Next = "Próximo",
+            ReadingAppearance = "Aparência da leitura",
+            Font = "Fonte",
+            BookFont = "Do livro",
+            Serif = "Serifada",
+            SansSerif = "Sem serifa",
+        };
 
-        internal bool IsPortuguese { get; init; }
+        internal string LanguageTag { get; init; } = "en";
+
+        internal string ChapterWord { get; init; } = "Chapter";
+
+        internal string OfWord { get; init; } = "of";
 
         internal string TableOfContents { get; init; } = "Table of contents";
 
@@ -1221,14 +1262,37 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
 
         internal string Larger { get; init; } = "Larger";
 
-        internal static BookUiText For(string? language) =>
-            language is not null && language.StartsWith("pt", StringComparison.OrdinalIgnoreCase)
-                ? Portuguese
-                : English;
+        internal static BookUiText For(HtmlBookUiLanguage requested, string? publicationLanguage) => requested switch
+        {
+            HtmlBookUiLanguage.English => English,
+            HtmlBookUiLanguage.PortuguesePortugal => PortuguesePortugal,
+            HtmlBookUiLanguage.PortugueseBrazil => PortugueseBrazil,
+            HtmlBookUiLanguage.Automatic => Automatic(publicationLanguage),
+            _ => throw new ArgumentOutOfRangeException(nameof(requested), requested, "The HTML book UI language is not defined."),
+        };
 
-        internal string ChapterProgress(int current, int total) => IsPortuguese
-            ? $"Capítulo {current.ToString(CultureInfo.InvariantCulture)} de {total.ToString(CultureInfo.InvariantCulture)}"
-            : $"Chapter {current.ToString(CultureInfo.InvariantCulture)} of {total.ToString(CultureInfo.InvariantCulture)}";
+        internal string ChapterProgress(int current, int total) =>
+            $"{ChapterWord} {current.ToString(CultureInfo.InvariantCulture)} {OfWord} {total.ToString(CultureInfo.InvariantCulture)}";
+
+        private static BookUiText Automatic(string? publicationLanguage)
+        {
+            if (publicationLanguage is null)
+            {
+                return English;
+            }
+
+            var normalized = publicationLanguage.Replace('_', '-');
+            if (normalized.Equals("pt-BR", StringComparison.OrdinalIgnoreCase)
+                || normalized.StartsWith("pt-BR-", StringComparison.OrdinalIgnoreCase))
+            {
+                return PortugueseBrazil;
+            }
+
+            return normalized.Equals("pt", StringComparison.OrdinalIgnoreCase)
+                   || normalized.StartsWith("pt-", StringComparison.OrdinalIgnoreCase)
+                ? PortuguesePortugal
+                : English;
+        }
     }
 
     private sealed record AssetFile(string Path, string MediaType, byte[] Content);

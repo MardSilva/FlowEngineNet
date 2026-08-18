@@ -438,6 +438,34 @@ public sealed class FlowCliIntegrationTests
     }
 
     [Fact]
+    public async Task RenderHtmlBook_ExplicitUiLanguageLocalizesGeneratedTextAndPreservesBookLanguage()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var documentPath = workspace.PathOf("sample.flow.json");
+        var outputDirectory = workspace.PathOf("livro-pt");
+        var application = FlowCliApplication.CreateDefault();
+        Assert.Equal(0, (await RunAsync(application, ["sample", documentPath])).ExitCode);
+
+        var result = await RunAsync(
+            application,
+            ["render", documentPath, "--html-book", outputDirectory, "--ui-language", "pt-PT"]);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("UI language: pt-PT", result.Output, StringComparison.Ordinal);
+        var chapter = XDocument.Load(Path.Combine(outputDirectory, "chapters", "chapter-001.html"));
+        Assert.Equal("en", (string?)chapter.Root!.Attribute("lang"));
+        Assert.Equal("pt-PT", (string?)chapter.Descendants("div")
+            .Single(element => (string?)element.Attribute("class") == "book-shell")
+            .Attribute("lang"));
+        Assert.Equal("Aspeto da leitura", chapter.Descendants("summary").Single().Value);
+        Assert.Contains(chapter.Descendants("a"), element => element.Value == "Índice");
+        Assert.Contains(chapter.Descendants("article"), element => (string?)element.Attribute("lang") == "en");
+
+        using var manifest = JsonDocument.Parse(await File.ReadAllBytesAsync(Path.Combine(outputDirectory, "manifest.json")));
+        Assert.Equal("pt-PT", manifest.RootElement.GetProperty("uiLanguage").GetString());
+    }
+
+    [Fact]
     public async Task RenderHtmlBook_RejectsUnsafeExistingDirectoryAndSourceContainingOutput()
     {
         using var workspace = new TemporaryWorkspace();

@@ -1,4 +1,5 @@
 using Flow.Cli;
+using Flow.Rendering.Html;
 
 namespace Flow.Cli.Tests;
 
@@ -57,6 +58,19 @@ public sealed class CliCommandParserTests
             _parser.Parse(["render", "book.flow.json", "--html-book", "book-directory"]).Command);
         Assert.Equal("book.flow.json", htmlBook.DocumentPath);
         Assert.Equal("book-directory", htmlBook.OutputDirectory);
+        Assert.Equal(HtmlBookUiLanguage.Automatic, htmlBook.UiLanguage);
+
+        var portugueseHtmlBook = Assert.IsType<RenderHtmlBookCommand>(
+            _parser.Parse(
+            [
+                "render",
+                "book.flow.json",
+                "--ui-language",
+                "pt-PT",
+                "--html-book",
+                "livro",
+            ]).Command);
+        Assert.Equal(HtmlBookUiLanguage.PortuguesePortugal, portugueseHtmlBook.UiLanguage);
     }
 
     [Theory]
@@ -101,5 +115,17 @@ public sealed class CliCommandParserTests
             _parser.Parse(
                 ["render", "book.flow.json", "--html", "one.html", "--html", "two.html", "--width", "800", "--height", "600"])
                 .IsSuccess);
+        Assert.StartsWith(
+            "FLOWCLI_INVALID_VALUE:",
+            _parser.Parse(
+                ["render", "book.flow.json", "--html-book", "book", "--ui-language", "portuguese"])
+                .Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_DUPLICATE_OPTION:",
+            _parser.Parse(
+                ["render", "book.flow.json", "--html-book", "book", "--ui-language", "en", "--ui-language", "pt-BR"])
+                .Error,
+            StringComparison.Ordinal);
     }
 }

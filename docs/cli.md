@@ -14,7 +14,7 @@ flow inspect <document>
 flow validate <document>
 flow hash <document>
 flow render <document> --html <output> --width <n> --height <n>
-flow render <document> --html-book <output-directory>
+flow render <document> --html-book <output-directory> [--ui-language <auto|en|pt-PT|pt-BR>]
 ```
 
 `sample` writes “The Flow Experiment” to the optional output path or to `sample.flow.json` in the current directory. The command serializes the same typed sample factory used to generate the committed reference document.
@@ -48,6 +48,8 @@ The imported `.flow.json` contains only canonical Flow metadata. Publisher, cont
 
 `render --html-book` writes the additional multi-file `flow-html-book-0.1` package. It uses a deterministic 1024×768 logical layout, keeps the TOC in `toc.html`, creates one file per semantic chapter, externalizes hash-deduplicated assets and typed CSS, and records canonical identity plus payload hashes in `manifest.json`. The directory is assembled beside the target and then moved into place. An arbitrary existing directory, filesystem root, reparse point, existing file, or directory containing the source document is never replaced. See [HTML book package](html-book-package.md).
 
+`--ui-language` controls only renderer-generated interface text. Values are `auto`, `en`, `pt-PT`, and `pt-BR`; matching is case-insensitive. `auto` uses `pt-BR` for Brazilian Portuguese publications, `pt-PT` for other Portuguese language tags, and English for all other or missing publication languages. Authored book content and TOC titles are never translated. The resolved UI language is written to `manifest.json` and reported by the CLI.
+
 The CLI imports the currently supported EPUB subset and reads `.flow.json`; it does not yet expose signing, verification, reader-preference switches, PDF, or paged output. Successful `sample`, `import`, and `render` operations replace their target files.
 
 During development, invoke the executable through the project:
@@ -58,7 +60,7 @@ dotnet run --project src/Flow.Cli -- epub-inspect book.epub --json inspection.js
 dotnet run --project src/Flow.Cli -- import book.epub --diagnostics-json import-report.json
 dotnet run --project src/Flow.Cli -- validate sample.flow.json
 dotnet run --project src/Flow.Cli -- render sample.flow.json --html sample.html --width 390 --height 844
-dotnet run --project src/Flow.Cli -- render sample.flow.json --html-book sample-book
+dotnet run --project src/Flow.Cli -- render sample.flow.json --html-book sample-book --ui-language pt-PT
 ```
 
 To keep the generated HTML book beside an imported EPUB, pass that directory explicitly:
@@ -66,10 +68,12 @@ To keep the generated HTML book beside an imported EPUB, pass that directory exp
 ```powershell
 $flow = 'C:\caminho\para\meu_livro.flow.json'
 $book = 'C:\caminho\para\meu_livro_book'
-dotnet run --project .\src\Flow.Cli -- render $flow --html-book $book
+dotnet run --project .\src\Flow.Cli -- render $flow --html-book $book --ui-language pt-PT
 ```
 
 The current CLI deliberately keeps `import` and `render` as separate operations. Importing does not create the HTML book automatically; a future Reader is expected to hide this pipeline when opening supported source formats directly.
+
+Generate separate package directories when more than one interface language is required. A package intentionally has one `index.html` and one coherent UI language rather than parallel `index_en.html`, `index_pt.html`, and `index_ptbr.html` entry points sharing ambiguous navigation state.
 
 ## Separation and testing
 

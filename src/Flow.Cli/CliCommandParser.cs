@@ -1,4 +1,5 @@
 using System.Globalization;
+using Flow.Rendering.Html;
 
 namespace Flow.Cli;
 
@@ -104,11 +105,9 @@ public sealed class CliCommandParser
             return CommandParseResult.Failure($"FLOWCLI_USAGE: {RenderUsage}");
         }
 
-        if (arguments.Count == 4
-            && arguments[2] == "--html-book"
-            && !string.IsNullOrWhiteSpace(arguments[3]))
+        if (arguments.Skip(2).Contains("--html-book", StringComparer.Ordinal))
         {
-            return CommandParseResult.Success(new RenderHtmlBookCommand(arguments[1], arguments[3]));
+            return ParseHtmlBook(arguments);
         }
 
         string? outputPath = null;
@@ -166,13 +165,69 @@ public sealed class CliCommandParser
             new RenderHtmlCommand(arguments[1], outputPath, width.Value, height.Value));
     }
 
+    private static CommandParseResult ParseHtmlBook(IReadOnlyList<string> arguments)
+    {
+        string? outputDirectory = null;
+        var uiLanguage = HtmlBookUiLanguage.Automatic;
+        var hasUiLanguage = false;
+        for (var index = 2; index < arguments.Count; index += 2)
+        {
+            if (index + 1 >= arguments.Count || string.IsNullOrWhiteSpace(arguments[index + 1]))
+            {
+                return CommandParseResult.Failure(
+                    $"FLOWCLI_USAGE: Option '{arguments[index]}' requires a value. {RenderUsage}");
+            }
+
+            var option = arguments[index];
+            var value = arguments[index + 1];
+            switch (option)
+            {
+                case "--html-book" when outputDirectory is null:
+                    outputDirectory = value;
+                    break;
+                case "--ui-language" when !hasUiLanguage:
+                    if (!TryParseUiLanguage(value, out uiLanguage))
+                    {
+                        return CommandParseResult.Failure(
+                            "FLOWCLI_INVALID_VALUE: --ui-language must be auto, en, pt-PT, or pt-BR.");
+                    }
+
+                    hasUiLanguage = true;
+                    break;
+                case "--html-book" or "--ui-language":
+                    return CommandParseResult.Failure(
+                        $"FLOWCLI_DUPLICATE_OPTION: Option '{option}' was specified more than once.");
+                default:
+                    return CommandParseResult.Failure(
+                        $"FLOWCLI_UNKNOWN_OPTION: Unknown HTML book option '{option}'. {RenderUsage}");
+            }
+        }
+
+        return outputDirectory is null
+            ? CommandParseResult.Failure($"FLOWCLI_USAGE: {RenderUsage}")
+            : CommandParseResult.Success(new RenderHtmlBookCommand(arguments[1], outputDirectory, uiLanguage));
+    }
+
+    private static bool TryParseUiLanguage(string value, out HtmlBookUiLanguage language)
+    {
+        language = value.ToLowerInvariant() switch
+        {
+            "auto" => HtmlBookUiLanguage.Automatic,
+            "en" => HtmlBookUiLanguage.English,
+            "pt-pt" => HtmlBookUiLanguage.PortuguesePortugal,
+            "pt-br" => HtmlBookUiLanguage.PortugueseBrazil,
+            _ => (HtmlBookUiLanguage)(-1),
+        };
+        return Enum.IsDefined(language);
+    }
+
     private static bool TryParseDimension(string value, out double dimension) =>
         double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out dimension)
         && double.IsFinite(dimension)
         && dimension > 0;
 
     private const string RenderUsage =
-        "Usage: flow render <document> (--html <output> --width <n> --height <n> | --html-book <output-directory>)";
+        "Usage: flow render <document> (--html <output> --width <n> --height <n> | --html-book <output-directory> [--ui-language <auto|en|pt-PT|pt-BR>])";
 
     private const string ImportUsage =
         "Usage: flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>] [--fidelity-report <fidelity.json>]";

@@ -410,6 +410,52 @@ public sealed class HtmlBookPackageRendererTests
         Assert.Equal(["cover", "section", "chapter", "chapter"], roles);
     }
 
+    [Theory]
+    [InlineData(HtmlBookUiLanguage.English, "en", "Reading appearance", "Contents", "Table of contents", "Next")]
+    [InlineData(HtmlBookUiLanguage.PortuguesePortugal, "pt-PT", "Aspeto da leitura", "Índice", "Índice", "Seguinte")]
+    [InlineData(HtmlBookUiLanguage.PortugueseBrazil, "pt-BR", "Aparência da leitura", "Sumário", "Sumário", "Próximo")]
+    public void Render_ExplicitUiLanguageLocalizesOnlyGeneratedInterface(
+        HtmlBookUiLanguage language,
+        string expectedLanguageTag,
+        string expectedAppearance,
+        string expectedContents,
+        string expectedTableOfContentsLabel,
+        string expectedNext)
+    {
+        var package = Render(
+            CreateTwoChapterDocument(),
+            1024,
+            768,
+            options: new HtmlBookPackageOptions(language));
+        var chapter = Parse(package, "chapters/chapter-001.html");
+        var contents = Parse(package, "toc.html");
+
+        Assert.Equal("en", (string?)chapter.Root!.Attribute("lang"));
+        Assert.Equal(
+            expectedLanguageTag,
+            (string?)chapter.Descendants("div").Single(element => (string?)element.Attribute("class") == "book-shell")
+                .Attribute("lang"));
+        Assert.Equal("en", (string?)chapter.Descendants("article").Single().Attribute("lang"));
+        Assert.Equal(expectedAppearance, chapter.Descendants("summary").Single().Value);
+        Assert.Contains(chapter.Descendants("a"), element => element.Value == expectedContents);
+        Assert.Contains(chapter.Descendants("a"), element => element.Value == expectedNext);
+        Assert.Equal(
+            expectedTableOfContentsLabel,
+            (string?)contents.Descendants("nav").Single(element => (string?)element.Attribute("id") == "toc")
+                .Attribute("aria-label"));
+        Assert.Equal("Contents", contents.Descendants("h2").Single().Value);
+
+        using var manifest = JsonDocument.Parse(package.GetFile("manifest.json").Content.ToArray());
+        Assert.Equal(expectedLanguageTag, manifest.RootElement.GetProperty("uiLanguage").GetString());
+    }
+
+    [Fact]
+    public void HtmlBookPackageOptions_RejectsUnknownUiLanguage()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(
+            () => new HtmlBookPackageOptions((HtmlBookUiLanguage)999));
+    }
+
     [Fact]
     public void Render_PreservesLongTextAndDoesNotAllowThemeOverrideOfHighContrastSafety()
     {
@@ -446,11 +492,12 @@ public sealed class HtmlBookPackageRendererTests
         FlowDocument document,
         double width,
         double height,
-        UserReadingPreferences? preferences = null)
+        UserReadingPreferences? preferences = null,
+        HtmlBookPackageOptions? options = null)
     {
         preferences ??= new UserReadingPreferences();
         var layout = new AdaptiveLayoutEngine().Layout(document, new LayoutContext(width, height, userPreferences: preferences));
-        return renderer.Render(document, layout, preferences, Integrity);
+        return renderer.Render(document, layout, preferences, Integrity, options ?? new HtmlBookPackageOptions());
     }
 
     private static FlowDocument CreateTwoChapterDocument()

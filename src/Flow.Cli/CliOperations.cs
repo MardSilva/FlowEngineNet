@@ -104,7 +104,8 @@ public sealed class CliOperations
             .ConfigureAwait(false);
         await output.WriteLineAsync("  flow render <document> --html <output> --width <n> --height <n>")
             .ConfigureAwait(false);
-        await output.WriteLineAsync("  flow render <document> --html-book <output-directory>")
+        await output.WriteLineAsync(
+                "  flow render <document> --html-book <output-directory> [--ui-language <auto|en|pt-PT|pt-BR>]")
             .ConfigureAwait(false);
         await output.WriteLineAsync("Exit codes: 0 success, 1 command/input failure, 2 semantic validation failure.")
             .ConfigureAwait(false);
@@ -486,11 +487,14 @@ public sealed class CliOperations
             document,
             layout,
             preferences,
-            new HtmlBookIntegrity(hash.Algorithm, hash.Hash, hash.CanonicalizationVersion));
+            new HtmlBookIntegrity(hash.Algorithm, hash.Hash, hash.CanonicalizationVersion),
+            new HtmlBookPackageOptions(command.UiLanguage));
 
         await WriteHtmlBookPackageAtomicallyAsync(package, outputDirectory, cancellationToken).ConfigureAwait(false);
         await output.WriteLineAsync($"HTML book: {outputDirectory}").ConfigureAwait(false);
         await output.WriteLineAsync($"Entry: {Path.Combine(outputDirectory, "index.html")}").ConfigureAwait(false);
+        await output.WriteLineAsync($"UI language: {UiLanguageName(command.UiLanguage, document.Metadata.Language)}")
+            .ConfigureAwait(false);
         await output.WriteLineAsync($"Document ID: {document.Identity.Id}").ConfigureAwait(false);
         await WriteHashAsync(output, hash).ConfigureAwait(false);
         await output.WriteLineAsync(
@@ -500,6 +504,34 @@ public sealed class CliOperations
                 $"Chapters: {package.Files.Count(static file => file.Path.StartsWith("chapters/", StringComparison.Ordinal)).ToString(CultureInfo.InvariantCulture)}")
             .ConfigureAwait(false);
         return 0;
+    }
+
+    private static string UiLanguageName(HtmlBookUiLanguage language, string? publicationLanguage)
+    {
+        if (language != HtmlBookUiLanguage.Automatic)
+        {
+            return language switch
+            {
+                HtmlBookUiLanguage.English => "en",
+                HtmlBookUiLanguage.PortuguesePortugal => "pt-PT",
+                HtmlBookUiLanguage.PortugueseBrazil => "pt-BR",
+                _ => throw new ArgumentOutOfRangeException(nameof(language)),
+            };
+        }
+
+        var normalized = publicationLanguage?.Replace('_', '-');
+        if (normalized is not null
+            && (normalized.Equals("pt-BR", StringComparison.OrdinalIgnoreCase)
+                || normalized.StartsWith("pt-BR-", StringComparison.OrdinalIgnoreCase)))
+        {
+            return "pt-BR (automatic)";
+        }
+
+        return normalized is not null
+               && (normalized.Equals("pt", StringComparison.OrdinalIgnoreCase)
+                   || normalized.StartsWith("pt-", StringComparison.OrdinalIgnoreCase))
+            ? "pt-PT (automatic)"
+            : "en (automatic fallback)";
     }
 
     private async Task<FlowDocument> ReadDocumentAsync(string path, CancellationToken cancellationToken)
