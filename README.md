@@ -76,6 +76,29 @@ Importer / .flow.json
 
 Presentation, reader preferences, viewport state, layout decisions, and renderer output do not participate in the canonical document hash.
 
+## Flow alongside EPUB and PDF
+
+Flow is a normalized semantic model, not a replacement for EPUB's ZIP container or a reason to force readers to convert every book manually. EPUB remains a good distribution format; Flow adds a stable representation that renderers, validators, annotations, accessibility tools, hashes, and signatures can share without depending on the source format.
+
+The intended Reader experience is:
+
+1. Open an EPUB directly on any supported platform.
+2. Import and validate it transparently, preferably in memory.
+3. Keep a compact cache only when that improves startup time or offline use.
+4. Present the same reading and annotation model for EPUB, future PDF import, and native Flow documents.
+
+The readable `.flow.json` format is currently an experimental interchange and debugging format. It is deliberately verbose and is not intended to be the final package installed on a constrained reading device. A compact Flow container may be investigated later, but only if it provides value beyond ZIP compression—for example, normalized semantics across source formats, stable IDs and annotations, integrity data, and renderer-independent assets. It must be cross-platform and must not make a Windows-only converter part of the normal reading workflow.
+
+### Localization boundary
+
+Flow keeps three kinds of text separate:
+
+- authored content, such as a title written as “Table of contents” in the EPUB, is preserved and is never translated silently;
+- generated Reader or renderer interface text, such as navigation labels and actions, can be localized according to an explicit UI culture;
+- stable diagnostic codes and serialized model names remain language-neutral, while their human-readable messages may be localized independently.
+
+The HTML book prototype currently has partial Portuguese and English interface localization. Completing this separation—including recording whether a navigation title came from the publication or was synthesized by Flow—is planned before localization can be considered complete.
+
 ## Adaptive Flow layout
 
 `AdaptiveLayoutEngine` converts an immutable `FlowDocument` plus a `LayoutContext` into an immutable `LayoutDocument` without generating HTML, CSS, coordinates, or pages.
@@ -202,6 +225,51 @@ dotnet run --project src/Flow.Cli -- validate samples/SampleBook/sample.flow.jso
 dotnet run --project src/Flow.Cli -- hash samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- render samples/SampleBook/sample.flow.json --html sample.html --width 390 --height 844
 dotnet run --project src/Flow.Cli -- render samples/SampleBook/sample.flow.json --html-book sample-book
+```
+
+### Import a real EPUB and generate its HTML book
+
+Pass the complete EPUB path to `flow import`. Quotes are recommended because book and directory names frequently contain spaces:
+
+```powershell
+Set-Location 'C:\caminho\para\FlowEngineNet'
+
+$epub = 'C:\caminho\para\Meu livro.epub'
+dotnet run --project .\src\Flow.Cli -- import $epub
+```
+
+When `--output` is omitted, the CLI creates the `.flow.json` beside the EPUB. Its portable file name is derived from the book title, while the original title—including accents—remains in the document metadata. For the example above, the result can be:
+
+```text
+C:\caminho\para\meu_livro.flow.json
+```
+
+The CLI prints the exact generated path. Validate it and create the multi-file HTML book in a directory beside the EPUB:
+
+```powershell
+$flow = 'C:\caminho\para\meu_livro.flow.json'
+$book = 'C:\caminho\para\meu_livro_book'
+
+dotnet run --project .\src\Flow.Cli -- validate $flow
+dotnet run --project .\src\Flow.Cli -- render $flow --html-book $book
+Start-Process "$book\index.html"
+```
+
+This produces, side by side:
+
+```text
+C:\caminho\para\Meu livro.epub
+C:\caminho\para\meu_livro.flow.json
+C:\caminho\para\meu_livro_book\
+```
+
+`import` and `render` are intentionally separate today: importing creates the Flow document; rendering creates the `book` directory only when requested. This makes failures and intermediate validation visible. A future Reader should perform these steps transparently when opening an EPUB, without requiring the user to run this CLI workflow.
+
+To choose the output paths explicitly:
+
+```powershell
+dotnet run --project .\src\Flow.Cli -- import $epub --output 'D:\Livros\meu_livro.flow.json'
+dotnet run --project .\src\Flow.Cli -- render 'D:\Livros\meu_livro.flow.json' --html-book 'D:\Livros\meu_livro_book'
 ```
 
 The detailed [sample walkthrough](samples/SampleBook/README.md) explains prerequisites, expected output, what to compare, safe experiments, limitations, and how the committed evidence is verified.

@@ -21,6 +21,15 @@ flow render <document> --html-book <output-directory>
 
 `import` accepts a security-bounded EPUB and writes a deterministic `.flow.json`. Without `--output`, the destination stays beside the source EPUB and receives a portable `snake_case` name derived from the imported title. Accents are folded (`é` becomes `e`), punctuation and repeated whitespace become one underscore, the stem is limited to 96 characters, and an unusable title falls back to the source name or `imported_book`. For example, “Isto é filtro solar: Eclesiastes e a vida debaixo do sol” becomes `isto_e_filtro_solar_eclesiastes_e_a_vida_debaixo_do_sol.flow.json`. An explicit `--output` always wins.
 
+For example:
+
+```powershell
+$epub = 'C:\caminho\para\Meu livro.epub'
+dotnet run --project .\src\Flow.Cli -- import $epub
+```
+
+may create `C:\caminho\para\meu_livro.flow.json`. The command prints the exact path after a successful atomic write.
+
 Warnings and errors use stable `EPUB*`/`FLOWCLI_*` diagnostics. `--diagnostics-json` writes the deterministic `flow-epub-import-diagnostics-0.1` report, including success, document summary, severity totals, and every EPUB diagnostic. It contains no timestamps, shell metadata, stack traces, or PowerShell capture artifacts. Both readable JSON formats use UTF-8 without BOM and LF line endings; ordinary Unicode such as Portuguese accents, Japanese, and Arabic remains literal, while JSON controls and security-sensitive characters remain escaped. The command validates before writing, uses atomic replacement, reports the imported identity and hash, and never leaves a partial Flow document after a failed import. A requested diagnostics report is still written for a failed import when the destination itself is usable.
 
 `--fidelity-report` writes the separate deterministic `flow-epub-fidelity-0.1` report. It compares typed source/destination counts and classifies outcomes as preserved, transformed, approximated, unsupported, or lost, with localized findings when source evidence permits. It is compatible with `--diagnostics-json`, is written atomically even for a failed/partial import, and never enters `.flow.json` or the canonical hash. Percentages with no source denominator are `null`; the report is an informative conversion audit, not an EPUB conformance or visual-equivalence claim. See [EPUB fidelity report](epub-fidelity.md).
@@ -51,6 +60,16 @@ dotnet run --project src/Flow.Cli -- validate sample.flow.json
 dotnet run --project src/Flow.Cli -- render sample.flow.json --html sample.html --width 390 --height 844
 dotnet run --project src/Flow.Cli -- render sample.flow.json --html-book sample-book
 ```
+
+To keep the generated HTML book beside an imported EPUB, pass that directory explicitly:
+
+```powershell
+$flow = 'C:\caminho\para\meu_livro.flow.json'
+$book = 'C:\caminho\para\meu_livro_book'
+dotnet run --project .\src\Flow.Cli -- render $flow --html-book $book
+```
+
+The current CLI deliberately keeps `import` and `render` as separate operations. Importing does not create the HTML book automatically; a future Reader is expected to hide this pipeline when opening supported source formats directly.
 
 ## Separation and testing
 
