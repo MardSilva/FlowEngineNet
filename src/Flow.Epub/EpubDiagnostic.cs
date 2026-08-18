@@ -67,6 +67,11 @@ public static class EpubDiagnosticCodes
     public const string InvalidStylesheet = "EPUB047";
     public const string UnsupportedCssSelector = "EPUB048";
     public const string UnsupportedCssProperty = "EPUB049";
+    public const string SanitizedSvg = "EPUB062";
+    public const string MathSemanticLoss = "EPUB063";
+    public const string InvalidTextDirection = "EPUB064";
+    public const string ConflictingInlineLanguage = "EPUB065";
+    public const string InvalidRubyStructure = "EPUB066";
     public const string InvalidCssValue = "EPUB050";
     public const string ExternalStylesheetBlocked = "EPUB051";
     public const string CssTargetNotRepresentable = "EPUB052";
@@ -75,4 +80,8 @@ public static class EpubDiagnosticCodes
     public const string MissingNoteBacklink = "EPUB055";
     public const string CircularNoteReference = "EPUB056";
     public const string AmbiguousNoteDestination = "EPUB057";
+    public const string InvalidTableStructure = "EPUB058";
+    public const string InvalidTableSpan = "EPUB059";
+    public const string InvalidTableScope = "EPUB060";
+    public const string MissingTableHeader = "EPUB061";
 }

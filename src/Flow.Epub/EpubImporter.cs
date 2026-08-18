@@ -18,6 +18,7 @@ public sealed class EpubImporter : IEpubImporter
     private static readonly XNamespace XhtmlNamespace = "http://www.w3.org/1999/xhtml";
     private static readonly XNamespace EpubNamespace = "http://www.idpf.org/2007/ops";
     private static readonly XNamespace NcxNamespace = "http://www.daisy.org/z3986/2005/ncx/";
+    private static readonly XNamespace MathMlNamespace = "http://www.w3.org/1998/Math/MathML";
 
     private readonly EpubImportLimits limits;
 
@@ -891,6 +892,7 @@ public sealed class EpubImporter : IEpubImporter
         private readonly List<EpubSourceLocation> sourceLocations = [];
         private readonly Dictionary<SourceLocationKey, int> sourceOccurrences = [];
         private readonly Dictionary<UnsupportedElementKey, int> unsupportedElements = [];
+        private readonly Dictionary<UnsupportedElementKey, int> mathLosses = [];
         private readonly HashSet<XElement> footnoteElements = [];
         private readonly Dictionary<XElement, NodeId> footnoteReferenceTargets = [];
         private readonly HashSet<XElement> invalidFootnoteReferences = [];
@@ -970,6 +972,15 @@ public sealed class EpubImporter : IEpubImporter
                 diagnostics.Add(Warning(
                     EpubDiagnosticCodes.UnsupportedElement,
                     $"{key.Description} has no direct Flow equivalent and occurred {occurrenceText}; recoverable text and child order were preserved.",
+                    key.ResourcePath));
+            }
+
+            foreach (var (key, count) in mathLosses)
+            {
+                var occurrenceText = count == 1 ? "once" : $"{count} times";
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.MathSemanticLoss,
+                    $"{key.Description} occurred {occurrenceText}; safe child content or an available textual fallback was preserved.",
                     key.ResourcePath));
             }
         }
@@ -1426,7 +1437,7 @@ public sealed class EpubImporter : IEpubImporter
                     && element.Name.LocalName is "h1" or "h2" or "h3" or "h4" or "h5" or "h6");
                 var title = heading is null
                     ? ImmutableArray<InlineNode>.Empty
-                    : ConvertInline(heading.Nodes(), source.Item.Path).ToImmutableArray();
+                    : ConvertInlineContent(heading, source.Item.Path).ToImmutableArray();
                 var list = toc.Elements(XhtmlNamespace + "ol").FirstOrDefault();
                 if (list is null)
                 {
@@ -1487,7 +1498,7 @@ public sealed class EpubImporter : IEpubImporter
                 else
                 {
                     result.Add(new NavigationEntryModel(
-                        ConvertInline(anchor.Nodes(), source.Item.Path).ToImmutableArray(),
+                        ConvertInlineContent(anchor, source.Item.Path).ToImmutableArray(),
                         href,
                         effectiveLevel,
                         logicalId));
@@ -1698,9 +1709,18 @@ public sealed class EpubImporter : IEpubImporter
             InlineCode code => code.Code,
             Link link => InlineText(link.Children),
             FootnoteReference reference => InlineText(reference.Label),
+            InlineMath math => math.AlternativeText ?? MathTextValue(math.Root),
+            InlineContainerNode container => InlineText(container.Children),
             LineBreak => " ",
             _ => string.Empty,
         }));
+
+        private static string MathTextValue(MathNode node) => node switch
+        {
+            MathText text => text.Value,
+            MathElement element => string.Concat(element.Children.Select(MathTextValue)),
+            _ => string.Empty,
+        };
 
         private static bool HasToken(string? values, string token) =>
             values?.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries)
@@ -1727,6 +1747,11 @@ public sealed class EpubImporter : IEpubImporter
             string resourcePath,
             CancellationToken cancellationToken)
         {
+            if (element.Name == MathMlNamespace + "math")
+            {
+                return [ConvertBlockMath(element, resourcePath)];
+            }
+
             if (element.Name.Namespace != XhtmlNamespace)
             {
                 ReportUnsupported(element, resourcePath, $"Foreign element <{element.Name.LocalName}>");
@@ -1749,9 +1774,9 @@ public sealed class EpubImporter : IEpubImporter
                 case "h4":
                 case "h5":
                 case "h6":
-                    return [new Heading(IdFor(element, "heading"), name[1] - '0', ConvertInline(element.Nodes(), resourcePath))];
+                    return [new Heading(IdFor(element, "heading"), name[1] - '0', ConvertInlineContent(element, resourcePath))];
                 case "p":
-                    return [new Paragraph(IdFor(element, "paragraph"), ConvertInline(element.Nodes(), resourcePath))];
+                    return [new Paragraph(IdFor(element, "paragraph"), ConvertInlineContent(element, resourcePath))];
                 case "ol":
                     return [await ConvertOrderedListAsync(element, resourcePath, cancellationToken).ConfigureAwait(false)];
                 case "ul":
@@ -1760,6 +1785,8 @@ public sealed class EpubImporter : IEpubImporter
                     return [new BlockQuote(
                         IdFor(element, "blockquote"),
                         await ConvertChildrenAsync(element, resourcePath, cancellationToken).ConfigureAwait(false))];
+                case "table":
+                    return [await ConvertTableAsync(element, resourcePath, cancellationToken).ConfigureAwait(false)];
                 case "figure":
                     return await ConvertFigureAsync(element, resourcePath, cancellationToken).ConfigureAwait(false);
                 case "img":
@@ -1822,8 +1849,12 @@ public sealed class EpubImporter : IEpubImporter
                     return;
                 }
 
-                var inline = ConvertInline(inlineBuffer, resourcePath);
-                if (inline.Any(static node => node is not Text text || !string.IsNullOrWhiteSpace(text.Value)))
+                var inline = ApplyInternationalization(
+                    parent,
+                    ConvertInline(inlineBuffer, resourcePath),
+                    resourcePath,
+                    inherit: true);
+                if (HasVisibleText(inline))
                 {
                     result.Add(new Paragraph(GeneratedIdFor(parent, "container-text"), inline));
                 }
@@ -1870,6 +1901,464 @@ public sealed class EpubImporter : IEpubImporter
             return new UnorderedList(IdFor(element, "unordered-list"), items);
         }
 
+        private async Task<Table> ConvertTableAsync(
+            XElement table,
+            string resourcePath,
+            CancellationToken cancellationToken)
+        {
+            var headerIds = table
+                .Descendants(XhtmlNamespace + "th")
+                .Where(elementIds.ContainsKey)
+                .Select(element => elementIds[element])
+                .ToHashSet();
+            var captions = table.Elements(XhtmlNamespace + "caption").ToArray();
+            TableCaption? caption = null;
+            if (captions.Length > 0)
+            {
+                caption = new TableCaption(
+                    IdFor(captions[0], "table-caption"),
+                    await ConvertChildrenAsync(captions[0], resourcePath, cancellationToken).ConfigureAwait(false));
+            }
+
+            if (captions.Length > 1)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidTableStructure,
+                    $"Table contains {captions.Length} captions; the first remains the semantic caption and additional caption content is preserved in recovery rows.",
+                    resourcePath));
+            }
+
+            var headElements = table.Elements(XhtmlNamespace + "thead").ToArray();
+            var headRows = new List<TableRow>();
+            foreach (var headElement in headElements)
+            {
+                headRows.AddRange(await ConvertRowsAsync(
+                    headElement,
+                    resourcePath,
+                    headerIds,
+                    cancellationToken).ConfigureAwait(false));
+            }
+
+            if (headElements.Length > 1)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidTableStructure,
+                    $"Table contains {headElements.Length} thead groups; their rows were merged in source order.",
+                    resourcePath));
+            }
+
+            var head = headElements.Length == 0
+                ? null
+                : new TableHead(IdFor(headElements[0], "table-head"), headRows);
+
+            var footElements = table.Elements(XhtmlNamespace + "tfoot").ToArray();
+            var footRows = new List<TableRow>();
+            foreach (var footElement in footElements)
+            {
+                footRows.AddRange(await ConvertRowsAsync(
+                    footElement,
+                    resourcePath,
+                    headerIds,
+                    cancellationToken).ConfigureAwait(false));
+            }
+
+            if (footElements.Length > 1)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidTableStructure,
+                    $"Table contains {footElements.Length} tfoot groups; their rows were merged in source order.",
+                    resourcePath));
+            }
+
+            var foot = footElements.Length == 0
+                ? null
+                : new TableFoot(IdFor(footElements[0], "table-foot"), footRows);
+
+            var bodies = new List<TableBody>();
+            var implicitRows = new List<TableRow>();
+            var orphanCells = new List<XElement>();
+
+            async Task FlushOrphanCellsAsync()
+            {
+                if (orphanCells.Count == 0)
+                {
+                    return;
+                }
+
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidTableStructure,
+                    $"{orphanCells.Count} table cells occurred outside a tr; they were preserved in one recovery row.",
+                    resourcePath));
+                var cells = new List<TableCellNode>();
+                foreach (var cell in orphanCells)
+                {
+                    cells.Add(await ConvertTableCellAsync(
+                        cell,
+                        resourcePath,
+                        headerIds,
+                        cancellationToken).ConfigureAwait(false));
+                }
+
+                implicitRows.Add(new TableRow(GeneratedIdFor(table, "table-recovery-row"), cells));
+                orphanCells.Clear();
+            }
+
+            void FlushImplicitBody()
+            {
+                if (implicitRows.Count == 0)
+                {
+                    return;
+                }
+
+                bodies.Add(new TableBody(GeneratedIdFor(table, "table-body"), implicitRows.ToArray()));
+                implicitRows.Clear();
+            }
+
+            foreach (var node in table.Nodes())
+            {
+                if (node is XElement structural
+                    && structural.Name.Namespace == XhtmlNamespace
+                    && structural.Name.LocalName is "caption" or "thead" or "tfoot")
+                {
+                    continue;
+                }
+
+                if (node is XElement bodyElement && bodyElement.Name == XhtmlNamespace + "tbody")
+                {
+                    await FlushOrphanCellsAsync().ConfigureAwait(false);
+                    FlushImplicitBody();
+                    bodies.Add(new TableBody(
+                        IdFor(bodyElement, "table-body"),
+                        await ConvertRowsAsync(
+                            bodyElement,
+                            resourcePath,
+                            headerIds,
+                            cancellationToken).ConfigureAwait(false)));
+                    continue;
+                }
+
+                if (node is XElement rowElement && rowElement.Name == XhtmlNamespace + "tr")
+                {
+                    await FlushOrphanCellsAsync().ConfigureAwait(false);
+                    implicitRows.Add(await ConvertTableRowAsync(
+                        rowElement,
+                        resourcePath,
+                        headerIds,
+                        cancellationToken).ConfigureAwait(false));
+                    continue;
+                }
+
+                if (node is XElement cellElement
+                    && cellElement.Name.Namespace == XhtmlNamespace
+                    && cellElement.Name.LocalName is "th" or "td")
+                {
+                    orphanCells.Add(cellElement);
+                    continue;
+                }
+
+                if (node is XText text && string.IsNullOrWhiteSpace(text.Value))
+                {
+                    continue;
+                }
+
+                await FlushOrphanCellsAsync().ConfigureAwait(false);
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidTableStructure,
+                    $"Unexpected {DescribeTableNode(node)} occurred directly inside table; recoverable content was preserved in a generated cell.",
+                    resourcePath));
+                var recovery = await ConvertRecoveryTableCellAsync(
+                    node,
+                    table,
+                    resourcePath,
+                    cancellationToken).ConfigureAwait(false);
+                if (recovery is not null)
+                {
+                    implicitRows.Add(new TableRow(GeneratedIdFor(table, "table-recovery-row"), [recovery]));
+                }
+            }
+
+            await FlushOrphanCellsAsync().ConfigureAwait(false);
+            FlushImplicitBody();
+
+            if (captions.Length > 1)
+            {
+                var recoveryRows = new List<TableRow>();
+                foreach (var extraCaption in captions.Skip(1))
+                {
+                    recoveryRows.Add(new TableRow(
+                        GeneratedIdFor(extraCaption, "table-recovery-row"),
+                        [new TableCell(
+                            GeneratedIdFor(extraCaption, "table-recovery-cell"),
+                            await ConvertChildrenAsync(extraCaption, resourcePath, cancellationToken).ConfigureAwait(false))]));
+                }
+
+                bodies.Insert(0, new TableBody(GeneratedIdFor(table, "table-caption-recovery"), recoveryRows));
+            }
+
+            return new Table(IdFor(table, "table"), bodies, caption, head, foot);
+        }
+
+        private async Task<IReadOnlyList<TableRow>> ConvertRowsAsync(
+            XElement group,
+            string resourcePath,
+            IReadOnlySet<NodeId> headerIds,
+            CancellationToken cancellationToken)
+        {
+            var rows = new List<TableRow>();
+            foreach (var node in group.Nodes())
+            {
+                if (node is XElement row && row.Name == XhtmlNamespace + "tr")
+                {
+                    rows.Add(await ConvertTableRowAsync(
+                        row,
+                        resourcePath,
+                        headerIds,
+                        cancellationToken).ConfigureAwait(false));
+                }
+                else if (node is not XText text || !string.IsNullOrWhiteSpace(text.Value))
+                {
+                    diagnostics.Add(Warning(
+                        EpubDiagnosticCodes.InvalidTableStructure,
+                        $"Unexpected {DescribeTableNode(node)} occurred inside {group.Name.LocalName}; recoverable content was preserved in a generated row and cell.",
+                        resourcePath));
+                    var recovery = await ConvertRecoveryTableCellAsync(
+                        node,
+                        group,
+                        resourcePath,
+                        cancellationToken).ConfigureAwait(false);
+                    if (recovery is not null)
+                    {
+                        rows.Add(new TableRow(GeneratedIdFor(group, "table-recovery-row"), [recovery]));
+                    }
+                }
+            }
+
+            return rows;
+        }
+
+        private async Task<TableRow> ConvertTableRowAsync(
+            XElement row,
+            string resourcePath,
+            IReadOnlySet<NodeId> headerIds,
+            CancellationToken cancellationToken)
+        {
+            var cells = new List<TableCellNode>();
+            foreach (var node in row.Nodes())
+            {
+                if (node is XElement cell
+                    && cell.Name.Namespace == XhtmlNamespace
+                    && cell.Name.LocalName is "th" or "td")
+                {
+                    cells.Add(await ConvertTableCellAsync(
+                        cell,
+                        resourcePath,
+                        headerIds,
+                        cancellationToken).ConfigureAwait(false));
+                    continue;
+                }
+
+                if (node is XText text && string.IsNullOrWhiteSpace(text.Value))
+                {
+                    continue;
+                }
+
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidTableStructure,
+                    $"Unexpected {DescribeTableNode(node)} occurred inside tr; recoverable content was preserved in a generated cell.",
+                    resourcePath));
+                var nestedCells = node is XElement wrapper
+                    ? wrapper.Descendants().Where(element =>
+                        element.Name.Namespace == XhtmlNamespace
+                        && element.Name.LocalName is "th" or "td"
+                        && !element.Ancestors().TakeWhile(ancestor => ancestor != row)
+                            .Any(ancestor => ancestor.Name == XhtmlNamespace + "table"))
+                        .ToArray()
+                    : [];
+                if (nestedCells.Length > 0)
+                {
+                    foreach (var nestedCell in nestedCells)
+                    {
+                        cells.Add(await ConvertTableCellAsync(
+                            nestedCell,
+                            resourcePath,
+                            headerIds,
+                            cancellationToken).ConfigureAwait(false));
+                    }
+                }
+                else
+                {
+                    var recovery = await ConvertRecoveryTableCellAsync(
+                        node,
+                        row,
+                        resourcePath,
+                        cancellationToken).ConfigureAwait(false);
+                    if (recovery is not null)
+                    {
+                        cells.Add(recovery);
+                    }
+                }
+            }
+
+            return new TableRow(IdFor(row, "table-row"), cells);
+        }
+
+        private async Task<TableCellNode> ConvertTableCellAsync(
+            XElement cell,
+            string resourcePath,
+            IReadOnlySet<NodeId> headerIds,
+            CancellationToken cancellationToken)
+        {
+            var columnSpan = ParseTableSpan(cell, "colspan", resourcePath);
+            var rowSpan = ParseTableSpan(cell, "rowspan", resourcePath);
+            var headers = ParseTableHeaders(cell, resourcePath, headerIds);
+            var children = await ConvertChildrenAsync(cell, resourcePath, cancellationToken).ConfigureAwait(false);
+            if (cell.Name.LocalName == "th")
+            {
+                return new TableHeaderCell(
+                    IdFor(cell, "table-header-cell"),
+                    children,
+                    columnSpan,
+                    rowSpan,
+                    ParseTableScope(cell, resourcePath),
+                    headers);
+            }
+
+            if (cell.Attribute("scope") is not null)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidTableScope,
+                    "A td element declares scope, which applies only to header cells; the attribute was ignored.",
+                    resourcePath));
+            }
+
+            return new TableCell(IdFor(cell, "table-cell"), children, columnSpan, rowSpan, headers);
+        }
+
+        private int ParseTableSpan(XElement cell, string attributeName, string resourcePath)
+        {
+            var raw = (string?)cell.Attribute(attributeName);
+            if (raw is null)
+            {
+                return 1;
+            }
+
+            if (int.TryParse(raw, System.Globalization.NumberStyles.None, System.Globalization.CultureInfo.InvariantCulture, out var value)
+                && value > 0)
+            {
+                return value;
+            }
+
+            diagnostics.Add(Warning(
+                EpubDiagnosticCodes.InvalidTableSpan,
+                $"Table cell {attributeName} value '{raw}' is not a positive integer; span 1 was used.",
+                resourcePath));
+            return 1;
+        }
+
+        private IReadOnlyList<NodeId> ParseTableHeaders(
+            XElement cell,
+            string resourcePath,
+            IReadOnlySet<NodeId> headerIds)
+        {
+            var result = new List<NodeId>();
+            var seen = new HashSet<NodeId>();
+            foreach (var token in ((string?)cell.Attribute("headers") ?? string.Empty)
+                         .Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries))
+            {
+                if (TryBuildReferenceKey(resourcePath, $"#{token}", out _, out var key)
+                    && anchors.TryGetValue(key, out var nodeId)
+                    && headerIds.Contains(nodeId))
+                {
+                    if (seen.Add(nodeId))
+                    {
+                        result.Add(nodeId);
+                    }
+                    else
+                    {
+                        diagnostics.Add(Warning(
+                            EpubDiagnosticCodes.InvalidTableStructure,
+                            $"Table cell headers token '{token}' is duplicated; one deterministic reference was retained.",
+                            resourcePath));
+                    }
+
+                    continue;
+                }
+
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.MissingTableHeader,
+                    $"Table cell headers token '{token}' does not resolve to one header cell in the same table and was omitted.",
+                    resourcePath));
+            }
+
+            return result;
+        }
+
+        private TableHeaderScope? ParseTableScope(XElement cell, string resourcePath)
+        {
+            var raw = (string?)cell.Attribute("scope");
+            if (raw is null)
+            {
+                return null;
+            }
+
+            var scope = raw.ToLowerInvariant() switch
+            {
+                "row" => TableHeaderScope.Row,
+                "col" => TableHeaderScope.Column,
+                "rowgroup" => TableHeaderScope.RowGroup,
+                "colgroup" => TableHeaderScope.ColumnGroup,
+                _ => (TableHeaderScope?)null,
+            };
+            if (scope is null)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidTableScope,
+                    $"Table header scope '{raw}' is unsupported; the header remains without an explicit scope.",
+                    resourcePath));
+            }
+
+            return scope;
+        }
+
+        private async Task<TableCell?> ConvertRecoveryTableCellAsync(
+            XNode node,
+            XElement styleSource,
+            string resourcePath,
+            CancellationToken cancellationToken)
+        {
+            IReadOnlyList<DocumentNode> children;
+            if (node is XText text)
+            {
+                var inline = ApplyInternationalization(
+                    styleSource,
+                    ConvertInline([text], resourcePath),
+                    resourcePath,
+                    inherit: true);
+                children = inline.Count == 0
+                    ? []
+                    : [new Paragraph(GeneratedIdFor(styleSource, "table-recovery-text"), inline)];
+            }
+            else if (node is XElement element)
+            {
+                children = (await ConvertBlockAsync(element, resourcePath, cancellationToken).ConfigureAwait(false)).ToArray();
+            }
+            else
+            {
+                children = [];
+            }
+
+            return children.Count == 0
+                ? null
+                : new TableCell(GeneratedIdFor(styleSource, "table-recovery-cell"), children);
+        }
+
+        private static string DescribeTableNode(XNode node) => node switch
+        {
+            XElement element => $"element <{element.Name.LocalName}>",
+            XText => "text",
+            _ => "node",
+        };
+
         private async Task<IReadOnlyList<ListItem>> ConvertListItemsAsync(
             XElement list,
             string resourcePath,
@@ -1892,7 +2381,13 @@ public sealed class EpubImporter : IEpubImporter
                     || element.Name.LocalName is not ("ol" or "ul" or "p")).ToArray();
                 if (NormalizedText(string.Concat(inlineNodes.Select(NodeText))).Length > 0)
                 {
-                    blockChildren.Add(new Paragraph(GeneratedIdFor(item, "list-text"), ConvertInline(inlineNodes, resourcePath)));
+                    blockChildren.Add(new Paragraph(
+                        GeneratedIdFor(item, "list-text"),
+                        ApplyInternationalization(
+                            item,
+                            ConvertInline(inlineNodes, resourcePath),
+                            resourcePath,
+                            inherit: true)));
                 }
 
                 foreach (var child in item.Elements().Where(static child =>
@@ -1924,7 +2419,7 @@ public sealed class EpubImporter : IEpubImporter
             Caption? caption = null;
             if (captionElement is not null)
             {
-                caption = new Caption(IdFor(captionElement, "caption"), ConvertInline(captionElement.Nodes(), resourcePath));
+                caption = new Caption(IdFor(captionElement, "caption"), ConvertInlineContent(captionElement, resourcePath));
             }
 
             return await ConvertImageAsync(image, element, caption, resourcePath, cancellationToken).ConfigureAwait(false);
@@ -2089,7 +2584,16 @@ public sealed class EpubImporter : IEpubImporter
                     var data = buffer.ToArray();
                     if (TryValidateImage(current, data, out var inspection))
                     {
-                        var digest = Convert.ToHexString(SHA256.HashData(data));
+                        var safeData = inspection.SanitizedData?.ToArray() ?? data;
+                        if (inspection.SanitizationFindings is { Count: > 0 } findings)
+                        {
+                            diagnostics.Add(Warning(
+                                EpubDiagnosticCodes.SanitizedSvg,
+                                $"SVG '{current.Path}' was preserved after removing unsafe content: {string.Join(", ", findings)}.",
+                                current.Path));
+                        }
+
+                        var digest = Convert.ToHexString(SHA256.HashData(safeData));
                         if (!assetHashes.TryGetValue(digest, out var assetId))
                         {
                             assetId = new AssetId(AllocateId($"asset-{Slug(current.Id)}").Value);
@@ -2098,7 +2602,7 @@ public sealed class EpubImporter : IEpubImporter
                                 assetId,
                                 inspection.MediaType,
                                 Path.GetFileName(current.Path),
-                                data);
+                                safeData);
                         }
                         else
                         {
@@ -2223,6 +2727,16 @@ public sealed class EpubImporter : IEpubImporter
                     continue;
                 }
 
+                if (element.Name == MathMlNamespace + "math")
+                {
+                    result.AddRange(ApplyInternationalization(
+                        element,
+                        [ConvertInlineMath(element, resourcePath)],
+                        resourcePath,
+                        inherit: false));
+                    continue;
+                }
+
                 var children = ConvertInline(element.Nodes(), resourcePath);
                 if (element.Name.Namespace != XhtmlNamespace)
                 {
@@ -2231,39 +2745,41 @@ public sealed class EpubImporter : IEpubImporter
                     continue;
                 }
 
-                switch (element.Name.LocalName.ToLowerInvariant())
+                var converted = new List<InlineNode>();
+                var name = element.Name.LocalName.ToLowerInvariant();
+                switch (name)
                 {
                     case "strong":
                     case "b":
-                        result.Add(new Strong(children));
+                        converted.Add(new Strong(children));
                         break;
                     case "em":
                     case "i":
-                        result.Add(new Emphasis(children));
+                        converted.Add(new Emphasis(children));
                         break;
                     case "u":
-                        result.Add(new Underline(children));
+                        converted.Add(new Underline(children));
                         break;
                     case "s":
                     case "strike":
                     case "del":
-                        result.Add(new Strikethrough(children));
+                        converted.Add(new Strikethrough(children));
                         break;
                     case "code":
-                        result.Add(new InlineCode(element.Value));
+                        converted.Add(new InlineCode(element.Value));
                         break;
                     case "a":
                         if (IsFootnoteReferenceElement(element))
                         {
-                            AddFootnoteReference(result, element, children);
+                            AddFootnoteReference(converted, element, children);
                         }
                         else
                         {
-                            AddLink(result, element, children, resourcePath);
+                            AddLink(converted, element, children, resourcePath);
                         }
                         break;
                     case "br":
-                        result.Add(new LineBreak());
+                        converted.Add(new LineBreak());
                         break;
                     case "img":
                         diagnostics.Add(Warning(
@@ -2273,16 +2789,98 @@ public sealed class EpubImporter : IEpubImporter
                         var alt = (string?)element.Attribute("alt");
                         if (!string.IsNullOrWhiteSpace(alt))
                         {
-                            result.Add(new Text(alt));
+                            converted.Add(new Text(alt));
                         }
 
                         break;
+                    case "bdi":
+                        converted.AddRange(ApplyInternationalization(
+                            element,
+                            children,
+                            resourcePath,
+                            inherit: false,
+                            forcedMode: BidirectionalMode.Isolation));
+                        result.AddRange(converted);
+                        continue;
+                    case "bdo":
+                        converted.AddRange(ApplyInternationalization(
+                            element,
+                            children,
+                            resourcePath,
+                            inherit: false,
+                            forcedMode: BidirectionalMode.Override));
+                        result.AddRange(converted);
+                        continue;
+                    case "ruby":
+                        var hasAnnotation = children.Any(static child => child is RubyAnnotation);
+                        var hasBase = children.Any(static child => child is not RubyAnnotation and not RubyFallbackParenthesis);
+                        if (!hasAnnotation || !hasBase || element.Ancestors(XhtmlNamespace + "ruby").Any())
+                        {
+                            diagnostics.Add(Warning(
+                                EpubDiagnosticCodes.InvalidRubyStructure,
+                                "Malformed or nested ruby was flattened while preserving its supported inline content.",
+                                resourcePath));
+                            converted.AddRange(children);
+                        }
+                        else
+                        {
+                            converted.Add(new Ruby(children));
+                        }
+
+                        break;
+                    case "rt":
+                        if (element.Parent?.Name != XhtmlNamespace + "ruby")
+                        {
+                            diagnostics.Add(Warning(
+                                EpubDiagnosticCodes.InvalidRubyStructure,
+                                "An <rt> outside a direct <ruby> parent was flattened while preserving its text.",
+                                resourcePath));
+                            converted.AddRange(children);
+                        }
+                        else
+                        {
+                            converted.Add(new RubyAnnotation(ApplyInternationalization(
+                                element,
+                                children,
+                                resourcePath,
+                                inherit: false)));
+                            result.AddRange(converted);
+                            continue;
+                        }
+
+                        break;
+                    case "rp":
+                        if (element.Parent?.Name != XhtmlNamespace + "ruby")
+                        {
+                            diagnostics.Add(Warning(
+                                EpubDiagnosticCodes.InvalidRubyStructure,
+                                "An <rp> outside a direct <ruby> parent was flattened while preserving its text.",
+                                resourcePath));
+                            converted.AddRange(children);
+                        }
+                        else
+                        {
+                            converted.Add(new RubyFallbackParenthesis(ApplyInternationalization(
+                                element,
+                                children,
+                                resourcePath,
+                                inherit: false)));
+                            result.AddRange(converted);
+                            continue;
+                        }
+
+                        break;
+                    case "rb":
+                    case "rtc":
+                        ReportUnsupported(element, resourcePath, $"Ruby helper <{name}> was flattened");
+                        converted.AddRange(children);
+                        break;
                     case "span":
-                        result.AddRange(children);
+                        converted.AddRange(children);
                         break;
                     case "small":
                         ReportUnsupported(element, resourcePath);
-                        result.AddRange(children);
+                        converted.AddRange(children);
                         break;
                     case "abbr":
                     case "cite":
@@ -2292,16 +2890,249 @@ public sealed class EpubImporter : IEpubImporter
                     case "mark":
                     case "time":
                         ReportUnsupported(element, resourcePath);
-                        result.AddRange(children);
+                        converted.AddRange(children);
                         break;
                     default:
                         ReportUnsupported(element, resourcePath, $"Inline element <{element.Name.LocalName}>");
-                        result.AddRange(children);
+                        converted.AddRange(children);
                         break;
                 }
+
+                result.AddRange(ApplyInternationalization(
+                    element,
+                    converted,
+                    resourcePath,
+                    inherit: false));
             }
 
             return result;
+        }
+
+        private IReadOnlyList<InlineNode> ConvertInlineContent(XElement element, string resourcePath) =>
+            ApplyInternationalization(
+                element,
+                ConvertInline(element.Nodes(), resourcePath),
+                resourcePath,
+                inherit: true);
+
+        private IReadOnlyList<InlineNode> ApplyInternationalization(
+            XElement element,
+            IEnumerable<InlineNode> nodes,
+            string resourcePath,
+            bool inherit,
+            BidirectionalMode? forcedMode = null)
+        {
+            IReadOnlyList<InlineNode> result = nodes.ToArray();
+            var directionElement = forcedMode is null && inherit
+                ? element.AncestorsAndSelf().FirstOrDefault(static candidate => candidate.Attribute("dir") is not null)
+                : element;
+            var directionValue = (string?)directionElement?.Attribute("dir");
+            var mode = forcedMode ?? BidirectionalMode.Embedding;
+            if (forcedMode == BidirectionalMode.Isolation && string.IsNullOrWhiteSpace(directionValue))
+            {
+                result = [new BidirectionalSpan(TextDirection.Auto, mode, result)];
+            }
+            else if (TryReadDirection(directionValue, out var direction))
+            {
+                if (mode == BidirectionalMode.Override && direction == TextDirection.Auto)
+                {
+                    diagnostics.Add(Warning(
+                        EpubDiagnosticCodes.InvalidTextDirection,
+                        "A bidirectional override cannot use dir=\"auto\"; its content was preserved without override semantics.",
+                        resourcePath));
+                }
+                else
+                {
+                    result = [new BidirectionalSpan(direction, mode, result)];
+                }
+            }
+            else if (forcedMode == BidirectionalMode.Override || directionValue is not null)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidTextDirection,
+                    $"Text direction '{directionValue ?? "(missing)"}' is invalid; visible content was preserved without directional semantics.",
+                    resourcePath));
+            }
+
+            var languageElement = inherit
+                ? element.AncestorsAndSelf().FirstOrDefault(HasLanguageDeclaration)
+                : element;
+            if (languageElement is not null && TryReadLanguage(languageElement, resourcePath, out var language))
+            {
+                result = [new LanguageSpan(language, result)];
+            }
+
+            return result;
+        }
+
+        private bool TryReadLanguage(
+            XElement element,
+            string resourcePath,
+            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out LanguageTag? language)
+        {
+            var htmlValue = (string?)element.Attribute("lang");
+            var xmlValue = (string?)element.Attribute(XNamespace.Xml + "lang");
+            var htmlValid = LanguageTag.TryParse(htmlValue, out var htmlLanguage);
+            var xmlValid = LanguageTag.TryParse(xmlValue, out var xmlLanguage);
+            if (htmlValue is not null && !htmlValid)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidLanguage,
+                    $"Inline lang value '{htmlValue}' is not a structurally valid BCP 47 tag.",
+                    resourcePath));
+            }
+
+            if (xmlValue is not null && !xmlValid)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidLanguage,
+                    $"Inline xml:lang value '{xmlValue}' is not a structurally valid BCP 47 tag.",
+                    resourcePath));
+            }
+
+            if (htmlLanguage is not null && xmlLanguage is not null && htmlLanguage != xmlLanguage)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.ConflictingInlineLanguage,
+                    $"Inline lang '{htmlLanguage}' conflicts with xml:lang '{xmlLanguage}'; xml:lang takes precedence.",
+                    resourcePath));
+            }
+
+            language = xmlLanguage ?? htmlLanguage;
+            return language is not null;
+        }
+
+        private static bool HasLanguageDeclaration(XElement element) =>
+            element.Attribute("lang") is not null || element.Attribute(XNamespace.Xml + "lang") is not null;
+
+        private static bool TryReadDirection(string? value, out TextDirection direction)
+        {
+            direction = value?.Trim().ToLowerInvariant() switch
+            {
+                "auto" => TextDirection.Auto,
+                "ltr" => TextDirection.LeftToRight,
+                "rtl" => TextDirection.RightToLeft,
+                _ => (TextDirection)(-1),
+            };
+            return Enum.IsDefined(direction);
+        }
+
+        private MathExpression ConvertBlockMath(XElement element, string resourcePath)
+        {
+            var root = ConvertMathElement(element, resourcePath);
+            return new MathExpression(IdFor(element, "math"), root, FindMathAlternative(element));
+        }
+
+        private InlineMath ConvertInlineMath(XElement element, string resourcePath) =>
+            new(ConvertMathElement(element, resourcePath), FindMathAlternative(element));
+
+        private MathElement ConvertMathElement(XElement element, string resourcePath)
+        {
+            var attributes = new List<KeyValuePair<string, string>>();
+            foreach (var attribute in element.Attributes())
+            {
+                if (attribute.IsNamespaceDeclaration
+                    || attribute.Name.LocalName == "alttext"
+                    || attribute.Name == XNamespace.Xml + "lang"
+                    || attribute.Name.Namespace == XNamespace.None
+                    && attribute.Name.LocalName is "lang" or "dir")
+                {
+                    continue;
+                }
+
+                if (attribute.Name.Namespace == XNamespace.None
+                    && MathElement.IsSupportedAttribute(attribute.Name.LocalName))
+                {
+                    attributes.Add(KeyValuePair.Create(attribute.Name.LocalName, attribute.Value));
+                }
+                else
+                {
+                    ReportMathLoss(element, resourcePath, $"MathML attribute '{attribute.Name}' was removed");
+                }
+            }
+
+            return new MathElement("math", ConvertMathChildren(element.Nodes(), resourcePath), attributes);
+        }
+
+        private IEnumerable<MathNode> ConvertMathChildren(IEnumerable<XNode> nodes, string resourcePath)
+        {
+            foreach (var node in nodes)
+            {
+                if (node is XText text)
+                {
+                    if (text.Value.Length > 0)
+                    {
+                        yield return new MathText(text.Value);
+                    }
+
+                    continue;
+                }
+
+                if (node is not XElement element)
+                {
+                    continue;
+                }
+
+                var name = element.Name.LocalName;
+                if (element.Name.Namespace != MathMlNamespace
+                    || name is "script" or "annotation-xml")
+                {
+                    ReportMathLoss(element, resourcePath, $"Unsafe or foreign MathML child <{name}> was removed");
+                    continue;
+                }
+
+                if (!MathElement.IsSupportedName(name))
+                {
+                    ReportMathLoss(element, resourcePath, $"Unsupported MathML element <{name}> was flattened");
+                    foreach (var child in ConvertMathChildren(element.Nodes(), resourcePath))
+                    {
+                        yield return child;
+                    }
+
+                    continue;
+                }
+
+                var attributes = new List<KeyValuePair<string, string>>();
+                foreach (var attribute in element.Attributes())
+                {
+                    if (attribute.IsNamespaceDeclaration)
+                    {
+                        continue;
+                    }
+
+                    if (attribute.Name.Namespace == XNamespace.None
+                        && MathElement.IsSupportedAttribute(attribute.Name.LocalName))
+                    {
+                        attributes.Add(KeyValuePair.Create(attribute.Name.LocalName, attribute.Value));
+                    }
+                    else
+                    {
+                        ReportMathLoss(element, resourcePath, $"MathML attribute '{attribute.Name}' was removed");
+                    }
+                }
+
+                yield return new MathElement(name, ConvertMathChildren(element.Nodes(), resourcePath), attributes);
+            }
+        }
+
+        private static string? FindMathAlternative(XElement element)
+        {
+            var altText = (string?)element.Attribute("alttext");
+            if (!string.IsNullOrWhiteSpace(altText))
+            {
+                return altText;
+            }
+
+            return element.Descendants(MathMlNamespace + "annotation")
+                .Where(annotation => ((string?)annotation.Attribute("encoding")) is "text/plain" or "application/x-tex")
+                .Select(static annotation => annotation.Value)
+                .FirstOrDefault(static value => !string.IsNullOrWhiteSpace(value));
+        }
+
+        private void ReportMathLoss(XElement element, string resourcePath, string description)
+        {
+            var key = new UnsupportedElementKey(resourcePath, element.Name.ToString(), description);
+            mathLosses[key] = mathLosses.TryGetValue(key, out var count) ? count + 1 : 1;
         }
 
         private void AddFootnoteReference(
@@ -2444,10 +3275,16 @@ public sealed class EpubImporter : IEpubImporter
 
         private static bool IsRepresentedNode(XElement element)
         {
+            if (element.Name == MathMlNamespace + "math")
+            {
+                return true;
+            }
+
             var name = element.Name.LocalName.ToLowerInvariant();
             return name is "h1" or "h2" or "h3" or "h4" or "h5" or "h6"
                 or "p" or "ol" or "ul" or "li" or "blockquote" or "figure" or "img"
-                or "picture" or "figcaption" or "section" or "article" or "pre" or "hr";
+                or "picture" or "figcaption" or "section" or "article" or "pre" or "hr"
+                or "table" or "caption" or "thead" or "tbody" or "tfoot" or "tr" or "th" or "td";
         }
 
         private static bool IsFootnoteElement(XElement element) =>
@@ -2468,6 +3305,11 @@ public sealed class EpubImporter : IEpubImporter
 
         private static bool IsInlineElement(XElement element)
         {
+            if (element.Name == MathMlNamespace + "math")
+            {
+                return !string.Equals((string?)element.Attribute("display"), "block", StringComparison.OrdinalIgnoreCase);
+            }
+
             if (element.Name.Namespace != XhtmlNamespace)
             {
                 return false;
@@ -2476,7 +3318,8 @@ public sealed class EpubImporter : IEpubImporter
             var name = element.Name.LocalName.ToLowerInvariant();
             return name is "strong" or "b" or "em" or "i" or "u" or "s" or "strike"
                 or "del" or "code" or "a" or "br" or "span" or "small" or "abbr"
-                or "cite" or "q" or "sub" or "sup" or "mark" or "time";
+                or "cite" or "q" or "sub" or "sup" or "mark" or "time" or "bdi"
+                or "bdo" or "ruby" or "rt" or "rp" or "rb" or "rtc";
         }
 
         private static string Slug(string value)

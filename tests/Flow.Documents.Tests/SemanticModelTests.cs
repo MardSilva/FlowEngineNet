@@ -138,7 +138,12 @@ public sealed class SemanticModelTests
             typeof(HeadingPresentation), typeof(ParagraphPresentation),
             typeof(FigurePresentation), typeof(CaptionPresentation),
             typeof(FootnotePresentation), typeof(CodeBlockPresentation),
-            typeof(TableOfContentsPresentation),
+            typeof(TableOfContentsPresentation), typeof(Table), typeof(TableCaption),
+            typeof(TableHead), typeof(TableBody), typeof(TableFoot), typeof(TableRow),
+            typeof(TableHeaderCell), typeof(TableCell),
+            typeof(MathNode), typeof(MathText), typeof(MathElement), typeof(MathExpression), typeof(InlineMath),
+            typeof(LanguageTag), typeof(LanguageSpan), typeof(BidirectionalSpan), typeof(Ruby),
+            typeof(RubyAnnotation), typeof(RubyFallbackParenthesis),
         ];
 
         var writableProperties = modelTypes

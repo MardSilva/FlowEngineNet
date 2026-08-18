@@ -179,6 +179,9 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
             Line("figure img { display: block; height: auto; max-width: 100%; width: 100%; }");
             Line("figcaption { margin-top: 0.5rem; }");
             Line("pre { max-width: 100%; overflow-x: auto; }");
+            Line("table { border-collapse: collapse; max-width: 100%; width: 100%; }");
+            Line("caption { text-align: start; }");
+            Line("th, td { border: 1px solid currentColor; padding: 0.4rem; text-align: start; vertical-align: top; }");
             Line("nav ol { list-style: none; padding-inline-start: 0; }");
             Line("nav li[data-level=\"2\"] { padding-inline-start: 1.5rem; }");
             Line("nav li[data-level=\"3\"] { padding-inline-start: 3rem; }");
@@ -248,6 +251,33 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
                 case Footnote:
                     WriteContainer("section", layoutNode, " role=\"doc-footnote\"");
                     break;
+                case Table:
+                    WriteContainer("table", layoutNode);
+                    break;
+                case TableCaption:
+                    WriteContainer("caption", layoutNode);
+                    break;
+                case TableHead:
+                    WriteContainer("thead", layoutNode);
+                    break;
+                case TableBody:
+                    WriteContainer("tbody", layoutNode);
+                    break;
+                case TableFoot:
+                    WriteContainer("tfoot", layoutNode);
+                    break;
+                case TableRow:
+                    WriteContainer("tr", layoutNode);
+                    break;
+                case TableHeaderCell headerCell:
+                    WriteTableCell("th", layoutNode, headerCell, headerCell.Scope);
+                    break;
+                case TableCell tableCell:
+                    WriteTableCell("td", layoutNode, tableCell, scope: null);
+                    break;
+                case MathExpression mathExpression:
+                    WriteMathExpression(layoutNode, mathExpression);
+                    break;
                 case HorizontalRule rule:
                     Line($"<hr id=\"{Id(rule.Id)}\"{StyleAttribute(layoutNode)} />");
                     break;
@@ -287,6 +317,49 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
             Line(
                 $"<h{heading.Level} id=\"{Id(heading.Id)}\" data-typography=\"{role}\"{StyleAttribute(layoutNode, breakStyle)}>"
                 + $"{Inline(heading.Content)}</h{heading.Level}>");
+        }
+
+        private void WriteTableCell(
+            string element,
+            LayoutNode layoutNode,
+            TableCellNode cell,
+            TableHeaderScope? scope)
+        {
+            var attributes = new StringBuilder();
+            if (cell.ColumnSpan != 1)
+            {
+                attributes.Append(" colspan=\"")
+                    .Append(cell.ColumnSpan.ToString(CultureInfo.InvariantCulture))
+                    .Append('\"');
+            }
+
+            if (cell.RowSpan != 1)
+            {
+                attributes.Append(" rowspan=\"")
+                    .Append(cell.RowSpan.ToString(CultureInfo.InvariantCulture))
+                    .Append('\"');
+            }
+
+            if (scope is not null)
+            {
+                attributes.Append(" scope=\"").Append(scope.Value switch
+                {
+                    TableHeaderScope.Row => "row",
+                    TableHeaderScope.Column => "col",
+                    TableHeaderScope.RowGroup => "rowgroup",
+                    TableHeaderScope.ColumnGroup => "colgroup",
+                    _ => throw new ArgumentOutOfRangeException(nameof(scope), scope, "Unknown table header scope."),
+                }).Append('\"');
+            }
+
+            if (!cell.Headers.IsEmpty)
+            {
+                attributes.Append(" headers=\"")
+                    .Append(string.Join(' ', cell.Headers.Select(Id)))
+                    .Append('\"');
+            }
+
+            WriteContainer(element, layoutNode, attributes.ToString());
         }
 
         private void WriteList(string element, LayoutNode node, int start = 1)
@@ -352,6 +425,14 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
                 : $" data-language=\"{Attribute(codeBlock.Language)}\"";
 
             Line($"<pre id=\"{Id(codeBlock.Id)}\"{StyleAttribute(layoutNode, style)}><code{language}>{Text(codeBlock.Code)}</code></pre>");
+        }
+
+        private void WriteMathExpression(LayoutNode layoutNode, MathExpression expression)
+        {
+            _output.Append("<div id=\"").Append(Id(expression.Id)).Append("\"")
+                .Append(StyleAttribute(layoutNode)).Append('>');
+            WriteMath(_output, expression.Root, expression.AlternativeText, block: true);
+            _output.AppendLine("</div>");
         }
 
         private void WriteTableOfContents(LayoutNode layoutNode, TableOfContents tableOfContents)
@@ -457,6 +538,26 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
 
                     output.Append("</sup></a>");
                     break;
+                case InlineMath inlineMath:
+                    WriteMath(output, inlineMath.Root, inlineMath.AlternativeText, block: false);
+                    break;
+                case LanguageSpan languageSpan:
+                    output.Append("<span lang=\"").Append(Attribute(languageSpan.Language.Value)).Append("\">");
+                    WriteInlineChildren(output, languageSpan.Children);
+                    output.Append("</span>");
+                    break;
+                case BidirectionalSpan bidirectionalSpan:
+                    WriteBidirectionalSpan(output, bidirectionalSpan);
+                    break;
+                case Ruby ruby:
+                    WriteInlineContainer(output, "ruby", ruby.Children);
+                    break;
+                case RubyAnnotation annotation:
+                    WriteInlineContainer(output, "rt", annotation.Children);
+                    break;
+                case RubyFallbackParenthesis fallback:
+                    WriteInlineContainer(output, "rp", fallback.Children);
+                    break;
                 case LineBreak:
                     output.Append("<br />");
                     break;
@@ -477,6 +578,88 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
             }
 
             output.Append("</").Append(element).Append('>');
+        }
+
+        private static void WriteInlineChildren(StringBuilder output, IEnumerable<InlineNode> children)
+        {
+            foreach (var child in children)
+            {
+                WriteInline(output, child);
+            }
+        }
+
+        private static void WriteBidirectionalSpan(StringBuilder output, BidirectionalSpan span)
+        {
+            var element = span.Mode switch
+            {
+                BidirectionalMode.Embedding => "span",
+                BidirectionalMode.Isolation => "bdi",
+                BidirectionalMode.Override => "bdo",
+                _ => throw new ArgumentOutOfRangeException(nameof(span), span.Mode, "Unknown bidirectional mode."),
+            };
+            var direction = span.Direction switch
+            {
+                TextDirection.Auto => "auto",
+                TextDirection.LeftToRight => "ltr",
+                TextDirection.RightToLeft => "rtl",
+                _ => throw new ArgumentOutOfRangeException(nameof(span), span.Direction, "Unknown text direction."),
+            };
+            output.Append('<').Append(element).Append(" dir=\"").Append(direction).Append("\">");
+            WriteInlineChildren(output, span.Children);
+            output.Append("</").Append(element).Append('>');
+        }
+
+        private static void WriteMath(
+            StringBuilder output,
+            MathElement root,
+            string? alternativeText,
+            bool block)
+        {
+            WriteMathNode(output, root, isRoot: true, alternativeText, block);
+        }
+
+        private static void WriteMathNode(
+            StringBuilder output,
+            MathNode node,
+            bool isRoot = false,
+            string? alternativeText = null,
+            bool block = false)
+        {
+            if (node is MathText text)
+            {
+                output.Append(Text(text.Value));
+                return;
+            }
+
+            var element = (MathElement)node;
+            output.Append('<').Append(element.Name);
+            if (isRoot)
+            {
+                output.Append(" xmlns=\"http://www.w3.org/1998/Math/MathML\"");
+                if (!element.Attributes.ContainsKey("display"))
+                {
+                    output.Append(block ? " display=\"block\"" : " display=\"inline\"");
+                }
+
+                if (!string.IsNullOrWhiteSpace(alternativeText))
+                {
+                    output.Append(" aria-label=\"").Append(Attribute(alternativeText)).Append('"');
+                }
+            }
+
+            foreach (var attribute in element.Attributes)
+            {
+                output.Append(' ').Append(attribute.Key).Append("=\"")
+                    .Append(Attribute(attribute.Value)).Append('"');
+            }
+
+            output.Append('>');
+            foreach (var child in element.Children)
+            {
+                WriteMathNode(output, child);
+            }
+
+            output.Append("</").Append(element.Name).Append('>');
         }
 
         private static void WriteLink(StringBuilder output, Link link)

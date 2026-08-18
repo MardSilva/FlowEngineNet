@@ -43,6 +43,56 @@ public sealed class FlowJsonDocumentSerializerTests
     }
 
     [Fact]
+    public async Task RoundTrip_PreservesCompleteTableRepresentation()
+    {
+        var headerId = new NodeId("header-product");
+        var table = new Table(
+            new NodeId("table-products"),
+            [
+                new TableBody(
+                    new NodeId("body-primary"),
+                    [
+                        new TableRow(
+                            new NodeId("row-product"),
+                            [
+                                new TableHeaderCell(
+                                    headerId,
+                                    [Paragraph("p-header-product", "Product")],
+                                    columnSpan: 2,
+                                    scope: TableHeaderScope.Column),
+                                new TableCell(
+                                    new NodeId("cell-flow"),
+                                    [Paragraph("p-cell-flow", "Flow")],
+                                    rowSpan: 2,
+                                    headers: [headerId]),
+                                new TableCell(new NodeId("cell-empty"), []),
+                            ]),
+                    ]),
+                new TableBody(new NodeId("body-secondary"), []),
+            ],
+            new TableCaption(new NodeId("caption-products"), [Paragraph("p-caption-products", "Products")]),
+            new TableHead(new NodeId("head-products"), []),
+            new TableFoot(new NodeId("foot-products"), []));
+        var document = new FlowDocument(
+            new DocumentIdentity(new DocumentId("urn:test:table-json")),
+            new DocumentMetadata("Table JSON"),
+            new DocumentContent([new Chapter(new NodeId("chapter-table"), [table])]));
+
+        var first = await SerializeAsync(document);
+        await using var input = new MemoryStream(first);
+        var restored = await _serializer.DeserializeAsync(input);
+        var second = await SerializeAsync(restored);
+
+        Assert.Equal(first, second);
+        var restoredTable = Assert.IsType<Table>(restored.Index.GetLocations(table.Id).Single().Node);
+        Assert.Equal(2, restoredTable.Bodies.Length);
+        var header = Assert.IsType<TableHeaderCell>(restoredTable.Bodies[0].Rows[0].Cells[0]);
+        Assert.Equal(2, header.ColumnSpan);
+        Assert.Equal(TableHeaderScope.Column, header.Scope);
+        Assert.Empty(restoredTable.Bodies[0].Rows[0].Cells[2].Children);
+    }
+
+    [Fact]
     public async Task DeserializeAsync_MalformedJsonProvidesLocationDiagnostic()
     {
         await using var input = new MemoryStream("{\n  \"format\": "u8.ToArray());

@@ -20,7 +20,9 @@ internal sealed record EpubImageInspection(
     string MediaType,
     int? Width,
     int? Height,
-    bool IsAnimated = false);
+    bool IsAnimated = false,
+    ReadOnlyMemory<byte>? SanitizedData = null,
+    IReadOnlyList<string>? SanitizationFindings = null);
 
 internal static class EpubImageInspector
 {
@@ -152,24 +154,40 @@ internal static class EpubImageInspector
                 return false;
             }
 
-            foreach (var element in document.Root.DescendantsAndSelf())
+            var findings = new SortedSet<string>(StringComparer.Ordinal);
+            foreach (var node in document.DescendantNodes().Where(static node => node is XComment or XProcessingInstruction).ToArray())
             {
-                if (element.Name.Namespace == svgNamespace
-                    && element.Name.LocalName is "script" or "foreignObject" or "style")
+                node.Remove();
+                findings.Add("comments or processing instructions");
+            }
+
+            foreach (var element in document.Root.DescendantsAndSelf().Reverse().ToArray())
+            {
+                if (element.Name.Namespace != svgNamespace
+                    || element.Name.LocalName is "script" or "foreignObject" or "style" or "iframe" or "object" or "embed"
+                    || element.Name.LocalName is "animate" or "animateMotion" or "animateTransform" or "set")
                 {
-                    failure = $"SVG element <{element.Name.LocalName}> can contain active or externally loaded content.";
-                    return false;
+                    if (ReferenceEquals(element, document.Root))
+                    {
+                        failure = "The SVG root is not in the supported SVG namespace.";
+                        return false;
+                    }
+
+                    findings.Add($"element <{element.Name.LocalName}>");
+                    element.Remove();
+                    continue;
                 }
 
-                foreach (var attribute in element.Attributes())
+                foreach (var attribute in element.Attributes().Where(static attribute => !attribute.IsNamespaceDeclaration).ToArray())
                 {
                     if (attribute.Name.LocalName.StartsWith("on", StringComparison.OrdinalIgnoreCase)
-                        || attribute.Value.Contains("url(", StringComparison.OrdinalIgnoreCase)
+                        || attribute.Name.LocalName.Equals("style", StringComparison.OrdinalIgnoreCase)
+                        || HasExternalCssReference(attribute.Value)
                         || attribute.Name.LocalName is "href" or "src"
-                        && !attribute.Value.StartsWith('#'))
+                        && !attribute.Value.TrimStart().StartsWith('#'))
                     {
-                        failure = $"SVG attribute '{attribute.Name}' can execute code or load an external resource.";
-                        return false;
+                        findings.Add($"attribute '{attribute.Name}'");
+                        attribute.Remove();
                     }
                 }
             }
@@ -183,7 +201,14 @@ internal static class EpubImageInspector
                 height ??= viewBoxHeight;
             }
 
-            inspection = new EpubImageInspection(EpubImageFormat.Svg, "image/svg+xml", width, height);
+            var sanitizedData = SerializeSvg(document);
+            inspection = new EpubImageInspection(
+                EpubImageFormat.Svg,
+                "image/svg+xml",
+                width,
+                height,
+                SanitizedData: sanitizedData,
+                SanitizationFindings: findings.ToArray());
             return true;
         }
         catch (Exception exception) when (exception is XmlException or InvalidDataException or DecoderFallbackException)
@@ -191,6 +216,48 @@ internal static class EpubImageInspector
             failure = $"The SVG XML is invalid or unsafe: {exception.Message}";
             return false;
         }
+    }
+
+    private static bool HasExternalCssReference(string value)
+    {
+        var index = 0;
+        while ((index = value.IndexOf("url(", index, StringComparison.OrdinalIgnoreCase)) >= 0)
+        {
+            var start = index + 4;
+            var end = value.IndexOf(')', start);
+            if (end < 0)
+            {
+                return true;
+            }
+
+            var target = value[start..end].Trim().Trim('\'', '"');
+            if (!target.StartsWith('#'))
+            {
+                return true;
+            }
+
+            index = end + 1;
+        }
+
+        return false;
+    }
+
+    private static byte[] SerializeSvg(XDocument document)
+    {
+        var encoding = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false);
+        using var stream = new MemoryStream();
+        using (var writer = XmlWriter.Create(stream, new XmlWriterSettings
+        {
+            Encoding = encoding,
+            Indent = false,
+            OmitXmlDeclaration = true,
+            NewLineHandling = NewLineHandling.None,
+        }))
+        {
+            document.Root!.WriteTo(writer);
+        }
+
+        return stream.ToArray();
     }
 
     private static bool TryReadJpegDimensions(ReadOnlySpan<byte> data, out int width, out int height)

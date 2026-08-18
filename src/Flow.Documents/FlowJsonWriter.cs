@@ -142,6 +142,43 @@ internal static class FlowJsonWriter
             case Footnote footnote:
                 WriteChildNodes(writer, footnote.Children);
                 break;
+            case Table table:
+                WriteOptionalNode(writer, "caption", table.Caption);
+                WriteOptionalNode(writer, "head", table.Head);
+                writer.WritePropertyName("bodies");
+                WriteNodes(writer, table.Bodies);
+                WriteOptionalNode(writer, "foot", table.Foot);
+                break;
+            case TableCaption tableCaption:
+                WriteChildNodes(writer, tableCaption.Children);
+                break;
+            case TableHead tableHead:
+                WriteNodeArray(writer, "rows", tableHead.Rows);
+                break;
+            case TableBody tableBody:
+                WriteNodeArray(writer, "rows", tableBody.Rows);
+                break;
+            case TableFoot tableFoot:
+                WriteNodeArray(writer, "rows", tableFoot.Rows);
+                break;
+            case TableRow tableRow:
+                WriteNodeArray(writer, "cells", tableRow.Cells);
+                break;
+            case TableHeaderCell headerCell:
+                WriteCell(writer, headerCell);
+                if (headerCell.Scope is not null)
+                {
+                    writer.WriteString("scope", headerCell.Scope.Value.ToString());
+                }
+
+                break;
+            case TableCell tableCell:
+                WriteCell(writer, tableCell);
+                break;
+            case MathExpression mathExpression:
+                WriteMathElement(writer, "root", mathExpression.Root);
+                WriteOptionalString(writer, "alternativeText", mathExpression.AlternativeText);
+                break;
             case HorizontalRule:
                 break;
             case CodeBlock codeBlock:
@@ -184,6 +221,15 @@ internal static class FlowJsonWriter
         Figure => "figure",
         Caption => "caption",
         Footnote => "footnote",
+        Table => "table",
+        TableCaption => "tableCaption",
+        TableHead => "tableHead",
+        TableBody => "tableBody",
+        TableFoot => "tableFoot",
+        TableRow => "tableRow",
+        TableHeaderCell => "tableHeaderCell",
+        TableCell => "tableCell",
+        MathExpression => "mathExpression",
         HorizontalRule => "horizontalRule",
         CodeBlock => "codeBlock",
         TableOfContents => "tableOfContents",
@@ -194,6 +240,41 @@ internal static class FlowJsonWriter
     {
         writer.WritePropertyName("children");
         WriteNodes(writer, children);
+    }
+
+    private static void WriteOptionalNode(Utf8JsonWriter writer, string propertyName, DocumentNode? node)
+    {
+        if (node is null)
+        {
+            return;
+        }
+
+        writer.WritePropertyName(propertyName);
+        WriteNode(writer, node);
+    }
+
+    private static void WriteNodeArray(
+        Utf8JsonWriter writer,
+        string propertyName,
+        IEnumerable<DocumentNode> nodes)
+    {
+        writer.WritePropertyName(propertyName);
+        WriteNodes(writer, nodes);
+    }
+
+    private static void WriteCell(Utf8JsonWriter writer, TableCellNode cell)
+    {
+        writer.WriteNumber("columnSpan", cell.ColumnSpan);
+        writer.WriteNumber("rowSpan", cell.RowSpan);
+        writer.WritePropertyName("headers");
+        writer.WriteStartArray();
+        foreach (var header in cell.Headers)
+        {
+            writer.WriteStringValue(header.Value);
+        }
+
+        writer.WriteEndArray();
+        WriteChildNodes(writer, cell.Children);
     }
 
     private static void WriteInlineProperty(
@@ -227,6 +308,15 @@ internal static class FlowJsonWriter
                 {
                     writer.WriteString("target", link.Target);
                 }
+                else if (container is LanguageSpan languageSpan)
+                {
+                    writer.WriteString("language", languageSpan.Language.Value);
+                }
+                else if (container is BidirectionalSpan bidirectionalSpan)
+                {
+                    writer.WriteString("direction", bidirectionalSpan.Direction.ToString());
+                    writer.WriteString("mode", bidirectionalSpan.Mode.ToString());
+                }
 
                 break;
             case InlineCode inlineCode:
@@ -238,6 +328,10 @@ internal static class FlowJsonWriter
                 {
                     WriteInlineProperty(writer, "label", footnoteReference.Label);
                 }
+                break;
+            case InlineMath inlineMath:
+                WriteMathElement(writer, "root", inlineMath.Root);
+                WriteOptionalString(writer, "alternativeText", inlineMath.AlternativeText);
                 break;
             case LineBreak:
                 break;
@@ -258,9 +352,57 @@ internal static class FlowJsonWriter
         InlineCode => "inlineCode",
         Link => "link",
         FootnoteReference => "footnoteReference",
+        InlineMath => "inlineMath",
+        LanguageSpan => "languageSpan",
+        BidirectionalSpan => "bidirectionalSpan",
+        Ruby => "ruby",
+        RubyAnnotation => "rubyAnnotation",
+        RubyFallbackParenthesis => "rubyFallbackParenthesis",
         LineBreak => "lineBreak",
         _ => throw UnsupportedNode(node.GetType()),
     };
+
+    private static void WriteMathElement(Utf8JsonWriter writer, string propertyName, MathElement element)
+    {
+        writer.WritePropertyName(propertyName);
+        WriteMathNode(writer, element);
+    }
+
+    private static void WriteMathNode(Utf8JsonWriter writer, MathNode node)
+    {
+        writer.WriteStartObject();
+        switch (node)
+        {
+            case MathText text:
+                writer.WriteString("type", "text");
+                writer.WriteString("value", text.Value);
+                break;
+            case MathElement element:
+                writer.WriteString("type", "element");
+                writer.WriteString("name", element.Name);
+                writer.WritePropertyName("attributes");
+                writer.WriteStartObject();
+                foreach (var attribute in element.Attributes)
+                {
+                    writer.WriteString(attribute.Key, attribute.Value);
+                }
+
+                writer.WriteEndObject();
+                writer.WritePropertyName("children");
+                writer.WriteStartArray();
+                foreach (var child in element.Children)
+                {
+                    WriteMathNode(writer, child);
+                }
+
+                writer.WriteEndArray();
+                break;
+            default:
+                throw UnsupportedNode(node.GetType());
+        }
+
+        writer.WriteEndObject();
+    }
 
     private static void WritePresentation(Utf8JsonWriter writer, DocumentPresentation presentation)
     {

@@ -164,7 +164,7 @@ public sealed class EpubImageImportTests
     }
 
     [Fact]
-    public async Task ImportAsync_AcceptsPassiveSvgAndRejectsActiveSvg()
+    public async Task ImportAsync_AcceptsPassiveSvgAndSanitizesActiveSvg()
     {
         var package = Package("""
             <item id="safe" href="images/safe.svg" media-type="image/svg+xml" />
@@ -185,11 +185,15 @@ public sealed class EpubImageImportTests
             });
 
         var document = Assert.IsType<FlowDocument>(result.Document);
-        Assert.Equal("image/svg+xml", Assert.Single(document.Assets).Value.MediaType);
-        Assert.Contains(result.Diagnostics, static item => item.Code == EpubDiagnosticCodes.UnsafeSvg);
-        Assert.Contains(
-            document.Index.Locations.Select(static location => location.Node).OfType<Paragraph>(),
-            static paragraph => Assert.IsType<Text>(paragraph.Content.Single()).Value == "Active fallback");
+        Assert.Equal(2, document.Assets.Count);
+        Assert.All(document.Assets.Values, static asset => Assert.Equal("image/svg+xml", asset.MediaType));
+        Assert.Contains(result.Diagnostics, static item => item.Code == EpubDiagnosticCodes.SanitizedSvg);
+        Assert.DoesNotContain(
+            document.Assets.Values.SelectMany(static asset => asset.Data.ToArray()),
+            static value => value == (byte)'!');
+        Assert.DoesNotContain(
+            document.Assets.Values.Select(static asset => System.Text.Encoding.UTF8.GetString(asset.Data.ToArray())),
+            static value => value.Contains("script", StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -210,6 +214,38 @@ public sealed class EpubImageImportTests
         Assert.Contains(
             document.Index.Locations.Select(static location => location.Node).OfType<Paragraph>(),
             static paragraph => Assert.IsType<Text>(paragraph.Content.Single()).Value == "Animation unavailable");
+    }
+
+    [Fact]
+    public async Task ImportAsync_InvalidSvgUsesRasterFallbackOrAlternativeText()
+    {
+        var package = Package("""
+            <item id="bad-svg" href="images/bad.svg" media-type="image/svg+xml" fallback="png" />
+            <item id="png" href="images/fallback.png" media-type="image/png" />
+            <item id="bad-only" href="images/bad-only.svg" media-type="image/svg+xml" />
+            """);
+        const string body = """
+            <img src="../images/bad.svg" alt="Raster fallback"/>
+            <img src="../images/bad-only.svg" alt="Text fallback"/>
+            """;
+
+        var result = await ImportAsync(
+            package,
+            body,
+            new Dictionary<string, byte[]>
+            {
+                ["EPUB/images/bad.svg"] = "<svg xmlns=\"http://www.w3.org/2000/svg\"><path>"u8.ToArray(),
+                ["EPUB/images/bad-only.svg"] = "<svg xmlns=\"http://www.w3.org/2000/svg\"><script>"u8.ToArray(),
+                ["EPUB/images/fallback.png"] = Png,
+            });
+
+        var document = Assert.IsType<FlowDocument>(result.Document);
+        Assert.Equal("image/png", Assert.Single(document.Assets).Value.MediaType);
+        Assert.Contains(result.Diagnostics, static item => item.Code == EpubDiagnosticCodes.UnsafeSvg);
+        Assert.Contains(result.Diagnostics, static item => item.Code == EpubDiagnosticCodes.ImageFallbackUsed);
+        Assert.Contains(
+            document.Index.Locations.Select(static item => item.Node).OfType<Paragraph>(),
+            static paragraph => paragraph.Content.OfType<Text>().Any(text => text.Value == "Text fallback"));
     }
 
     [Fact]

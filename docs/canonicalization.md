@@ -49,6 +49,9 @@ Every node contributes its node-type discriminator and stable `NodeId`, followed
 - ordered-list start and list-item order;
 - unordered-list item order;
 - figure asset reference, alternative text, and caption;
+- table caption/head/body/foot relationships, row and cell order, cell kind, positive column/row spans, header scope, header-ID references, and cell block content;
+- block and inline mathematical element names, ordinal attribute names/values, child order, token text, and optional textual alternatives;
+- normalized inline language tags, bidirectional direction/mode, ruby base/annotation/fallback node kinds, and their child order;
 - code text and optional language;
 - TOC title, maximum depth, entry order, entry level, target anchor, and label;
 - inline text and formatting structure;

@@ -20,7 +20,9 @@ public sealed class DocumentValidator
         ValidateHeadingLevels(document, diagnostics);
         ValidateFigures(document, diagnostics);
         ValidateReferences(document, diagnostics);
+        ValidateTables(document, diagnostics);
         ValidateTableOfContents(document, diagnostics);
+        ValidateInternationalization(document, diagnostics);
 
         return new ValidationResult(diagnostics);
     }
@@ -58,9 +60,13 @@ public sealed class DocumentValidator
             var isValid = location.Node switch
             {
                 Chapter => location.Parent is null,
-                Section => location.Parent is Chapter or Section,
+                Section => location.Parent is Chapter or Section or TableCellNode or TableCaption,
                 ListItem => location.Parent is OrderedList or UnorderedList,
                 Caption => location.Parent is Figure,
+                TableCaption => location.Parent is Table,
+                TableHead or TableBody or TableFoot => location.Parent is Table,
+                TableRow => location.Parent is TableHead or TableBody or TableFoot,
+                TableCellNode => location.Parent is TableRow,
                 Footnote when location.Parent is Footnote => false,
                 _ => true,
             };
@@ -206,6 +212,47 @@ public sealed class DocumentValidator
         }
     }
 
+    private static void ValidateTables(
+        FlowDocument document,
+        ImmutableArray<ValidationDiagnostic>.Builder diagnostics)
+    {
+        foreach (var table in document.Index.Locations.Select(static location => location.Node).OfType<Table>())
+        {
+            var tableNodes = Descendants(table).ToArray();
+            var headers = tableNodes.OfType<TableHeaderCell>().Select(static cell => cell.Id).ToHashSet();
+            foreach (var cell in tableNodes.OfType<TableCellNode>())
+            {
+                foreach (var headerId in cell.Headers)
+                {
+                    if (!headers.Contains(headerId))
+                    {
+                        diagnostics.Add(Error(
+                            ValidationDiagnosticCodes.UnresolvedTableHeaderReference,
+                            $"Table cell '{cell.Id}' references header '{headerId}', which is not one unique header cell in table '{table.Id}'.",
+                            cell.Id));
+                    }
+                }
+            }
+        }
+
+        static IEnumerable<DocumentNode> Descendants(DocumentNode root)
+        {
+            foreach (var child in DocumentNodeTraversal.GetChildren(root))
+            {
+                if (child is Table)
+                {
+                    continue;
+                }
+
+                yield return child;
+                foreach (var descendant in Descendants(child))
+                {
+                    yield return descendant;
+                }
+            }
+        }
+    }
+
     private static IEnumerable<InlineNode> GetInlineDescendants(DocumentNode node)
     {
         IEnumerable<InlineNode> roots = node switch
@@ -238,6 +285,93 @@ public sealed class DocumentValidator
             }
         }
     }
+
+    private static void ValidateInternationalization(
+        FlowDocument document,
+        ImmutableArray<ValidationDiagnostic>.Builder diagnostics)
+    {
+        foreach (var location in document.Index.Locations)
+        {
+            foreach (var root in GetInlineRoots(location.Node))
+            {
+                ValidateInline(root, parent: null, insideRuby: false, location.Node.Id, diagnostics);
+            }
+        }
+    }
+
+    private static void ValidateInline(
+        InlineNode node,
+        InlineNode? parent,
+        bool insideRuby,
+        NodeId ownerId,
+        ImmutableArray<ValidationDiagnostic>.Builder diagnostics)
+    {
+        if (node is LanguageSpan languageSpan && !LanguageTag.TryParse(languageSpan.Language.Value, out _))
+        {
+            diagnostics.Add(Error(
+                ValidationDiagnosticCodes.InvalidLanguageTag,
+                $"Inline language '{languageSpan.Language.Value}' in node '{ownerId}' is invalid.",
+                ownerId));
+        }
+
+        if (node is BidirectionalSpan bidirectional
+            && (!Enum.IsDefined(bidirectional.Direction)
+                || !Enum.IsDefined(bidirectional.Mode)
+                || bidirectional.Mode == BidirectionalMode.Override
+                && bidirectional.Direction == TextDirection.Auto))
+        {
+            diagnostics.Add(Error(
+                ValidationDiagnosticCodes.InvalidBidirectionalStructure,
+                $"Bidirectional span in node '{ownerId}' has an invalid direction/mode combination.",
+                ownerId));
+        }
+
+        if (node is RubyAnnotation or RubyFallbackParenthesis && parent is not Ruby)
+        {
+            diagnostics.Add(Error(
+                ValidationDiagnosticCodes.InvalidRubyStructure,
+                $"{node.GetType().Name} in node '{ownerId}' must be a direct child of Ruby.",
+                ownerId));
+        }
+
+        if (node is Ruby ruby)
+        {
+            var hasAnnotation = ruby.Children.Any(static child => child is RubyAnnotation);
+            var hasBase = ruby.Children.Any(static child => child is not RubyAnnotation and not RubyFallbackParenthesis);
+            if (insideRuby || !hasAnnotation || !hasBase)
+            {
+                diagnostics.Add(Error(
+                    ValidationDiagnosticCodes.InvalidRubyStructure,
+                    $"Ruby in node '{ownerId}' must have base content and an annotation and cannot be nested.",
+                    ownerId));
+            }
+        }
+
+        if (node is InlineContainerNode container)
+        {
+            foreach (var child in container.Children)
+            {
+                ValidateInline(child, node, insideRuby || node is Ruby, ownerId, diagnostics);
+            }
+        }
+        else if (node is FootnoteReference reference)
+        {
+            foreach (var child in reference.Label)
+            {
+                ValidateInline(child, node, insideRuby, ownerId, diagnostics);
+            }
+        }
+    }
+
+    private static IEnumerable<InlineNode> GetInlineRoots(DocumentNode node) => node switch
+    {
+        Heading heading => heading.Content,
+        Paragraph paragraph => paragraph.Content,
+        Caption caption => caption.Content,
+        TableOfContents tableOfContents => tableOfContents.Title.Concat(
+            tableOfContents.Entries.SelectMany(static entry => entry.Label)),
+        _ => [],
+    };
 
     private static IEnumerable<InlineNode> GetInlineDescendants(IEnumerable<InlineNode> roots)
     {

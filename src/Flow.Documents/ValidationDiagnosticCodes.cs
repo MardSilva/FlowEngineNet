@@ -11,4 +11,8 @@ public static class ValidationDiagnosticCodes
     public const string UnresolvedAnchor = "FLOW_UNRESOLVED_ANCHOR";
     public const string UnresolvedFootnoteReference = "FLOW_UNRESOLVED_FOOTNOTE_REFERENCE";
     public const string InvalidTableOfContentsTarget = "FLOW_INVALID_TOC_TARGET";
+    public const string UnresolvedTableHeaderReference = "FLOW_UNRESOLVED_TABLE_HEADER_REFERENCE";
+    public const string InvalidLanguageTag = "FLOW_INVALID_LANGUAGE_TAG";
+    public const string InvalidBidirectionalStructure = "FLOW_INVALID_BIDIRECTIONAL_STRUCTURE";
+    public const string InvalidRubyStructure = "FLOW_INVALID_RUBY_STRUCTURE";
 }

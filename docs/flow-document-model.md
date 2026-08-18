@@ -74,14 +74,34 @@ The basic block model supports:
 - `OrderedList`, `UnorderedList`, and addressable `ListItem` nodes;
 - `Figure`, which references a `FlowAsset` through `AssetId`;
 - addressable `Caption` and `Footnote` nodes;
+- semantic `Table`, `TableCaption`, `TableHead`, `TableBody`, `TableFoot`, `TableRow`, `TableHeaderCell`, and `TableCell` nodes;
+- block `MathExpression` with a restricted immutable Presentation MathML tree and optional textual alternative;
 - `HorizontalRule` and `CodeBlock`;
 - semantic `TableOfContents`, with optional typed entries and stable anchor targets. An empty entry collection reserves automatic generation for a later milestone.
 
 A figure owns its optional caption relationship directly. Whether an asset exists and whether IDs are unique are document-level validation concerns and are deliberately not hidden inside node constructors.
 
+### Tables
+
+`Table` keeps one optional caption, one optional head, any number of ordered bodies, and one optional foot. Row groups own ordered `TableRow` collections, and rows own only `TableHeaderCell` or `TableCell` nodes. Captions and cells contain ordinary semantic block nodes, including empty collections for intentionally empty cells. This hierarchy represents document meaning, not a measured or rendered grid.
+
+Both cell types expose positive typed `ColumnSpan` and `RowSpan` integers plus an immutable ordered collection of header `NodeId` references. A header cell can additionally declare `TableHeaderScope.Row`, `Column`, `RowGroup`, or `ColumnGroup`. No table type contains coordinates, calculated columns, widths, heights, pages, or viewport state.
+
+Constructors reject nonpositive spans and unknown scope values. `DocumentValidator` checks the required table hierarchy and requires every `Headers` target to resolve to a `TableHeaderCell` in the same table. Irregular row lengths remain valid semantic input; neither validation nor layout invents missing cells or a visual coordinate grid.
+
 ## Inline nodes
 
-Inline content is semantic and never stores raw HTML. The model supports `Text`, `Strong`, `Emphasis`, `Underline`, `Strikethrough`, `InlineCode`, `Link`, `FootnoteReference`, and `LineBreak`.
+Inline content is semantic and never stores raw HTML. The model supports `Text`, `Strong`, `Emphasis`, `Underline`, `Strikethrough`, `InlineCode`, `Link`, `FootnoteReference`, `InlineMath`, `LanguageSpan`, `BidirectionalSpan`, `Ruby`, `RubyAnnotation`, `RubyFallbackParenthesis`, and `LineBreak`.
+
+`MathExpression` and `InlineMath` contain `MathElement`/`MathText` trees rather than source XML. Element and attribute names must belong to a fixed safe Presentation MathML vocabulary; linking, scripting, event, style, and arbitrary foreign attributes cannot be constructed. Element order, allowed attributes, token text, and an optional textual alternative are canonical semantic content. This model preserves notation structure but does not interpret, evaluate, simplify, or claim mathematical correctness.
+
+### Inline internationalization
+
+`LanguageSpan` declares a typed `LanguageTag` for any inline range, so one paragraph can contain Portuguese, English, Arabic, Hebrew, Japanese, or other language changes without presentation data. `LanguageTag` accepts the structural BCP 47 shape used by the importer and normalizes casing deterministically: primary language and ordinary subtags are lowercase, four-letter script subtags are title case, and two-letter region subtags are uppercase. It does not claim registry lookup or semantic validation of every registered/deprecated subtag.
+
+`BidirectionalSpan` combines `TextDirection.Auto`, `LeftToRight`, or `RightToLeft` with `BidirectionalMode.Embedding`, `Isolation`, or `Override`. Isolation represents source `bdi`; override represents `bdo` and requires an explicit LTR or RTL direction. These values describe Unicode reading semantics. They contain no alignment, coordinate, font, or physical placement instruction.
+
+`Ruby` retains base content, `RubyAnnotation` (`rt`), and optional `RubyFallbackParenthesis` (`rp`) nodes in source order. Validation requires base content and at least one direct annotation, rejects orphan annotation/fallback nodes, and rejects nested ruby in this initial simple-ruby profile.
 
 Formatting nodes contain other inline nodes, allowing nested meaning without an inheritance hierarchy for every combination. A `FootnoteReference` targets a typed `NodeId`; validation requires it to resolve to one unique `Footnote`. Its optional immutable `Label` preserves source-visible inline content such as a superscript number or symbol. The original one-argument constructor remains valid and leaves renderer-generated labeling as a presentation decision.
 
@@ -92,11 +112,12 @@ Formatting nodes contain other inline nodes, allowing nested meaning without an 
 The current validator checks:
 
 - duplicate and syntactically invalid node IDs;
-- structural placement of chapters, sections, list items, captions, and nested footnotes;
+- structural placement of chapters, sections, list items, captions, table parts, and nested footnotes;
 - heading-level jumps;
 - figure assets;
 - malformed and unresolved `flow:` links;
 - footnote references;
+- table header-cell references;
 - explicit TOC targets and maximum depth.
 
 Chapters must be document-root children, sections belong to chapters or other sections, list items belong to lists, and captions belong to figures. Constructors make several invalid states impossible, but the document-wide pass remains necessary for cross-node invariants.
@@ -158,6 +179,8 @@ This model intentionally does not yet implement:
 
 - automatic TOC entry generation;
 - embedded signature transport or trust policy;
-- semantic nodes for tables, mathematics, rich media, per-span language, and annotations.
+- semantic nodes for rich media beyond safe image assets, per-span language, and annotations;
+- Content MathML, OpenMath, mathematical evaluation, and lossless preservation of arbitrary MathML extensions.
+- BCP 47 registry validation, complex ruby grouping/placement, and language-aware line breaking or font selection.
 
 Those behaviors can be layered over the semantic model without adding dependencies from `Flow.Documents` to infrastructure projects. Adaptive Flow layout, standalone HTML rendering, and a limited EPUB importer already exist in outward projects.
