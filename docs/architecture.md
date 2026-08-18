@@ -29,7 +29,7 @@ An importer or serializer creates a `FlowDocument`. The layout engine combines t
 
 ## HTML rendering
 
-`Flow.Rendering` defines the renderer boundary and immutable rendered bytes. `Flow.Rendering.Html` implements deterministic standalone HTML5 plus an additive multi-file book package with shared CSS/assets and cross-file anchor rewriting. Both consume resolved layout state without mutating or recanonicalizing the source document. Before rendering, the established standalone mapping verifies semantic validity, document/layout identity, and the one-to-one relationship between semantic and layout nodes. The CLI computes canonical integrity and passes it into the package adapter, avoiding a new HTML-to-Security project dependency. See [html-renderer.md](html-renderer.md) and [html-book-package.md](html-book-package.md).
+`Flow.Rendering` defines the renderer boundary and immutable rendered bytes. `Flow.Rendering.Html` implements deterministic standalone HTML5 plus an additive multi-file book package with shared CSS/assets, cross-file anchor rewriting, a renderer-only footnote placement graph, hierarchical TOC, editorial logical progress, localized accessible landmarks, and script-free progressive appearance controls. Both consume resolved layout state without mutating or recanonicalizing the source document. Before rendering, the established standalone mapping verifies semantic validity, document/layout identity, and the one-to-one relationship between semantic and layout nodes. The CLI computes canonical integrity and passes it into the package adapter, avoiding a new HTML-to-Security project dependency. See [html-renderer.md](html-renderer.md) and [html-book-package.md](html-book-package.md).
 
 ## Command-line composition
 

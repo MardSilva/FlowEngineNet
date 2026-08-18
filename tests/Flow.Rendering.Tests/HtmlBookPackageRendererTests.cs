@@ -6,6 +6,7 @@ using Flow.Core;
 using Flow.Documents;
 using Flow.Layout;
 using Flow.Rendering.Html;
+using Flow.Security;
 
 namespace Flow.Rendering.Tests;
 
@@ -34,8 +35,10 @@ public sealed class HtmlBookPackageRendererTests
 
         var first = Parse(package, "chapters/chapter-001.html");
         var second = Parse(package, "chapters/chapter-002.html");
-        Assert.Equal("chapter-002.html#footnote-two", (string?)first.Descendants("a").Single(element => (string?)element.Attribute("role") == "doc-noteref").Attribute("href"));
-        Assert.Equal("chapter-001.html#paragraph-one", (string?)second.Descendants("a").Single(element => element.Value == "back").Attribute("href"));
+        Assert.Equal("#footnote-two", (string?)first.Descendants("a").Single(element => (string?)element.Attribute("role") == "doc-noteref").Attribute("href"));
+        Assert.Equal("#paragraph-one", (string?)first.Descendants("a").Single(element => element.Value == "back").Attribute("href"));
+        Assert.Single(first.Descendants("section"), element => (string?)element.Attribute("role") == "doc-footnote");
+        Assert.DoesNotContain(second.Descendants("section"), element => (string?)element.Attribute("role") == "doc-footnote");
         Assert.DoesNotContain(first.Descendants("nav"), element => (string?)element.Attribute("aria-label") == "Table of contents");
         AssertAllInternalLinksResolve(package);
         AssertAllLocalResourcesResolveWithoutScripts(package);
@@ -182,6 +185,251 @@ public sealed class HtmlBookPackageRendererTests
         }
     }
 
+    [Fact]
+    public void Render_ProvidesBookLandmarksKeyboardNavigationCreditsAndLogicalProgress()
+    {
+        var package = Render(CreateTwoChapterDocument(), 1024, 768);
+
+        foreach (var htmlFile in package.Files.Where(static file => file.Path.EndsWith(".html", StringComparison.Ordinal)))
+        {
+            var html = Parse(package, htmlFile.Path);
+            var body = html.Root!.Element("body")!;
+            var skipLink = Assert.Single(body.Elements("a"), element => (string?)element.Attribute("class") == "skip-link");
+            var main = Assert.Single(body.Descendants("main"));
+            Assert.Equal($"#{(string?)main.Attribute("id")}", (string?)skipLink.Attribute("href"));
+            Assert.Equal("-1", (string?)main.Attribute("tabindex"));
+            Assert.Single(body.Descendants("header"), element => (string?)element.Attribute("class") == "book-masthead");
+            Assert.Single(body.Descendants("aside"), element => (string?)element.Attribute("aria-label") == "Reading preferences");
+            Assert.Single(body.Descendants("footer"), element => (string?)element.Attribute("class") == "book-footer");
+            Assert.Single(body.Descendants("nav"), element => (string?)element.Attribute("aria-label") == "Primary book navigation");
+            Assert.Single(body.Descendants("nav"), element => (string?)element.Attribute("aria-label") == "Secondary book navigation");
+            Assert.DoesNotContain(body.Descendants(), static element => element.Name.LocalName == "script");
+
+            foreach (var input in body.Descendants("input"))
+            {
+                var id = Assert.IsType<string>((string?)input.Attribute("id"));
+                Assert.Contains(body.Descendants("label"), label => (string?)label.Attribute("for") == id);
+            }
+
+            var progress = Assert.Single(body.Descendants("p"), element => (string?)element.Attribute("aria-label") == "Logical reading position");
+            Assert.DoesNotContain("page", progress.Value, StringComparison.OrdinalIgnoreCase);
+        }
+
+        var index = Parse(package, "index.html");
+        var credits = Assert.Single(index.Descendants("section"), element => (string?)element.Attribute("class") == "book-credits");
+        Assert.Equal("Flow", Assert.Single(credits.Descendants("dd")).Value);
+        Assert.Equal(
+            "Open contents",
+            Assert.Single(
+                index.Descendants("p").Where(element => (string?)element.Attribute("class") == "start-reading")
+                    .Descendants("a")).Value);
+        Assert.Equal("Chapter 1 of 2", Parse(package, "chapters/chapter-001.html").Descendants("p")
+            .Single(element => (string?)element.Attribute("aria-label") == "Logical reading position").Value);
+    }
+
+    [Fact]
+    public void Render_DoesNotInventCreditsWhenNoAuthorMetadataExists()
+    {
+        var document = CreateDocument(
+            [new Paragraph(new NodeId("content"), [new Text("Content")])],
+            "urn:flow:html-book:no-credits",
+            authors: []);
+
+        var index = Parse(Render(document, 1024, 768), "index.html");
+
+        Assert.DoesNotContain(index.Descendants("section"), element => (string?)element.Attribute("class") == "book-credits");
+    }
+
+    [Fact]
+    public void Render_StylesProvideResponsiveThemesFocusPreferencesReducedMotionAndPrintFallbacks()
+    {
+        var preferences = new UserReadingPreferences(
+            preferredBodyFont: "Reader Serif",
+            fontScale: 1.2,
+            preferredHeadingFont: "Reader Sans",
+            theme: ReadingTheme.Dark);
+
+        var package = Render(CreateTwoChapterDocument(), 390, 844, preferences);
+        var css = Encoding.UTF8.GetString(package.GetFile("styles/book.css").Content.AsSpan());
+        var chapter = Parse(package, "chapters/chapter-001.html");
+
+        Assert.Equal("dark", (string?)chapter.Root!.Attribute("data-default-theme"));
+        Assert.Contains("Reader Serif", css, StringComparison.Ordinal);
+        Assert.Contains("Reader Sans", css, StringComparison.Ordinal);
+        Assert.Contains("@media (prefers-color-scheme: dark)", css, StringComparison.Ordinal);
+        Assert.Contains("@media (prefers-reduced-motion: reduce)", css, StringComparison.Ordinal);
+        Assert.Contains("@media (max-width: 42rem)", css, StringComparison.Ordinal);
+        Assert.Contains("@media print", css, StringComparison.Ordinal);
+        Assert.Contains(":focus-visible", css, StringComparison.Ordinal);
+        Assert.Contains("#ffffff", css, StringComparison.Ordinal);
+        Assert.Contains("#171717", css, StringComparison.Ordinal);
+        Assert.Contains("#f4ecd8", css, StringComparison.Ordinal);
+        Assert.Contains("max-width: 46rem", css, StringComparison.Ordinal);
+        Assert.Contains("--book-reader-scale: 1.3", css, StringComparison.Ordinal);
+        Assert.DoesNotContain("javascript", css, StringComparison.OrdinalIgnoreCase);
+
+        var controls = chapter.Descendants("input").ToArray();
+        Assert.Contains(controls, input => (string?)input.Attribute("name") == "flow-reader-theme" && (string?)input.Attribute("value") == "sepia");
+        Assert.Contains(controls, input => (string?)input.Attribute("name") == "flow-reader-font" && (string?)input.Attribute("value") == "sans");
+        Assert.Contains(controls, input => (string?)input.Attribute("name") == "flow-reader-scale" && (string?)input.Attribute("value") == "larger");
+    }
+
+    [Fact]
+    public void Render_PresentationAndReadingPreferencesDoNotChangeCanonicalHash()
+    {
+        var source = CreateTwoChapterDocument();
+        var styled = new FlowDocument(
+            source.Identity,
+            source.Metadata,
+            source.Content,
+            source.Assets.Values,
+            new DocumentPresentation(theme: ReadingTheme.Sepia));
+        var integrityService = new Sha256DocumentIntegrityService(new FlowDocumentCanonicalizer());
+        var before = integrityService.ComputeHash(source);
+
+        _ = Render(
+            styled,
+            1600,
+            1000,
+            new UserReadingPreferences(preferredBodyFont: "Reader Serif", fontScale: 1.3, theme: ReadingTheme.Dark));
+
+        var after = integrityService.ComputeHash(styled);
+        Assert.Equal(before.Hash, after.Hash);
+        Assert.Equal(before.CanonicalizationVersion, after.CanonicalizationVersion);
+    }
+
+    [Fact]
+    public void Render_SharedFootnoteUsesOneBackMatterDefinition()
+    {
+        var noteId = new NodeId("shared-note");
+        var first = new Chapter(
+            new NodeId("shared-first"),
+            [
+                new Heading(new NodeId("shared-first-heading"), 1, [new Text("One")]),
+                new Paragraph(new NodeId("shared-first-p"), [new FootnoteReference(noteId, [new Text("1")])]),
+            ]);
+        var second = new Chapter(
+            new NodeId("shared-second"),
+            [
+                new Heading(new NodeId("shared-second-heading"), 1, [new Text("Two")]),
+                new Paragraph(new NodeId("shared-second-p"), [new FootnoteReference(noteId, [new Text("1")])]),
+                new Footnote(noteId, [new Paragraph(new NodeId("shared-note-p"), [new Text("Shared")])]),
+            ]);
+        var package = Render(CreateDocument([first, second], "urn:flow:html-book:shared-note"), 1024, 768);
+
+        var firstHtml = Parse(package, "chapters/chapter-001.html");
+        var secondHtml = Parse(package, "chapters/chapter-002.html");
+        var notes = Parse(package, "backmatter/notes.html");
+
+        Assert.Equal(
+            "../backmatter/notes.html#shared-note",
+            (string?)firstHtml.Descendants("a").Single(element => (string?)element.Attribute("role") == "doc-noteref").Attribute("href"));
+        Assert.Equal(
+            "../backmatter/notes.html#shared-note",
+            (string?)secondHtml.Descendants("a").Single(element => (string?)element.Attribute("role") == "doc-noteref").Attribute("href"));
+        Assert.DoesNotContain(firstHtml.Descendants(), element => (string?)element.Attribute("id") == noteId.Value);
+        Assert.DoesNotContain(secondHtml.Descendants(), element => (string?)element.Attribute("id") == noteId.Value);
+        Assert.Single(notes.Descendants(), element => (string?)element.Attribute("id") == noteId.Value);
+        Assert.Equal("doc-endnotes", (string?)notes.Descendants("section").First().Attribute("role"));
+
+        using var manifest = JsonDocument.Parse(package.GetFile("manifest.json").Content.ToArray());
+        var notePosition = manifest.RootElement.GetProperty("readingOrder").EnumerateArray()
+            .Single(item => item.GetProperty("path").GetString() == "backmatter/notes.html");
+        Assert.Equal("notes", notePosition.GetProperty("kind").GetString());
+        Assert.Equal("notes", notePosition.GetProperty("publicationRole").GetString());
+        AssertAllInternalLinksResolve(package);
+    }
+
+    [Fact]
+    public void Render_TocUsesNestedOrderedListsForItsSemanticLevels()
+    {
+        var firstHeading = new NodeId("nested-first");
+        var firstChild = new NodeId("nested-first-child");
+        var secondHeading = new NodeId("nested-second");
+        var toc = new TableOfContents(
+            new NodeId("nested-toc"),
+            [new Text("Contents")],
+            [
+                new TableOfContentsEntry([new Text("First")], DocumentAnchor.Parse($"flow:nested-chapter/{firstHeading}"), 1),
+                new TableOfContentsEntry([new Text("Child")], DocumentAnchor.Parse($"flow:nested-chapter/{firstChild}"), 2),
+                new TableOfContentsEntry([new Text("Second")], DocumentAnchor.Parse($"flow:nested-chapter/{secondHeading}"), 1),
+            ]);
+        var chapter = new Chapter(
+            new NodeId("nested-chapter"),
+            [
+                new Heading(firstHeading, 1, [new Text("First")]),
+                new Heading(firstChild, 2, [new Text("Child")]),
+                new Heading(secondHeading, 1, [new Text("Second")]),
+            ]);
+
+        var html = Parse(Render(CreateDocument([toc, chapter], "urn:flow:html-book:nested-toc"), 1024, 768), "toc.html");
+        var rootList = html.Descendants("nav").Single(element => (string?)element.Attribute("id") == "nested-toc")
+            .Elements("ol").Single();
+        var topLevel = rootList.Elements("li").ToArray();
+
+        Assert.Equal(2, topLevel.Length);
+        Assert.Equal("1", (string?)topLevel[0].Attribute("data-level"));
+        Assert.Equal("Child", topLevel[0].Elements("ol").Single().Elements("li").Single().Elements("a").Single().Value);
+        Assert.Equal("1", (string?)topLevel[1].Attribute("data-level"));
+    }
+
+    [Fact]
+    public void Render_PortugueseBookLocalizesUiAndCountsOnlyNumberedChapters()
+    {
+        var coverAsset = new AssetId("cover.png");
+        var coverFigure = new NodeId("cover-figure");
+        var document = new FlowDocument(
+            new DocumentIdentity(new DocumentId("urn:flow:html-book:pt")),
+            new DocumentMetadata("Livro", "pt-BR", ["Autora"]),
+            new DocumentContent(
+                [
+                    new Chapter(new NodeId("cover-page"), [new Figure(coverFigure, coverAsset, alternativeText: "Capa")]),
+                    new Chapter(new NodeId("introduction"), [new Heading(new NodeId("introduction-heading"), 1, [new Text("Introdução")])]),
+                    new Chapter(new NodeId("chapter-one"), [new Heading(new NodeId("numbered-one"), 1, [new Text("1. Começo")])]),
+                    new Chapter(new NodeId("chapter-two"), [new Heading(new NodeId("numbered-two"), 1, [new Text("2. Fim")])]),
+                ]),
+            [new FlowAsset(coverAsset, "image/png", "cover.png", new byte[] { 1, 2, 3 })],
+            new DocumentPresentation(cover: new CoverPresentation(coverFigure)));
+        var package = Render(document, 390, 844);
+
+        AssertProgress(package, "chapters/chapter-001.html", "Capa", "Posição lógica de leitura");
+        AssertProgress(package, "chapters/chapter-002.html", "Introdução", "Posição lógica de leitura");
+        AssertProgress(package, "chapters/chapter-003.html", "Capítulo 1 de 2", "Posição lógica de leitura");
+        AssertProgress(package, "chapters/chapter-004.html", "Capítulo 2 de 2", "Posição lógica de leitura");
+        var chapter = Parse(package, "chapters/chapter-003.html");
+        Assert.Contains(chapter.Descendants("a"), element => element.Value == "Anterior");
+        Assert.Contains(chapter.Descendants("a"), element => element.Value == "Sumário");
+        Assert.Contains(chapter.Descendants("a"), element => element.Value == "Próximo");
+        Assert.Equal("Aparência da leitura", chapter.Descendants("summary").Single().Value);
+
+        using var manifest = JsonDocument.Parse(package.GetFile("manifest.json").Content.ToArray());
+        var roles = manifest.RootElement.GetProperty("readingOrder").EnumerateArray()
+            .Where(item => item.GetProperty("kind").GetString() == "chapter")
+            .Select(item => item.GetProperty("publicationRole").GetString() ?? string.Empty)
+            .ToArray();
+        Assert.Equal(["cover", "section", "chapter", "chapter"], roles);
+    }
+
+    [Fact]
+    public void Render_PreservesLongTextAndDoesNotAllowThemeOverrideOfHighContrastSafety()
+    {
+        var longText = string.Concat(Enumerable.Repeat("Texto longo sem perda. ", 600));
+        var document = CreateDocument(
+            [new Chapter(new NodeId("long-chapter"), [new Paragraph(new NodeId("long-text"), [new Text(longText)])])],
+            "urn:flow:html-book:long");
+        var preferences = new UserReadingPreferences(theme: ReadingTheme.HighContrast);
+
+        var package = Render(document, 390, 844, preferences);
+        var chapter = Parse(package, "chapters/chapter-001.html");
+
+        Assert.Equal(longText, chapter.Descendants("p").Single(element => (string?)element.Attribute("id") == "long-text").Value);
+        Assert.Equal("high-contrast", (string?)chapter.Root!.Attribute("data-default-theme"));
+        Assert.DoesNotContain(
+            chapter.Descendants("input"),
+            input => (string?)input.Attribute("name") == "flow-reader-theme"
+                     && (string?)input.Attribute("value") != "default");
+    }
+
     [Theory]
     [InlineData("../escape.html")]
     [InlineData("chapters/../../escape.html")]
@@ -194,9 +442,13 @@ public sealed class HtmlBookPackageRendererTests
         Assert.Throws<ArgumentException>(() => new HtmlBookFile(path, "text/html", ReadOnlyMemory<byte>.Empty));
     }
 
-    private HtmlBookPackage Render(FlowDocument document, double width, double height)
+    private HtmlBookPackage Render(
+        FlowDocument document,
+        double width,
+        double height,
+        UserReadingPreferences? preferences = null)
     {
-        var preferences = new UserReadingPreferences();
+        preferences ??= new UserReadingPreferences();
         var layout = new AdaptiveLayoutEngine().Layout(document, new LayoutContext(width, height, userPreferences: preferences));
         return renderer.Render(document, layout, preferences, Integrity);
     }
@@ -236,13 +488,27 @@ public sealed class HtmlBookPackageRendererTests
         return CreateDocument([toc, first, second], "urn:flow:html-book:two");
     }
 
-    private static FlowDocument CreateDocument(IEnumerable<DocumentNode> nodes, string id) => new(
+    private static FlowDocument CreateDocument(
+        IEnumerable<DocumentNode> nodes,
+        string id,
+        IEnumerable<string>? authors = null) => new(
         new DocumentIdentity(new DocumentId(id), "1"),
-        new DocumentMetadata("HTML book", "en", ["Flow"]),
+        new DocumentMetadata("HTML book", "en", authors ?? ["Flow"]),
         new DocumentContent(nodes));
 
     private static XDocument Parse(HtmlBookPackage package, string path) =>
         XDocument.Parse(Encoding.UTF8.GetString(package.GetFile(path).Content.AsSpan()));
+
+    private static void AssertProgress(
+        HtmlBookPackage package,
+        string path,
+        string expectedProgress,
+        string accessibleLabel)
+    {
+        var progress = Parse(package, path).Descendants("p")
+            .Single(element => (string?)element.Attribute("aria-label") == accessibleLabel);
+        Assert.Equal(expectedProgress, progress.Value);
+    }
 
     private static string[] AllSemanticIds(HtmlBookPackage package) => package.Files
         .Where(static file => file.Path.EndsWith(".html", StringComparison.Ordinal))

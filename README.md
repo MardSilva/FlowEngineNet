@@ -40,7 +40,7 @@ Implemented:
 - canonical inline language ranges, typed bidirectional embedding/isolation/override, and Japanese ruby annotations imported from XHTML;
 - renderer-independent adaptive layout for `ReadingMode.Flow`;
 - deterministic standalone HTML5 rendering with embedded CSS and assets;
-- deterministic, script-free HTML book packages with their own TOC, chapter files, deduplicated assets, shared CSS, and integrity manifest;
+- deterministic, script-free HTML book packages with hierarchical TOC, chapter-local notes, editorial progress, Portuguese UI, book-like responsive themes and navigation, deduplicated assets, shared CSS, and integrity manifest;
 - the five-chapter “The Flow Experiment” reference book;
 - a lightweight CLI for sampling, inspection, validation, hashing, and HTML rendering;
 - readable UTF-8 JSON output, deterministic EPUB diagnostic reports, and title-derived portable `.flow.json` names;
@@ -179,7 +179,7 @@ The real EPUB cycle now follows these increments:
 4. validate fidelity and performance against legal real-world publications;
 5. pass the large-book gate before beginning the PDF importer.
 
-The first three increments now have executable implementations. The next work is appearance/accessibility refinement, followed by measurable performance and corpus gates; this does not yet justify a universal EPUB-support claim.
+The first four increments now have executable implementations, including the package's book-like appearance and accessibility structure. The next work is measurable performance, cancellation, and corpus gates; this does not yet justify a universal EPUB-support or accessibility-conformance claim.
 
 A document can only be considered end-to-end usable when an EPUB can be imported without silent semantic loss, represented as a valid `FlowDocument`, laid out, rendered, inspected, and round-tripped through the supported Flow format. The repository has not reached that point yet.
 
