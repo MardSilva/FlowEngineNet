@@ -20,7 +20,9 @@ flow render <document> --html <output> --width <n> --height <n>
 
 `import` accepts a security-bounded EPUB and writes a deterministic `.flow.json`. Without `--output`, the destination is the source path with `.epub` replaced by `.flow.json`. Warnings and errors use stable `EPUB*`/`FLOWCLI_*` diagnostics. The command validates before writing, uses an atomic replacement, reports the imported identity and hash, and never leaves a partial output after a failed import.
 
-`epub-inspect` reads only the EPUB container and OPF structure. It reports the EPUB 2/3 family, principal metadata, manifest, linear/non-linear spine, navigation documents, archive sizes, resource types, missing resources, unsupported resources, and diagnostics without producing a `FlowDocument`. `--json` writes the deterministic `flow-epub-inspection-0.1` report even when the publication is invalid enough to return exit code `1`.
+The imported `.flow.json` contains only canonical Flow metadata. Publisher, contributors, extra languages, subjects, dates, rights, cover declarations, accessibility properties, and OPF refinements are available to API callers through the noncanonical `EpubImportResult.MetadataReport`; the CLI does not persist that source report yet.
+
+`epub-inspect` reads only the EPUB container and OPF structure. It reports the EPUB 2/3 family, principal metadata, manifest properties, fallback and media-overlay IDs, linear/non-linear and repeated spine references, navigation documents, archive sizes, resource types, missing resources, unsupported resources, and diagnostics without producing a `FlowDocument`. `--json` writes the deterministic `flow-epub-inspection-0.1` report even when the publication is invalid enough to return exit code `1`. Spine entries are always emitted by declared position; manifest sorting in JSON is never treated as reading order.
 
 `inspect` reports identity, metadata, total nodes, chapters, sections, paragraphs, figures, footnotes, assets, addressable anchors, and presentation availability.
 

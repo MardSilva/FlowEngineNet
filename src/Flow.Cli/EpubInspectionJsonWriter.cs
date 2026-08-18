@@ -76,6 +76,8 @@ internal static class EpubInspectionJsonWriter
             writer.WriteString("declaredHref", item.DeclaredHref);
             writer.WriteString("path", item.Path);
             writer.WriteString("mediaType", item.MediaType);
+            WriteNullableString(writer, "fallbackId", item.FallbackId);
+            WriteNullableString(writer, "mediaOverlayId", item.MediaOverlayId);
             writer.WritePropertyName("properties");
             writer.WriteStartArray();
             foreach (var property in item.Properties)
@@ -107,6 +109,7 @@ internal static class EpubInspectionJsonWriter
             WriteNullableString(writer, "mediaType", item.MediaType);
             writer.WriteBoolean("existsInArchive", item.ExistsInArchive);
             writer.WriteBoolean("supported", item.IsSupported);
+            writer.WriteBoolean("repeatedReference", item.IsRepeatedReference);
             writer.WriteEndObject();
         }
 

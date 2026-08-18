@@ -3,14 +3,20 @@ using Flow.Documents;
 
 namespace Flow.Epub;
 
-/// <summary>Contains an optional imported document and every diagnostic produced during import.</summary>
+/// <summary>Contains an optional document, noncanonical source/processing evidence, and every import diagnostic.</summary>
 public sealed record EpubImportResult
 {
-    public EpubImportResult(FlowDocument? document, IEnumerable<EpubDiagnostic> diagnostics)
+    public EpubImportResult(
+        FlowDocument? document,
+        IEnumerable<EpubDiagnostic> diagnostics,
+        EpubMetadataReport? metadataReport = null,
+        EpubPackageProcessingReport? processingReport = null)
     {
         ArgumentNullException.ThrowIfNull(diagnostics);
         Document = document;
         Diagnostics = diagnostics.ToImmutableArray();
+        MetadataReport = metadataReport;
+        ProcessingReport = processingReport;
     }
 
     /// <summary>Gets the imported document, including a recoverable partial result when available.</summary>
@@ -18,6 +24,12 @@ public sealed record EpubImportResult
 
     /// <summary>Gets immutable diagnostics in discovery order.</summary>
     public ImmutableArray<EpubDiagnostic> Diagnostics { get; }
+
+    /// <summary>Gets noncanonical typed metadata retained from the OPF source.</summary>
+    public EpubMetadataReport? MetadataReport { get; }
+
+    /// <summary>Gets typed evidence for manifest resolution and every declared spine position.</summary>
+    public EpubPackageProcessingReport? ProcessingReport { get; }
 
     /// <summary>Gets whether a document was produced without error diagnostics.</summary>
     public bool IsSuccess => Document is not null && Diagnostics.All(

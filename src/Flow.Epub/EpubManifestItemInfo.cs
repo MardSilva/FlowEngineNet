@@ -13,7 +13,9 @@ public sealed record EpubManifestItemInfo
         IEnumerable<string> properties,
         bool existsInArchive,
         bool isNavigationDocument,
-        bool isSupported)
+        bool isSupported,
+        string? fallbackId = null,
+        string? mediaOverlayId = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(declaredHref);
@@ -29,6 +31,8 @@ public sealed record EpubManifestItemInfo
         ExistsInArchive = existsInArchive;
         IsNavigationDocument = isNavigationDocument;
         IsSupported = isSupported;
+        FallbackId = fallbackId;
+        MediaOverlayId = mediaOverlayId;
     }
 
     public string Id { get; }
@@ -46,4 +50,8 @@ public sealed record EpubManifestItemInfo
     public bool IsNavigationDocument { get; }
 
     public bool IsSupported { get; }
+
+    public string? FallbackId { get; }
+
+    public string? MediaOverlayId { get; }
 }

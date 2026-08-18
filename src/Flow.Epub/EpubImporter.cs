@@ -15,7 +15,6 @@ public sealed class EpubImporter : IEpubImporter
     private const string ContainerPath = "META-INF/container.xml";
     private static readonly XNamespace ContainerNamespace = "urn:oasis:names:tc:opendocument:xmlns:container";
     private static readonly XNamespace OpfNamespace = "http://www.idpf.org/2007/opf";
-    private static readonly XNamespace DcNamespace = "http://purl.org/dc/elements/1.1/";
     private static readonly XNamespace XhtmlNamespace = "http://www.w3.org/1999/xhtml";
     private static readonly XNamespace EpubNamespace = "http://www.idpf.org/2007/ops";
     private static readonly XNamespace NcxNamespace = "http://www.daisy.org/z3986/2005/ncx/";
@@ -83,15 +82,19 @@ public sealed class EpubImporter : IEpubImporter
                 return new EpubImportResult(null, diagnostics);
             }
 
-            var model = ReadPackage(package, packagePath, diagnostics);
+            var model = ReadPackage(package, packagePath, entries, diagnostics);
             if (model is null)
             {
                 return new EpubImportResult(null, diagnostics);
             }
 
-            var document = await ConvertPackageAsync(model, entries, diagnostics, cancellationToken)
+            var conversion = await ConvertPackageAsync(model, entries, diagnostics, cancellationToken)
                 .ConfigureAwait(false);
-            return new EpubImportResult(document, diagnostics);
+            return new EpubImportResult(
+                conversion.Document,
+                diagnostics,
+                model.MetadataReport,
+                conversion.ProcessingReport);
         }
         catch (OperationCanceledException)
         {
@@ -155,6 +158,7 @@ public sealed class EpubImporter : IEpubImporter
     private static PackageModel? ReadPackage(
         XDocument package,
         string packagePath,
+        IReadOnlyDictionary<string, ZipArchiveEntry> entries,
         List<EpubDiagnostic> diagnostics)
     {
         var root = package.Root;
@@ -167,32 +171,7 @@ public sealed class EpubImporter : IEpubImporter
             return null;
         }
 
-        var metadataElement = root.Element(OpfNamespace + "metadata");
-        var title = metadataElement?.Elements(DcNamespace + "title")
-            .Select(static element => NormalizedText(element.Value))
-            .FirstOrDefault(static value => value.Length > 0);
-        if (title is null)
-        {
-            title = "Untitled EPUB";
-            diagnostics.Add(Warning(
-                EpubDiagnosticCodes.MetadataFallback,
-                "The EPUB has no dc:title; the importer used 'Untitled EPUB'.",
-                packagePath));
-        }
-
-        var identifier = metadataElement?.Elements(DcNamespace + "identifier")
-            .Select(static element => NormalizedText(element.Value))
-            .FirstOrDefault(static value => value.Length > 0);
-        var language = metadataElement?.Elements(DcNamespace + "language")
-            .Select(static element => NormalizedText(element.Value))
-            .FirstOrDefault(static value => value.Length > 0);
-        var authors = metadataElement?.Elements(DcNamespace + "creator")
-            .Select(static element => NormalizedText(element.Value))
-            .Where(static value => value.Length > 0)
-            .ToImmutableArray() ?? [];
-        var description = metadataElement?.Elements(DcNamespace + "description")
-            .Select(static element => NormalizedText(element.Value))
-            .FirstOrDefault(static value => value.Length > 0);
+        var metadata = EpubMetadataReader.Read(root, packagePath, diagnostics);
 
         var manifest = new Dictionary<string, ManifestItem>(StringComparer.Ordinal);
         var manifestOrder = new List<ManifestItem>();
@@ -222,7 +201,14 @@ public sealed class EpubImporter : IEpubImporter
             var properties = ((string?)item.Attribute("properties") ?? string.Empty)
                 .Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
                 .ToImmutableHashSet(StringComparer.Ordinal);
-            var manifestItem = new ManifestItem(id, resourcePath, mediaType, properties);
+            var manifestItem = new ManifestItem(
+                id,
+                resourcePath,
+                mediaType,
+                properties,
+                NormalizeOptional((string?)item.Attribute("fallback")),
+                NormalizeOptional((string?)item.Attribute("media-overlay")),
+                entries.ContainsKey(resourcePath));
             if (!manifest.TryAdd(id, manifestItem))
             {
                 diagnostics.Add(Error(
@@ -232,27 +218,93 @@ public sealed class EpubImporter : IEpubImporter
             }
             else
             {
+                if (manifestOrder.Any(existing => string.Equals(existing.Path, resourcePath, StringComparison.Ordinal)))
+                {
+                    diagnostics.Add(Warning(
+                        EpubDiagnosticCodes.DuplicateManifestResource,
+                        $"Manifest item '{id}' repeats resource path '{resourcePath}' under another ID.",
+                        packagePath));
+                }
+
                 manifestOrder.Add(manifestItem);
+                if (!manifestItem.ExistsInArchive)
+                {
+                    diagnostics.Add(Error(
+                        EpubDiagnosticCodes.MissingResource,
+                        $"Manifest resource '{resourcePath}' is missing from the archive.",
+                        resourcePath));
+                }
+
+                if (manifestItem.MediaOverlayId is not null)
+                {
+                    diagnostics.Add(Warning(
+                        EpubDiagnosticCodes.UnsupportedMediaOverlay,
+                        $"Manifest item '{id}' declares media overlay '{manifestItem.MediaOverlayId}'; timing and audio are not imported.",
+                        resourcePath));
+                }
+
+                foreach (var property in manifestItem.Properties.Where(static property =>
+                             property is not "nav" and not "cover-image"))
+                {
+                    diagnostics.Add(Warning(
+                        EpubDiagnosticCodes.UnsupportedResource,
+                        $"Manifest property '{property}' on item '{id}' is retained in the processing report but is not interpreted.",
+                        resourcePath));
+                }
             }
         }
+
+        foreach (var item in manifestOrder)
+        {
+            if (item.FallbackId is not null && !manifest.ContainsKey(item.FallbackId))
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.BrokenFallback,
+                    $"Manifest item '{item.Id}' references missing fallback item '{item.FallbackId}'.",
+                    item.Path));
+            }
+
+            if (item.MediaOverlayId is not null && !manifest.ContainsKey(item.MediaOverlayId))
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.UnsupportedMediaOverlay,
+                    $"Media overlay reference '{item.MediaOverlayId}' from item '{item.Id}' does not resolve in the manifest.",
+                    item.Path));
+            }
+        }
+
+        ReportCircularFallbackChains(manifestOrder, manifest, packagePath, diagnostics);
 
         var spine = new List<SpineItem>();
         var spineElement = root.Element(OpfNamespace + "spine");
         var spineTocId = (string?)spineElement?.Attribute("toc");
+        var spineOccurrences = new Dictionary<string, int>(StringComparer.Ordinal);
+        var position = 0;
         foreach (var itemReference in spineElement?.Elements(OpfNamespace + "itemref") ?? [])
         {
-            var idref = (string?)itemReference.Attribute("idref");
-            if (string.IsNullOrWhiteSpace(idref) || !manifest.TryGetValue(idref, out var item))
+            var idref = NormalizeOptional((string?)itemReference.Attribute("idref"));
+            var linearValue = NormalizeOptional((string?)itemReference.Attribute("linear"));
+            var isLinear = !string.Equals(linearValue, "no", StringComparison.OrdinalIgnoreCase);
+            if (linearValue is not null
+                && !string.Equals(linearValue, "yes", StringComparison.OrdinalIgnoreCase)
+                && !string.Equals(linearValue, "no", StringComparison.OrdinalIgnoreCase))
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidSpineLinearity,
+                    $"Spine reference '{idref ?? "(missing)"}' has invalid linear value '{linearValue}'; it is treated as linear='yes'.",
+                    packagePath));
+                isLinear = true;
+            }
+
+            ManifestItem? item = null;
+            if (idref is null || !manifest.TryGetValue(idref, out item))
             {
                 diagnostics.Add(Error(
                     EpubDiagnosticCodes.InvalidPackage,
                     $"Spine reference '{idref ?? "(missing)"}' does not resolve to a manifest item.",
                     packagePath));
-                continue;
             }
-
-            var isLinear = !string.Equals((string?)itemReference.Attribute("linear"), "no", StringComparison.OrdinalIgnoreCase);
-            if (!isLinear)
+            else if (!isLinear)
             {
                 diagnostics.Add(Warning(
                     EpubDiagnosticCodes.NonLinearSpineItem,
@@ -260,7 +312,27 @@ public sealed class EpubImporter : IEpubImporter
                     item.Path));
             }
 
-            spine.Add(new SpineItem(item, isLinear));
+            var occurrence = idref is null
+                ? 1
+                : spineOccurrences.TryGetValue(idref, out var previous) ? previous + 1 : 1;
+            if (idref is not null)
+            {
+                spineOccurrences[idref] = occurrence;
+            }
+
+            var repeated = occurrence > 1;
+            if (repeated)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.RepeatedSpineItem,
+                    $"Spine item '{idref}' is repeated at position {position}; the occurrence remains in declared order.",
+                    item?.Path ?? packagePath));
+            }
+
+            var stableIdentity = idref is null
+                ? $"missing-spine-{position + 1}"
+                : occurrence == 1 ? idref : $"{idref}-occurrence-{occurrence}";
+            spine.Add(new SpineItem(position++, idref, item, isLinear, repeated, stableIdentity));
         }
 
         if (spine.Count == 0)
@@ -269,64 +341,191 @@ public sealed class EpubImporter : IEpubImporter
             return null;
         }
 
+        var cover = ResolveCoverMetadata(metadata.Epub2CoverItemId, manifestOrder, packagePath, diagnostics);
+        var metadataReport = metadata.Report.WithCover(cover);
+
         return new PackageModel(
             packagePath,
-            title,
-            identifier,
-            language,
-            authors,
-            description,
+            metadata.Title,
+            metadata.Subtitle,
+            metadata.Identifier,
+            metadata.Language,
+            metadata.Authors,
+            metadata.Description,
+            metadataReport,
             manifest,
             manifestOrder,
             spine,
             spineTocId);
     }
 
-    private async Task<FlowDocument?> ConvertPackageAsync(
+    private static void ReportCircularFallbackChains(
+        IReadOnlyList<ManifestItem> manifestOrder,
+        IReadOnlyDictionary<string, ManifestItem> manifest,
+        string packagePath,
+        List<EpubDiagnostic> diagnostics)
+    {
+        var reported = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var start in manifestOrder)
+        {
+            var positions = new Dictionary<string, int>(StringComparer.Ordinal);
+            var chain = new List<string>();
+            var current = start;
+            while (true)
+            {
+                if (positions.TryGetValue(current.Id, out var cycleStart))
+                {
+                    var cycle = chain.Skip(cycleStart).Append(current.Id).ToArray();
+                    if (cycle.Any(reported.Add))
+                    {
+                        diagnostics.Add(Warning(
+                            EpubDiagnosticCodes.CircularFallback,
+                            $"Manifest fallback cycle detected: {string.Join(" -> ", cycle)}.",
+                            packagePath));
+                    }
+
+                    break;
+                }
+
+                positions[current.Id] = chain.Count;
+                chain.Add(current.Id);
+                if (current.FallbackId is null || !manifest.TryGetValue(current.FallbackId, out current))
+                {
+                    break;
+                }
+            }
+        }
+    }
+
+    private static EpubCoverMetadata? ResolveCoverMetadata(
+        string? epub2CoverItemId,
+        IReadOnlyList<ManifestItem> manifest,
+        string packagePath,
+        List<EpubDiagnostic> diagnostics)
+    {
+        var epub3Candidates = manifest.Where(static item => item.Properties.Contains("cover-image")).ToArray();
+        if (epub3Candidates.Length > 1)
+        {
+            diagnostics.Add(Warning(
+                EpubDiagnosticCodes.MetadataConflict,
+                "Multiple manifest items declare the EPUB 3 cover-image property; the first in manifest order is retained.",
+                packagePath));
+        }
+
+        var epub2Candidate = epub2CoverItemId is null
+            ? null
+            : manifest.FirstOrDefault(item => string.Equals(item.Id, epub2CoverItemId, StringComparison.Ordinal));
+        if (epub2CoverItemId is not null && epub2Candidate is null)
+        {
+            diagnostics.Add(Warning(
+                EpubDiagnosticCodes.InvalidMetadata,
+                $"EPUB 2 cover metadata references unknown manifest item '{epub2CoverItemId}'.",
+                packagePath));
+        }
+
+        if (epub3Candidates.FirstOrDefault() is { } epub3Candidate
+            && epub2Candidate is not null
+            && !string.Equals(epub3Candidate.Id, epub2Candidate.Id, StringComparison.Ordinal))
+        {
+            diagnostics.Add(Warning(
+                EpubDiagnosticCodes.MetadataConflict,
+                $"EPUB 3 cover '{epub3Candidate.Id}' conflicts with EPUB 2 cover '{epub2Candidate.Id}'; EPUB 3 takes precedence.",
+                packagePath));
+        }
+
+        var selected = epub3Candidates.FirstOrDefault() ?? epub2Candidate;
+        if (selected is null)
+        {
+            return null;
+        }
+
+        if (!selected.MediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase))
+        {
+            diagnostics.Add(Warning(
+                EpubDiagnosticCodes.InvalidMetadata,
+                $"Cover manifest item '{selected.Id}' has non-image media type '{selected.MediaType}'.",
+                packagePath));
+        }
+
+        return new EpubCoverMetadata(
+            selected.Id,
+            selected.Path,
+            selected.MediaType,
+            epub3Candidates.Length > 0 ? "epub3-cover-image" : "epub2-meta-cover");
+    }
+
+    private async Task<PackageConversionResult> ConvertPackageAsync(
         PackageModel package,
         IReadOnlyDictionary<string, ZipArchiveEntry> entries,
         List<EpubDiagnostic> diagnostics,
         CancellationToken cancellationToken)
     {
         var xhtmlDocuments = new List<XhtmlModel>();
+        var spineDecisions = new List<EpubSpineProcessingDecision>(package.Spine.Count);
         foreach (var spineItem in package.Spine)
         {
-            if (!string.Equals(spineItem.Item.MediaType, "application/xhtml+xml", StringComparison.OrdinalIgnoreCase))
+            var resolution = ResolveSpineItem(spineItem, package.Manifest, diagnostics);
+            var decision = resolution.Decision;
+            if (resolution.Selected is null)
             {
-                diagnostics.Add(Warning(
-                    EpubDiagnosticCodes.UnsupportedResource,
-                    $"Spine resource with media type '{spineItem.Item.MediaType}' is not supported.",
-                    spineItem.Item.Path));
+                spineDecisions.Add(decision);
                 continue;
             }
 
-            if (!entries.TryGetValue(spineItem.Item.Path, out var entry))
+            var selected = resolution.Selected;
+            if (!entries.TryGetValue(selected.Path, out var entry))
             {
-                diagnostics.Add(Error(
-                    EpubDiagnosticCodes.MissingResource,
-                    "A spine XHTML resource is missing from the archive.",
-                    spineItem.Item.Path));
+                spineDecisions.Add(decision with
+                {
+                    Disposition = EpubSpineDisposition.Excluded,
+                    Reason = EpubSpineDecisionReason.MissingArchiveResource,
+                    SelectedItemId = null,
+                    SelectedResourcePath = null,
+                });
                 continue;
             }
 
-            var xhtml = await LoadXmlAsync(entry, spineItem.Item.Path, diagnostics, cancellationToken)
+            var xhtml = await LoadXmlAsync(entry, selected.Path, diagnostics, cancellationToken)
                 .ConfigureAwait(false);
             if (xhtml?.Root?.Name != XhtmlNamespace + "html"
                 || xhtml.Root.Element(XhtmlNamespace + "body") is null)
             {
-                diagnostics.Add(Error(
-                    EpubDiagnosticCodes.InvalidXml,
-                    "The spine resource must be XHTML in the XHTML namespace and contain a body.",
-                    spineItem.Item.Path));
+                if (xhtml is not null)
+                {
+                    diagnostics.Add(Error(
+                        EpubDiagnosticCodes.InvalidXml,
+                        "The selected spine resource must be XHTML in the XHTML namespace and contain a body.",
+                        selected.Path));
+                }
+
+                spineDecisions.Add(decision with
+                {
+                    Disposition = EpubSpineDisposition.Excluded,
+                    Reason = EpubSpineDecisionReason.InvalidXhtml,
+                    SelectedItemId = null,
+                    SelectedResourcePath = null,
+                });
                 continue;
             }
 
-            xhtmlDocuments.Add(new XhtmlModel(spineItem.Item, xhtml));
+            xhtmlDocuments.Add(new XhtmlModel(selected, xhtml, spineItem.StableIdentity));
+            spineDecisions.Add(decision);
         }
+
+        var processingReport = new EpubPackageProcessingReport(
+            package.ManifestOrder.Select(static item => new EpubManifestResourceDecision(
+                item.Id,
+                item.Path,
+                item.MediaType,
+                item.Properties,
+                item.FallbackId,
+                item.MediaOverlayId,
+                item.ExistsInArchive)),
+            spineDecisions);
 
         if (xhtmlDocuments.Count == 0)
         {
-            return null;
+            return new PackageConversionResult(null, processingReport);
         }
 
         var navigationDocuments = await LoadNavigationDocumentsAsync(
@@ -337,6 +536,11 @@ public sealed class EpubImporter : IEpubImporter
             cancellationToken).ConfigureAwait(false);
 
         var context = new ConversionContext(entries, package.Manifest, diagnostics, limits);
+        foreach (var xhtml in xhtmlDocuments)
+        {
+            context.ConsumedResourcePaths.Add(xhtml.Item.Path);
+        }
+
         context.PrepareIds(xhtmlDocuments);
         var content = new List<DocumentNode>();
         var tableOfContents = context.ConvertTableOfContents(navigationDocuments, package.SpineTocId);
@@ -350,12 +554,25 @@ public sealed class EpubImporter : IEpubImporter
             content.Add(await context.ConvertChapterAsync(xhtml, cancellationToken).ConfigureAwait(false));
         }
 
+        if (package.MetadataReport.Cover is { } cover && !entries.ContainsKey(cover.Path))
+        {
+            diagnostics.Add(Error(
+                EpubDiagnosticCodes.MissingResource,
+                $"Cover resource '{cover.Path}' declared by OPF metadata is missing from the archive.",
+                cover.Path));
+        }
+
         ReportUnusedManifestResources(package, context, diagnostics);
 
         var documentId = CreateDocumentId(package.Identifier, package.PackagePath, diagnostics);
         var document = new FlowDocument(
             new DocumentIdentity(documentId),
-            new DocumentMetadata(package.Title, package.Language, package.Authors, description: package.Description),
+            new DocumentMetadata(
+                package.Title,
+                package.Language,
+                package.Authors,
+                package.Subtitle,
+                package.Description),
             new DocumentContent(content),
             context.Assets.Values);
 
@@ -370,7 +587,95 @@ public sealed class EpubImporter : IEpubImporter
                 $"{validationDiagnostic.Code}: {validationDiagnostic.Message}"));
         }
 
-        return document;
+        return new PackageConversionResult(document, processingReport);
+    }
+
+    private static SpineResolution ResolveSpineItem(
+        SpineItem spineItem,
+        IReadOnlyDictionary<string, ManifestItem> manifest,
+        List<EpubDiagnostic> diagnostics)
+    {
+        var readingRole = spineItem.IsLinear
+            ? EpubSpineReadingRole.Linear
+            : EpubSpineReadingRole.Supplemental;
+        if (spineItem.Item is null)
+        {
+            return Excluded(EpubSpineDecisionReason.MissingManifestItem, []);
+        }
+
+        var source = spineItem.Item;
+        var current = source;
+        var visited = new HashSet<string>(StringComparer.Ordinal);
+        var chain = new List<string>();
+        while (true)
+        {
+            chain.Add(current.Id);
+            if (!visited.Add(current.Id))
+            {
+                diagnostics.Add(Error(
+                    EpubDiagnosticCodes.CircularFallback,
+                    $"Fallback chain for spine item '{spineItem.IdRef}' is circular: {string.Join(" -> ", chain)}.",
+                    source.Path));
+                return Excluded(EpubSpineDecisionReason.CircularFallback, chain);
+            }
+
+            if (current.ExistsInArchive
+                && string.Equals(current.MediaType, "application/xhtml+xml", StringComparison.OrdinalIgnoreCase))
+            {
+                var substituted = !string.Equals(current.Id, source.Id, StringComparison.Ordinal);
+                return new SpineResolution(
+                    current,
+                    new EpubSpineProcessingDecision(
+                        spineItem.Position,
+                        spineItem.IdRef,
+                        readingRole,
+                        spineItem.IsRepeated,
+                        substituted ? EpubSpineDisposition.Substituted : EpubSpineDisposition.Included,
+                        substituted ? EpubSpineDecisionReason.XhtmlFallback : EpubSpineDecisionReason.DirectXhtml,
+                        current.Id,
+                        current.Path,
+                        chain.ToImmutableArray()));
+            }
+
+            if (current.FallbackId is null)
+            {
+                if (current.ExistsInArchive)
+                {
+                    diagnostics.Add(Warning(
+                        EpubDiagnosticCodes.UnsupportedResource,
+                        $"Spine item '{spineItem.IdRef}' ends at unsupported media type '{current.MediaType}' without an XHTML fallback.",
+                        current.Path));
+                    return Excluded(EpubSpineDecisionReason.UnsupportedMediaType, chain);
+                }
+
+                return Excluded(EpubSpineDecisionReason.MissingArchiveResource, chain);
+            }
+
+            if (!manifest.TryGetValue(current.FallbackId, out var fallback))
+            {
+                diagnostics.Add(Error(
+                    EpubDiagnosticCodes.BrokenFallback,
+                    $"Fallback chain for spine item '{spineItem.IdRef}' references missing item '{current.FallbackId}'.",
+                    current.Path));
+                chain.Add(current.FallbackId);
+                return Excluded(EpubSpineDecisionReason.BrokenFallback, chain);
+            }
+
+            current = fallback;
+        }
+
+        SpineResolution Excluded(EpubSpineDecisionReason reason, IEnumerable<string> fallbackChain) => new(
+            null,
+            new EpubSpineProcessingDecision(
+                spineItem.Position,
+                spineItem.IdRef,
+                readingRole,
+                spineItem.IsRepeated,
+                EpubSpineDisposition.Excluded,
+                reason,
+                null,
+                null,
+                fallbackChain.ToImmutableArray()));
     }
 
     private async Task<IReadOnlyList<NavigationModel>> LoadNavigationDocumentsAsync(
@@ -380,7 +685,9 @@ public sealed class EpubImporter : IEpubImporter
         List<EpubDiagnostic> diagnostics,
         CancellationToken cancellationToken)
     {
-        var xhtmlByPath = xhtmlDocuments.ToDictionary(static item => item.Item.Path, StringComparer.Ordinal);
+        var xhtmlByPath = xhtmlDocuments
+            .GroupBy(static item => item.Item.Path, StringComparer.Ordinal)
+            .ToDictionary(static group => group.Key, static group => group.First(), StringComparer.Ordinal);
         var candidates = package.ManifestOrder
             .Where(static item => item.Properties.Contains("nav")
                 || string.Equals(item.MediaType, "application/x-dtbncx+xml", StringComparison.OrdinalIgnoreCase))
@@ -423,8 +730,11 @@ public sealed class EpubImporter : IEpubImporter
         ConversionContext context,
         List<EpubDiagnostic> diagnostics)
     {
-        var spinePaths = package.Spine.Select(static item => item.Item.Path).ToHashSet(StringComparer.Ordinal);
-        foreach (var item in package.Manifest.Values.OrderBy(static item => item.Path, StringComparer.Ordinal))
+        var spinePaths = package.Spine
+            .Where(static item => item.Item is not null)
+            .Select(static item => item.Item!.Path)
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (var item in package.ManifestOrder)
         {
             if (spinePaths.Contains(item.Path) || context.ConsumedResourcePaths.Contains(item.Path))
             {
@@ -471,6 +781,17 @@ public sealed class EpubImporter : IEpubImporter
     private static string NormalizedText(string value) =>
         string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
+    private static string? NormalizeOptional(string? value)
+    {
+        if (value is null)
+        {
+            return null;
+        }
+
+        var normalized = NormalizedText(value);
+        return normalized.Length == 0 ? null : normalized;
+    }
+
     private static bool HasErrors(IEnumerable<EpubDiagnostic> diagnostics) =>
         diagnostics.Any(static diagnostic => diagnostic.Severity == EpubDiagnosticSeverity.Error);
 
@@ -484,23 +805,42 @@ public sealed class EpubImporter : IEpubImporter
         string Id,
         string Path,
         string MediaType,
-        ImmutableHashSet<string> Properties);
+        ImmutableHashSet<string> Properties,
+        string? FallbackId,
+        string? MediaOverlayId,
+        bool ExistsInArchive);
 
-    private sealed record SpineItem(ManifestItem Item, bool IsLinear);
+    private sealed record SpineItem(
+        int Position,
+        string? IdRef,
+        ManifestItem? Item,
+        bool IsLinear,
+        bool IsRepeated,
+        string StableIdentity);
 
     private sealed record PackageModel(
         string PackagePath,
         string Title,
+        string? Subtitle,
         string? Identifier,
         string? Language,
         ImmutableArray<string> Authors,
         string? Description,
+        EpubMetadataReport MetadataReport,
         IReadOnlyDictionary<string, ManifestItem> Manifest,
         IReadOnlyList<ManifestItem> ManifestOrder,
         IReadOnlyList<SpineItem> Spine,
         string? SpineTocId);
 
-    private sealed record XhtmlModel(ManifestItem Item, XDocument Document);
+    private sealed record XhtmlModel(ManifestItem Item, XDocument Document, string StableIdentity);
+
+    private sealed record PackageConversionResult(
+        FlowDocument? Document,
+        EpubPackageProcessingReport ProcessingReport);
+
+    private sealed record SpineResolution(
+        ManifestItem? Selected,
+        EpubSpineProcessingDecision Decision);
 
     private enum NavigationKind
     {
@@ -553,7 +893,7 @@ public sealed class EpubImporter : IEpubImporter
         {
             foreach (var xhtml in xhtmlDocuments)
             {
-                var chapterId = AllocateId($"chapter-{Slug(xhtml.Item.Id)}");
+                var chapterId = AllocateId($"chapter-{Slug(xhtml.StableIdentity)}");
                 var body = xhtml.Document.Root?.Element(XhtmlNamespace + "body");
                 if (body is null)
                 {
@@ -561,7 +901,7 @@ public sealed class EpubImporter : IEpubImporter
                 }
 
                 elementIds[body] = chapterId;
-                anchors[xhtml.Item.Path] = chapterId;
+                anchors.TryAdd(xhtml.Item.Path, chapterId);
                 foreach (var element in body.Descendants())
                 {
                     var htmlId = (string?)element.Attribute("id");
@@ -579,7 +919,7 @@ public sealed class EpubImporter : IEpubImporter
                         elementIds[targetElement] = nodeId;
                     }
 
-                    anchors[$"{xhtml.Item.Path}#{htmlId}"] = nodeId;
+                    anchors.TryAdd($"{xhtml.Item.Path}#{htmlId}", nodeId);
                     if (!ReferenceEquals(targetElement, element))
                     {
                         diagnostics.Add(Warning(

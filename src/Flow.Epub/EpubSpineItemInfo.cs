@@ -8,4 +8,5 @@ public sealed record EpubSpineItemInfo(
     string? ResourcePath,
     string? MediaType,
     bool ExistsInArchive,
-    bool IsSupported);
+    bool IsSupported,
+    bool IsRepeatedReference = false);

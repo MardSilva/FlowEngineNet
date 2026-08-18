@@ -40,4 +40,15 @@ public static class EpubDiagnosticCodes
     public const string InvalidTableOfContentsLevel = "EPUB020";
     public const string CircularTableOfContentsReference = "EPUB021";
     public const string TableOfContentsConflict = "EPUB022";
+    public const string InvalidMetadata = "EPUB023";
+    public const string OrphanMetadataRefinement = "EPUB024";
+    public const string MetadataConflict = "EPUB025";
+    public const string InvalidLanguage = "EPUB026";
+    public const string MissingIdentifier = "EPUB027";
+    public const string CircularFallback = "EPUB028";
+    public const string BrokenFallback = "EPUB029";
+    public const string RepeatedSpineItem = "EPUB030";
+    public const string UnsupportedMediaOverlay = "EPUB031";
+    public const string InvalidSpineLinearity = "EPUB032";
+    public const string DuplicateManifestResource = "EPUB033";
 }

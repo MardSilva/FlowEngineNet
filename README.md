@@ -28,6 +28,8 @@ Implemented:
 - a diagnostic-first, security-bounded EPUB import prototype;
 - non-converting EPUB 2/3 package inspection with deterministic JSON reports;
 - EPUB 3 Navigation Document import with EPUB 2 NCX fallback and stable Flow anchors;
+- expanded OPF metadata import with a typed, noncanonical source report;
+- exact spine-order processing with XHTML fallback chains and typed inclusion decisions;
 - renderer-independent adaptive layout for `ReadingMode.Flow`;
 - deterministic standalone HTML5 rendering with embedded CSS and assets;
 - the five-chapter “The Flow Experiment” reference book;
