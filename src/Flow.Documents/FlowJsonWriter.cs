@@ -32,7 +32,6 @@ internal static class FlowJsonWriter
         }
 
         writer.WriteEndArray();
-
         if (document.Presentation is not null)
         {
             WritePresentation(writer, document.Presentation);
@@ -280,6 +279,22 @@ internal static class FlowJsonWriter
         }
 
         writer.WriteEndArray();
+        if (!presentation.NodeTypography.IsEmpty)
+        {
+            writer.WritePropertyName("nodeTypography");
+            writer.WriteStartArray();
+            foreach (var pair in presentation.NodeTypography.OrderBy(static pair => pair.Key.Value, StringComparer.Ordinal))
+            {
+                writer.WriteStartObject();
+                writer.WriteString("nodeId", pair.Key.Value);
+                writer.WritePropertyName("style");
+                WriteTypographyStyle(writer, pair.Value);
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+        }
+
         WriteHeadingPresentation(writer, presentation.Headings);
         WriteParagraphPresentation(writer, presentation.Paragraphs);
         WriteFigurePresentation(writer, presentation.Figures);
@@ -304,6 +319,7 @@ internal static class FlowJsonWriter
         WriteOptionalLength(writer, "marginBefore", style.MarginBefore);
         WriteOptionalLength(writer, "marginAfter", style.MarginAfter);
         WriteOptionalLength(writer, "indent", style.Indent);
+        WriteOptionalEnum(writer, "textDecoration", style.TextDecoration);
         writer.WriteEndObject();
     }
 

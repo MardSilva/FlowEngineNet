@@ -51,4 +51,23 @@ public static class EpubDiagnosticCodes
     public const string UnsupportedMediaOverlay = "EPUB031";
     public const string InvalidSpineLinearity = "EPUB032";
     public const string DuplicateManifestResource = "EPUB033";
+    public const string DuplicateSourceId = "EPUB034";
+    public const string InvalidSourceId = "EPUB035";
+    public const string SourceIdCollision = "EPUB036";
+    public const string UnmappedSourceLocation = "EPUB037";
+    public const string InvalidImageData = "EPUB038";
+    public const string ImageMediaTypeMismatch = "EPUB039";
+    public const string ImageDimensionsExceeded = "EPUB040";
+    public const string MissingImageAlternativeText = "EPUB041";
+    public const string UnsupportedImageFormat = "EPUB042";
+    public const string UnsafeSvg = "EPUB043";
+    public const string ImageFallbackUsed = "EPUB044";
+    public const string ImageDeduplicated = "EPUB045";
+    public const string ImageBytesExceeded = "EPUB046";
+    public const string InvalidStylesheet = "EPUB047";
+    public const string UnsupportedCssSelector = "EPUB048";
+    public const string UnsupportedCssProperty = "EPUB049";
+    public const string InvalidCssValue = "EPUB050";
+    public const string ExternalStylesheetBlocked = "EPUB051";
+    public const string CssTargetNotRepresentable = "EPUB052";
 }

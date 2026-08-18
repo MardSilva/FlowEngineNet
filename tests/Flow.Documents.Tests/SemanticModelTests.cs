@@ -164,6 +164,28 @@ public sealed class SemanticModelTests
                 [first, second]));
     }
 
+    [Fact]
+    public void DocumentPresentation_CopiesTypedNodeTypographyAndSupportsDecorationFlags()
+    {
+        var nodeId = new NodeId("styled-paragraph");
+        var source = new List<KeyValuePair<NodeId, TypographyStyle>>
+        {
+            KeyValuePair.Create(
+                nodeId,
+                new TypographyStyle(
+                    textDecoration: TextDecoration.Underline | TextDecoration.LineThrough)),
+        };
+
+        var presentation = new DocumentPresentation(nodeTypography: source);
+        source.Clear();
+
+        Assert.Single(presentation.NodeTypography);
+        Assert.Equal(
+            TextDecoration.Underline | TextDecoration.LineThrough,
+            presentation.NodeTypography[nodeId].TextDecoration);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TypographyStyle(textDecoration: (TextDecoration)8));
+    }
+
     private static Paragraph Paragraph(string id, string text) =>
         new(new NodeId(id), [new Text(text)]);
 }

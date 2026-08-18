@@ -13,7 +13,8 @@ public sealed record TypographyStyle
         TextTransform? textTransform = null,
         Length? marginBefore = null,
         Length? marginAfter = null,
-        Length? indent = null)
+        Length? indent = null,
+        TextDecoration? textDecoration = null)
     {
         ValidateFontFamily(fontFamily);
         ValidatePositiveLength(fontSize, nameof(fontSize));
@@ -21,6 +22,7 @@ public sealed record TypographyStyle
         ValidateEnum(fontStyle, nameof(fontStyle));
         ValidateEnum(textAlignment, nameof(textAlignment));
         ValidateEnum(textTransform, nameof(textTransform));
+        ValidateTextDecoration(textDecoration);
 
         if (lineHeight is not null && (!double.IsFinite(lineHeight.Value) || lineHeight.Value <= 0))
         {
@@ -38,6 +40,7 @@ public sealed record TypographyStyle
         MarginBefore = marginBefore;
         MarginAfter = marginAfter;
         Indent = indent;
+        TextDecoration = textDecoration;
     }
 
     public string? FontFamily { get; }
@@ -62,6 +65,8 @@ public sealed record TypographyStyle
 
     public Length? Indent { get; }
 
+    public TextDecoration? TextDecoration { get; }
+
     public bool IsEmpty => FontFamily is null
         && FontSize is null
         && FontWeight is null
@@ -72,7 +77,18 @@ public sealed record TypographyStyle
         && TextTransform is null
         && MarginBefore is null
         && MarginAfter is null
-        && Indent is null;
+        && Indent is null
+        && TextDecoration is null;
+
+    private static void ValidateTextDecoration(TextDecoration? value)
+    {
+        const Flow.Documents.TextDecoration supported =
+            Flow.Documents.TextDecoration.Underline | Flow.Documents.TextDecoration.LineThrough;
+        if (value is not null && (value.Value & ~supported) != 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(value), value, "The text decoration contains unsupported flags.");
+        }
+    }
 
     private static void ValidateFontFamily(string? fontFamily)
     {

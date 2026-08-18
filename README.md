@@ -29,7 +29,11 @@ Implemented:
 - non-converting EPUB 2/3 package inspection with deterministic JSON reports;
 - EPUB 3 Navigation Document import with EPUB 2 NCX fallback and stable Flow anchors;
 - expanded OPF metadata import with a typed, noncanonical source report;
+- deterministic EPUB resource/fragment traceability to stable Flow node IDs;
+- byte-validated EPUB covers and JPEG/PNG/static-GIF/WebP/passive-SVG assets with hash deduplication;
+- a safe EPUB CSS subset translated into typed, noncanonical role/node presentation;
 - exact spine-order processing with XHTML fallback chains and typed inclusion decisions;
+- order-preserving XHTML mixed-content conversion with aggregated semantic-loss diagnostics;
 - renderer-independent adaptive layout for `ReadingMode.Flow`;
 - deterministic standalone HTML5 rendering with embedded CSS and assets;
 - the five-chapter “The Flow Experiment” reference book;
@@ -161,7 +165,7 @@ The final clean-directory review passes 134 tests with zero build warnings; see 
 The real EPUB cycle now follows these increments:
 
 1. import EPUB through the CLI into a valid, deterministic `.flow.json`;
-2. expand accessibility metadata, CSS, tables, notes, and media fallbacks (TOC navigation is now imported);
+2. expand accessibility metadata, tables, notes, and media fallbacks (TOC navigation and a safe typed CSS subset are now imported);
 3. generate a self-contained HTML book with its own TOC and chapter files;
 4. validate fidelity and performance against legal real-world publications;
 5. pass the large-book gate before beginning the PDF importer.

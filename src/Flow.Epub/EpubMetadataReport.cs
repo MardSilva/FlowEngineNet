@@ -138,7 +138,11 @@ public sealed record EpubMetadataProperty(
     string? Language);
 
 /// <summary>Describes the manifest resource selected as the publication cover.</summary>
-public sealed record EpubCoverMetadata(string ItemId, string Path, string MediaType, string Source);
+public sealed record EpubCoverMetadata(string ItemId, string Path, string MediaType, string Source)
+{
+    /// <summary>Gets the deduplicated Flow asset produced for the cover, when it was safely importable.</summary>
+    public Flow.Core.AssetId? AssetId { get; init; }
+}
 
 /// <summary>Collects recognized schema.org accessibility metadata without making it canonical.</summary>
 public sealed record EpubAccessibilityMetadata

@@ -274,7 +274,25 @@ internal static class FlowJsonReader
             ReadFootnotePresentation(element, path),
             ReadCodeBlockPresentation(element, path),
             ReadTableOfContentsPresentation(element, path),
-            OptionalEnum<ReadingTheme>(element, "theme", $"{path}.theme"));
+            OptionalEnum<ReadingTheme>(element, "theme", $"{path}.theme"),
+            ReadNodeTypography(element, path));
+    }
+
+    private static IEnumerable<KeyValuePair<Flow.Core.NodeId, TypographyStyle>> ReadNodeTypography(
+        JsonElement parent,
+        string path)
+    {
+        if (!parent.TryGetProperty("nodeTypography", out var element))
+        {
+            return [];
+        }
+
+        RequireKind(element, JsonValueKind.Array, $"{path}.nodeTypography");
+        return element.EnumerateArray().Select((item, index) => KeyValuePair.Create(
+            new Flow.Core.NodeId(RequiredString(item, "nodeId", $"{path}.nodeTypography[{index}].nodeId")),
+            ReadTypographyStyle(
+                RequiredProperty(item, "style", $"{path}.nodeTypography[{index}].style"),
+                $"{path}.nodeTypography[{index}].style"))).ToArray();
     }
 
     private static TypographySet ReadTypography(JsonElement element, string path)
@@ -306,7 +324,28 @@ internal static class FlowJsonReader
             OptionalEnum<TextTransform>(element, "textTransform", $"{path}.textTransform"),
             OptionalLength(element, "marginBefore", $"{path}.marginBefore"),
             OptionalLength(element, "marginAfter", $"{path}.marginAfter"),
-            OptionalLength(element, "indent", $"{path}.indent"));
+            OptionalLength(element, "indent", $"{path}.indent"),
+            OptionalTextDecoration(element, "textDecoration", $"{path}.textDecoration"));
+
+    private static TextDecoration? OptionalTextDecoration(JsonElement parent, string name, string path)
+    {
+        if (!parent.TryGetProperty(name, out var property) || property.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (property.ValueKind != JsonValueKind.String
+            || !Enum.TryParse<TextDecoration>(property.GetString(), ignoreCase: false, out var value)
+            || (value & ~(TextDecoration.Underline | TextDecoration.LineThrough)) != 0)
+        {
+            throw Error(
+                FlowSerializationDiagnosticCodes.InvalidDocument,
+                $"Property '{path}' has an unsupported text decoration value.",
+                path);
+        }
+
+        return value;
+    }
 
     private static HeadingPresentation? ReadHeadingPresentation(JsonElement parent, string path) =>
         parent.TryGetProperty("headings", out var element)

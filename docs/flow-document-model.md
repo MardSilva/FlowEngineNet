@@ -103,7 +103,7 @@ Chapters must be document-root children, sections belong to chapters or other se
 
 ## Presentation and typography
 
-`DocumentPresentation` is optional. A document with `Presentation == null` remains complete and usable. When present, it contains a `TypographySet` plus small, typed presentation intentions for headings, paragraphs, figures, captions, footnotes, code blocks, and the table of contents.
+`DocumentPresentation` is optional. A document with `Presentation == null` remains complete and usable. When present, it contains a `TypographySet`, an optional immutable `NodeTypography` map keyed by stable `NodeId`, plus small typed presentation intentions for headings, paragraphs, figures, captions, footnotes, code blocks, and the table of contents. Per-node typography allows an importer to preserve a class/ID-specific author intention without widening it to every node sharing a role.
 
 `TypographySet` maps independent `TypographyRole` values to partial `TypographyStyle` values. The supported roles are body, chapter title, headings 1 through 6, subtitle, TOC title and levels 1 through 3, caption, footnote, block quote, and code. A missing style or property means “unspecified”, allowing defaults and future user preferences to participate in the cascade without mutating the document.
 
@@ -114,6 +114,7 @@ Chapters must be document-root children, sections belong to chapters or other se
 - unitless line height;
 - typed letter spacing;
 - alignment and text transformation enums;
+- typed underline and line-through decoration flags;
 - typed margins and indentation.
 
 `Length` preserves its numeric value and unit as `Pixel`, `RootEm`, `Em`, or `Percent`. It is not a CSS string. Font-family values reject CSS lists and expression punctuation; renderer-specific fallback lists will belong to renderer policy rather than the canonical document model.
@@ -135,7 +136,7 @@ Flow defaults
 < RendererSafetyConstraints
 ```
 
-The result contains complete `ResolvedTypographyStyle` values for every typography role plus the resolved content margin and theme. Partial author properties inherit from Flow defaults. User font choices do not replace the code font unless renderer safety explicitly requires one font for all roles.
+The result contains complete `ResolvedTypographyStyle` values for every typography role plus optional resolved styles on layout nodes, the resolved content margin, and theme. Partial author role and node properties inherit from Flow defaults. User font choices do not replace the code font unless renderer safety explicitly requires one font for all roles.
 
 Renderer limits are the highest-precedence accessibility layer. They clamp font size and line height and can establish minimum paragraph spacing/content margins, a required font, or a required theme. Length limits only compare values with matching units; a renderer must provide environmental conversion before constraining different units.
 

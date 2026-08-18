@@ -210,6 +210,7 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
             Line($"  text-align: {CssTextAlignment(style.TextAlignment)};");
             Line($"  text-indent: {CssLength(style.Indent)};");
             Line($"  text-transform: {style.TextTransform.ToString().ToLowerInvariant()};");
+            Line($"  text-decoration: {CssTextDecoration(style.TextDecoration)};");
         }
 
         private void WriteNode(LayoutNode layoutNode, DocumentNode? parent)
@@ -224,7 +225,7 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
                     WriteHeading(layoutNode, heading, parent);
                     break;
                 case Paragraph paragraph:
-                    Line($"<p id=\"{Id(paragraph.Id)}\">{Inline(paragraph.Content)}</p>");
+                    Line($"<p id=\"{Id(paragraph.Id)}\"{StyleAttribute(layoutNode)}>{Inline(paragraph.Content)}</p>");
                     break;
                 case BlockQuote:
                     WriteContainer("blockquote", layoutNode, " data-typography=\"blockquote\"");
@@ -242,19 +243,19 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
                     WriteFigure(layoutNode, figure);
                     break;
                 case Caption caption:
-                    Line($"<figcaption id=\"{Id(caption.Id)}\">{Inline(caption.Content)}</figcaption>");
+                    Line($"<figcaption id=\"{Id(caption.Id)}\"{StyleAttribute(layoutNode)}>{Inline(caption.Content)}</figcaption>");
                     break;
                 case Footnote:
                     WriteContainer("section", layoutNode, " role=\"doc-footnote\"");
                     break;
                 case HorizontalRule rule:
-                    Line($"<hr id=\"{Id(rule.Id)}\" />");
+                    Line($"<hr id=\"{Id(rule.Id)}\"{StyleAttribute(layoutNode)} />");
                     break;
                 case CodeBlock codeBlock:
                     WriteCodeBlock(layoutNode, codeBlock);
                     break;
                 case TableOfContents tableOfContents:
-                    WriteTableOfContents(tableOfContents);
+                    WriteTableOfContents(layoutNode, tableOfContents);
                     break;
                 default:
                     throw new NotSupportedException(
@@ -264,7 +265,7 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
 
         private void WriteContainer(string element, LayoutNode node, string attributes = "")
         {
-            Line($"<{element} id=\"{Id(node.SemanticId)}\"{attributes}>");
+            Line($"<{element} id=\"{Id(node.SemanticId)}\"{attributes}{StyleAttribute(node)}>");
             foreach (var child in node.Children)
             {
                 WriteNode(child, node.SemanticNode);
@@ -280,11 +281,11 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
                 : $"heading-{heading.Level.ToString(CultureInfo.InvariantCulture)}";
             var breakStyle = layoutNode.Intent is HeadingLayoutIntent { KeepWithNext: true }
                 or HeadingLayoutIntent { AvoidBreakAfter: true }
-                ? " style=\"break-after: avoid;\""
-                : string.Empty;
+                ? "break-after: avoid;"
+                : null;
 
             Line(
-                $"<h{heading.Level} id=\"{Id(heading.Id)}\" data-typography=\"{role}\"{breakStyle}>"
+                $"<h{heading.Level} id=\"{Id(heading.Id)}\" data-typography=\"{role}\"{StyleAttribute(layoutNode, breakStyle)}>"
                 + $"{Inline(heading.Content)}</h{heading.Level}>");
         }
 
@@ -293,7 +294,7 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
             var startAttribute = element == "ol" && start != 1
                 ? $" start=\"{start.ToString(CultureInfo.InvariantCulture)}\""
                 : string.Empty;
-            Line($"<{element} id=\"{Id(node.SemanticId)}\"{startAttribute}>");
+            Line($"<{element} id=\"{Id(node.SemanticId)}\"{startAttribute}{StyleAttribute(node)}>");
             foreach (var item in node.Children)
             {
                 WriteNode(item, node.SemanticNode);
@@ -323,7 +324,7 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
             var style = $"max-width: {CssLength(intent.MaximumWidth)};{keepStyle}{placementStyle}";
             var source = $"data:{SafeMediaType(asset.MediaType)};base64,{Convert.ToBase64String(asset.Data.AsSpan())}";
 
-            Line($"<figure id=\"{Id(figure.Id)}\" style=\"{Attribute(style)}\">");
+            Line($"<figure id=\"{Id(figure.Id)}\"{StyleAttribute(layoutNode, style)}>");
             Line(
                 $"<img src=\"{Attribute(source)}\" alt=\"{Attribute(figure.AlternativeText ?? string.Empty)}\" />");
             foreach (var child in layoutNode.Children)
@@ -350,12 +351,12 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
                 ? string.Empty
                 : $" data-language=\"{Attribute(codeBlock.Language)}\"";
 
-            Line($"<pre id=\"{Id(codeBlock.Id)}\" style=\"{Attribute(style)}\"><code{language}>{Text(codeBlock.Code)}</code></pre>");
+            Line($"<pre id=\"{Id(codeBlock.Id)}\"{StyleAttribute(layoutNode, style)}><code{language}>{Text(codeBlock.Code)}</code></pre>");
         }
 
-        private void WriteTableOfContents(TableOfContents tableOfContents)
+        private void WriteTableOfContents(LayoutNode layoutNode, TableOfContents tableOfContents)
         {
-            Line($"<nav id=\"{Id(tableOfContents.Id)}\" aria-label=\"Table of contents\">");
+            Line($"<nav id=\"{Id(tableOfContents.Id)}\" aria-label=\"Table of contents\"{StyleAttribute(layoutNode)}>");
             if (!tableOfContents.Title.IsEmpty)
             {
                 Line($"<h2>{Inline(tableOfContents.Title)}</h2>");
@@ -371,6 +372,35 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
 
             Line("</ol>");
             Line("</nav>");
+        }
+
+        private static string StyleAttribute(LayoutNode node, string? additional = null)
+        {
+            var declarations = new List<string>();
+            if (node.Typography is { } typography)
+            {
+                declarations.Add($"font-family: \"{CssString(typography.FontFamily)}\";");
+                declarations.Add($"font-size: {CssLength(typography.FontSize)};");
+                declarations.Add($"font-style: {typography.FontStyle.ToString().ToLowerInvariant()};");
+                declarations.Add($"font-weight: {((int)typography.FontWeight).ToString(CultureInfo.InvariantCulture)};");
+                declarations.Add($"letter-spacing: {CssLength(typography.LetterSpacing)};");
+                declarations.Add($"line-height: {CssNumber(typography.LineHeight)};");
+                declarations.Add($"margin-block-start: {CssLength(typography.MarginBefore)};");
+                declarations.Add($"margin-block-end: {CssLength(typography.MarginAfter)};");
+                declarations.Add($"text-align: {CssTextAlignment(typography.TextAlignment)};");
+                declarations.Add($"text-indent: {CssLength(typography.Indent)};");
+                declarations.Add($"text-transform: {typography.TextTransform.ToString().ToLowerInvariant()};");
+                declarations.Add($"text-decoration: {CssTextDecoration(typography.TextDecoration)};");
+            }
+
+            if (!string.IsNullOrWhiteSpace(additional))
+            {
+                declarations.Add(additional.Trim());
+            }
+
+            return declarations.Count == 0
+                ? string.Empty
+                : $" style=\"{Attribute(string.Join(' ', declarations))}\"";
         }
 
         private static string Inline(IEnumerable<InlineNode> nodes)
@@ -516,6 +546,27 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
             TextAlignment.Justify => "justify",
             _ => throw new ArgumentOutOfRangeException(nameof(alignment), alignment, "Unknown text alignment."),
         };
+
+        private static string CssTextDecoration(TextDecoration decoration)
+        {
+            if (decoration == TextDecoration.None)
+            {
+                return "none";
+            }
+
+            var values = new List<string>(2);
+            if (decoration.HasFlag(TextDecoration.Underline))
+            {
+                values.Add("underline");
+            }
+
+            if (decoration.HasFlag(TextDecoration.LineThrough))
+            {
+                values.Add("line-through");
+            }
+
+            return string.Join(' ', values);
+        }
 
         private static string CssString(string value)
         {

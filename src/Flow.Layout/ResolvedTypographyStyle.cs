@@ -15,7 +15,8 @@ public sealed record ResolvedTypographyStyle
         TextTransform textTransform,
         Length marginBefore,
         Length marginAfter,
-        Length indent)
+        Length indent,
+        TextDecoration textDecoration = TextDecoration.None)
     {
         FontFamily = fontFamily;
         FontSize = fontSize;
@@ -28,6 +29,7 @@ public sealed record ResolvedTypographyStyle
         MarginBefore = marginBefore;
         MarginAfter = marginAfter;
         Indent = indent;
+        TextDecoration = textDecoration;
     }
 
     public string FontFamily { get; }
@@ -52,6 +54,8 @@ public sealed record ResolvedTypographyStyle
 
     public Length Indent { get; }
 
+    public TextDecoration TextDecoration { get; }
+
     internal ResolvedTypographyStyle With(
         string? fontFamily = null,
         Length? fontSize = null,
@@ -68,5 +72,6 @@ public sealed record ResolvedTypographyStyle
             TextTransform,
             MarginBefore,
             marginAfter ?? MarginAfter,
-            Indent);
+            Indent,
+            TextDecoration);
 }

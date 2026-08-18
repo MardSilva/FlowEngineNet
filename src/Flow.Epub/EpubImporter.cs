@@ -93,8 +93,9 @@ public sealed class EpubImporter : IEpubImporter
             return new EpubImportResult(
                 conversion.Document,
                 diagnostics,
-                model.MetadataReport,
-                conversion.ProcessingReport);
+                conversion.MetadataReport ?? model.MetadataReport,
+                conversion.ProcessingReport,
+                conversion.SourceMap);
         }
         catch (OperationCanceledException)
         {
@@ -525,7 +526,7 @@ public sealed class EpubImporter : IEpubImporter
 
         if (xhtmlDocuments.Count == 0)
         {
-            return new PackageConversionResult(null, processingReport);
+            return new PackageConversionResult(null, processingReport, null, package.MetadataReport);
         }
 
         var navigationDocuments = await LoadNavigationDocumentsAsync(
@@ -541,6 +542,7 @@ public sealed class EpubImporter : IEpubImporter
             context.ConsumedResourcePaths.Add(xhtml.Item.Path);
         }
 
+        await context.LoadCssAsync(xhtmlDocuments, cancellationToken).ConfigureAwait(false);
         context.PrepareIds(xhtmlDocuments);
         var content = new List<DocumentNode>();
         var tableOfContents = context.ConvertTableOfContents(navigationDocuments, package.SpineTocId);
@@ -553,6 +555,14 @@ public sealed class EpubImporter : IEpubImporter
         {
             content.Add(await context.ConvertChapterAsync(xhtml, cancellationToken).ConfigureAwait(false));
         }
+
+        var coverAssetId = await context.ImportCoverAsync(package.MetadataReport.Cover, cancellationToken)
+            .ConfigureAwait(false);
+        var metadataReport = coverAssetId is null || package.MetadataReport.Cover is null
+            ? package.MetadataReport
+            : package.MetadataReport.WithCover(package.MetadataReport.Cover with { AssetId = coverAssetId });
+
+        context.FlushUnsupportedDiagnostics();
 
         if (package.MetadataReport.Cover is { } cover && !entries.ContainsKey(cover.Path))
         {
@@ -574,7 +584,10 @@ public sealed class EpubImporter : IEpubImporter
                 package.Subtitle,
                 package.Description),
             new DocumentContent(content),
-            context.Assets.Values);
+            context.Assets.Values,
+            context.NodeTypography.Count == 0
+                ? null
+                : new DocumentPresentation(nodeTypography: context.NodeTypography));
 
         var validation = new DocumentValidator().Validate(document);
         foreach (var validationDiagnostic in validation.Diagnostics)
@@ -587,7 +600,7 @@ public sealed class EpubImporter : IEpubImporter
                 $"{validationDiagnostic.Code}: {validationDiagnostic.Message}"));
         }
 
-        return new PackageConversionResult(document, processingReport);
+        return new PackageConversionResult(document, processingReport, context.CreateSourceMap(document), metadataReport);
     }
 
     private static SpineResolution ResolveSpineItem(
@@ -836,7 +849,9 @@ public sealed class EpubImporter : IEpubImporter
 
     private sealed record PackageConversionResult(
         FlowDocument? Document,
-        EpubPackageProcessingReport ProcessingReport);
+        EpubPackageProcessingReport ProcessingReport,
+        EpubSourceMap? SourceMap,
+        EpubMetadataReport? MetadataReport);
 
     private sealed record SpineResolution(
         ManifestItem? Selected,
@@ -870,7 +885,12 @@ public sealed class EpubImporter : IEpubImporter
         private readonly Dictionary<XElement, NodeId> elementIds = [];
         private readonly Dictionary<string, NodeId> anchors = new(StringComparer.Ordinal);
         private readonly Dictionary<string, AssetId> assetIds = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, AssetId> assetHashes = new(StringComparer.Ordinal);
         private readonly HashSet<string> allocatedIds = new(StringComparer.Ordinal);
+        private readonly List<EpubSourceLocation> sourceLocations = [];
+        private readonly Dictionary<SourceLocationKey, int> sourceOccurrences = [];
+        private readonly Dictionary<UnsupportedElementKey, int> unsupportedElements = [];
+        private IReadOnlyDictionary<XElement, TypographyStyle> cssStyles = new Dictionary<XElement, TypographyStyle>();
         private int generatedId;
 
         internal ConversionContext(
@@ -887,13 +907,79 @@ public sealed class EpubImporter : IEpubImporter
 
         internal Dictionary<AssetId, FlowAsset> Assets { get; } = [];
 
+        internal Dictionary<NodeId, TypographyStyle> NodeTypography { get; } = [];
+
         internal HashSet<string> ConsumedResourcePaths { get; } = new(StringComparer.Ordinal);
+
+        internal async Task LoadCssAsync(
+            IEnumerable<XhtmlModel> xhtmlDocuments,
+            CancellationToken cancellationToken)
+        {
+            var mediaTypes = manifest.Values
+                .GroupBy(static item => item.Path, StringComparer.Ordinal)
+                .ToDictionary(static group => group.Key, static group => group.First().MediaType, StringComparer.Ordinal);
+            var processor = new EpubCssProcessor(entries, mediaTypes, limits, diagnostics, ConsumedResourcePaths);
+            cssStyles = await processor.ProcessAsync(
+                xhtmlDocuments.Select(static item => (item.Item.Path, item.Document)),
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        internal async Task<AssetId?> ImportCoverAsync(
+            EpubCoverMetadata? cover,
+            CancellationToken cancellationToken)
+        {
+            if (cover is null)
+            {
+                return null;
+            }
+
+            var imported = await TryImportImageAssetAsync(cover.Path, "publication cover", cancellationToken)
+                .ConfigureAwait(false);
+            return imported?.AssetId;
+        }
+
+        internal EpubSourceMap CreateSourceMap(FlowDocument document)
+        {
+            var mapped = new List<EpubSourceLocation>(sourceLocations.Count);
+            foreach (var location in sourceLocations)
+            {
+                if (document.Index.TryGetUniqueNode(location.NodeId, out _))
+                {
+                    mapped.Add(location);
+                    continue;
+                }
+
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.UnmappedSourceLocation,
+                    $"Source location '{FormatSourceLocation(location.ResourcePath, location.Fragment)}' did not produce a semantic Flow node.",
+                    location.ResourcePath));
+            }
+
+            return new EpubSourceMap(mapped);
+        }
+
+        internal void FlushUnsupportedDiagnostics()
+        {
+            foreach (var (key, count) in unsupportedElements)
+            {
+                var occurrenceText = count == 1 ? "once" : $"{count} times";
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.UnsupportedElement,
+                    $"{key.Description} has no direct Flow equivalent and occurred {occurrenceText}; recoverable text and child order were preserved.",
+                    key.ResourcePath));
+            }
+        }
 
         internal void PrepareIds(IEnumerable<XhtmlModel> xhtmlDocuments)
         {
             foreach (var xhtml in xhtmlDocuments)
             {
-                var chapterId = AllocateId($"chapter-{Slug(xhtml.StableIdentity)}");
+                var chapterId = AllocateId($"chapter-{Slug(xhtml.StableIdentity)}", out var chapterCollision);
+                if (chapterCollision)
+                {
+                    ReportIdCollision(xhtml.Item.Path, null, chapterId);
+                }
+
                 var body = xhtml.Document.Root?.Element(XhtmlNamespace + "body");
                 if (body is null)
                 {
@@ -901,7 +987,10 @@ public sealed class EpubImporter : IEpubImporter
                 }
 
                 elementIds[body] = chapterId;
+                RegisterNodeTypography(body, chapterId);
                 anchors.TryAdd(xhtml.Item.Path, chapterId);
+                AddSourceLocation(xhtml.Item.Path, null, chapterId);
+                var sourceIds = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var element in body.Descendants())
                 {
                     var htmlId = (string?)element.Attribute("id");
@@ -910,16 +999,43 @@ public sealed class EpubImporter : IEpubImporter
                         continue;
                     }
 
-                    var targetElement = IsRepresentedNode(element)
-                        ? element
-                        : element.Ancestors().FirstOrDefault(IsRepresentedNode) ?? body;
-                    if (!elementIds.TryGetValue(targetElement, out var nodeId))
+                    if (!IsValidSourceId(htmlId))
                     {
-                        nodeId = AllocateId($"{chapterId.Value}-{Slug(htmlId)}");
-                        elementIds[targetElement] = nodeId;
+                        diagnostics.Add(Warning(
+                            EpubDiagnosticCodes.InvalidSourceId,
+                            $"EPUB source ID '{htmlId}' is not a valid XML NCName; it was retained for traceability and link resolution.",
+                            xhtml.Item.Path));
                     }
 
+                    if (!sourceIds.Add(htmlId))
+                    {
+                        diagnostics.Add(Warning(
+                            EpubDiagnosticCodes.DuplicateSourceId,
+                            $"EPUB source ID '{htmlId}' occurs more than once in the same XHTML resource; the first occurrence remains the primary link target.",
+                            xhtml.Item.Path));
+                    }
+
+                    var enclosingFigure = element.Name.LocalName is "img" or "picture"
+                        ? element.Ancestors(XhtmlNamespace + "figure").FirstOrDefault()
+                        : null;
+                    var targetElement = enclosingFigure
+                        ?? (IsRepresentedNode(element)
+                            ? element
+                            : element.Ancestors().FirstOrDefault(IsRepresentedNode) ?? body);
+                    if (!elementIds.TryGetValue(targetElement, out var nodeId))
+                    {
+                        nodeId = AllocateId($"{chapterId.Value}-{Slug(htmlId)}", out var collision);
+                        elementIds[targetElement] = nodeId;
+                        if (collision)
+                        {
+                            ReportIdCollision(xhtml.Item.Path, htmlId, nodeId);
+                        }
+                    }
+
+                    RegisterNodeTypography(targetElement, nodeId);
+
                     anchors.TryAdd($"{xhtml.Item.Path}#{htmlId}", nodeId);
+                    AddSourceLocation(xhtml.Item.Path, htmlId, nodeId);
                     if (!ReferenceEquals(targetElement, element))
                     {
                         diagnostics.Add(Warning(
@@ -928,6 +1044,36 @@ public sealed class EpubImporter : IEpubImporter
                             xhtml.Item.Path));
                     }
                 }
+            }
+        }
+
+        private void AddSourceLocation(string resourcePath, string? fragment, NodeId nodeId)
+        {
+            var key = new SourceLocationKey(resourcePath, fragment);
+            var occurrence = sourceOccurrences.TryGetValue(key, out var previous) ? previous + 1 : 1;
+            sourceOccurrences[key] = occurrence;
+            sourceLocations.Add(new EpubSourceLocation(resourcePath, fragment, nodeId, occurrence));
+        }
+
+        private void ReportIdCollision(string resourcePath, string? fragment, NodeId allocatedId) =>
+            diagnostics.Add(Warning(
+                EpubDiagnosticCodes.SourceIdCollision,
+                $"Source location '{FormatSourceLocation(resourcePath, fragment)}' normalized to an already allocated Flow ID; deterministic ID '{allocatedId.Value}' was assigned.",
+                resourcePath));
+
+        private static string FormatSourceLocation(string resourcePath, string? fragment) =>
+            fragment is null ? resourcePath : $"{resourcePath}#{fragment}";
+
+        private static bool IsValidSourceId(string value)
+        {
+            try
+            {
+                XmlConvert.VerifyNCName(value);
+                return true;
+            }
+            catch (XmlException)
+            {
+                return false;
             }
         }
 
@@ -1376,8 +1522,8 @@ public sealed class EpubImporter : IEpubImporter
         {
             if (element.Name.Namespace != XhtmlNamespace)
             {
-                ReportUnsupported(element, resourcePath);
-                return FallbackTextBlock(element, "foreign");
+                ReportUnsupported(element, resourcePath, $"Foreign element <{element.Name.LocalName}>");
+                return await ConvertChildrenAsync(element, resourcePath, cancellationToken).ConfigureAwait(false);
             }
 
             var name = element.Name.LocalName.ToLowerInvariant();
@@ -1404,15 +1550,31 @@ public sealed class EpubImporter : IEpubImporter
                     return await ConvertFigureAsync(element, resourcePath, cancellationToken).ConfigureAwait(false);
                 case "img":
                     return await ConvertImageAsync(element, element, null, resourcePath, cancellationToken).ConfigureAwait(false);
+                case "picture":
+                    return await ConvertImageAsync(element, element, null, resourcePath, cancellationToken).ConfigureAwait(false);
                 case "section":
-                case "article":
                     return [new Section(
                         IdFor(element, name),
                         await ConvertChildrenAsync(element, resourcePath, cancellationToken).ConfigureAwait(false))];
-                case "div":
+                case "article":
+                    ReportUnsupported(element, resourcePath, "Element <article> mapped to a Flow Section");
+                    return [new Section(
+                        IdFor(element, name),
+                        await ConvertChildrenAsync(element, resourcePath, cancellationToken).ConfigureAwait(false))];
                 case "main":
                 case "header":
                 case "footer":
+                case "aside":
+                case "address":
+                case "details":
+                case "summary":
+                case "dl":
+                case "dt":
+                case "dd":
+                    ReportUnsupported(element, resourcePath);
+                    return await ConvertChildrenAsync(element, resourcePath, cancellationToken).ConfigureAwait(false);
+                case "div":
+                    ReportUnsupported(element, resourcePath, "Generic container <div>");
                     return await ConvertChildrenAsync(element, resourcePath, cancellationToken).ConfigureAwait(false);
                 case "pre":
                     return [new CodeBlock(IdFor(element, "code"), element.Value)];
@@ -1427,7 +1589,7 @@ public sealed class EpubImporter : IEpubImporter
                     return [];
                 default:
                     ReportUnsupported(element, resourcePath);
-                    return FallbackTextBlock(element, name);
+                    return await ConvertChildrenAsync(element, resourcePath, cancellationToken).ConfigureAwait(false);
             }
         }
 
@@ -1449,7 +1611,7 @@ public sealed class EpubImporter : IEpubImporter
                 var inline = ConvertInline(inlineBuffer, resourcePath);
                 if (inline.Any(static node => node is not Text text || !string.IsNullOrWhiteSpace(text.Value)))
                 {
-                    result.Add(new Paragraph(IdFor(null, "container-text"), inline));
+                    result.Add(new Paragraph(GeneratedIdFor(parent, "container-text"), inline));
                 }
 
                 inlineBuffer.Clear();
@@ -1507,7 +1669,7 @@ public sealed class EpubImporter : IEpubImporter
                     || element.Name.LocalName is not ("ol" or "ul" or "p")).ToArray();
                 if (NormalizedText(string.Concat(inlineNodes.Select(NodeText))).Length > 0)
                 {
-                    blockChildren.Add(new Paragraph(IdFor(null, "list-text"), ConvertInline(inlineNodes, resourcePath)));
+                    blockChildren.Add(new Paragraph(GeneratedIdFor(item, "list-text"), ConvertInline(inlineNodes, resourcePath)));
                 }
 
                 foreach (var child in item.Elements().Where(static child =>
@@ -1527,12 +1689,13 @@ public sealed class EpubImporter : IEpubImporter
             string resourcePath,
             CancellationToken cancellationToken)
         {
-            var image = element.DescendantsAndSelf(XhtmlNamespace + "img").FirstOrDefault();
+            var image = element.Element(XhtmlNamespace + "picture")
+                ?? element.DescendantsAndSelf(XhtmlNamespace + "img").FirstOrDefault();
             var captionElement = element.Element(XhtmlNamespace + "figcaption");
             if (image is null)
             {
                 ReportUnsupported(element, resourcePath, "Figure without an image");
-                return FallbackTextBlock(element, "figure");
+                return await ConvertChildrenAsync(element, resourcePath, cancellationToken).ConfigureAwait(false);
             }
 
             Caption? caption = null;
@@ -1545,48 +1708,266 @@ public sealed class EpubImporter : IEpubImporter
         }
 
         private async Task<IEnumerable<DocumentNode>> ConvertImageAsync(
-            XElement image,
+            XElement imageSource,
             XElement idSource,
             Caption? caption,
             string resourcePath,
             CancellationToken cancellationToken)
         {
-            var source = (string?)image.Attribute("src");
-            var alternativeText = (string?)image.Attribute("alt");
-            if (string.IsNullOrWhiteSpace(source)
-                || !TryNormalizeArchivePath(GetDirectory(resourcePath), source, out var imagePath))
+            var fallbackImage = imageSource.Name == XhtmlNamespace + "picture"
+                ? imageSource.Elements(XhtmlNamespace + "img").LastOrDefault()
+                : imageSource;
+            var alternativeText = (string?)fallbackImage?.Attribute("alt");
+            if (fallbackImage is null || fallbackImage.Attribute("alt") is null)
             {
-                diagnostics.Add(Error(
-                    EpubDiagnosticCodes.InvalidReference,
-                    $"Image source '{source ?? "(missing)"}' is missing or unsafe.",
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.MissingImageAlternativeText,
+                    "An image has no alt attribute; no textual alternative can be preserved.",
                     resourcePath));
-                return AlternativeTextFallback(alternativeText, idSource);
             }
 
-            var manifestItem = manifest.Values.FirstOrDefault(item => string.Equals(item.Path, imagePath, StringComparison.Ordinal));
-            if (manifestItem is null
-                || !manifestItem.MediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
-                || !entries.TryGetValue(imagePath, out var entry))
+            foreach (var reference in ReadImageReferences(imageSource, fallbackImage, resourcePath))
             {
-                diagnostics.Add(Error(
-                    EpubDiagnosticCodes.MissingResource,
-                    $"Image resource '{imagePath}' is absent from the manifest/archive or is not declared as an image.",
-                    resourcePath));
-                return AlternativeTextFallback(alternativeText, idSource);
-            }
+                if (!TryNormalizeArchivePath(GetDirectory(resourcePath), reference, out var imagePath))
+                {
+                    diagnostics.Add(Warning(
+                        EpubDiagnosticCodes.InvalidReference,
+                        $"Image source '{reference}' is external, missing, or unsafe and was not loaded.",
+                        resourcePath));
+                    continue;
+                }
 
-            if (!assetIds.TryGetValue(imagePath, out var assetId))
-            {
-                assetId = new AssetId(AllocateId($"asset-{Slug(manifestItem.Id)}").Value);
-                assetIds.Add(imagePath, assetId);
-                await using var stream = entry.Open();
-                await using var buffer = await CopyWithLimitAsync(stream, limits.MaximumEntryBytes, cancellationToken)
+                var imported = await TryImportImageAssetAsync(imagePath, $"image in '{resourcePath}'", cancellationToken)
                     .ConfigureAwait(false);
-                Assets[assetId] = new FlowAsset(assetId, manifestItem.MediaType, Path.GetFileName(imagePath), buffer.ToArray());
-                ConsumedResourcePaths.Add(imagePath);
+                if (imported is not null)
+                {
+                    return [new Figure(IdFor(idSource, "figure"), imported.AssetId, caption, alternativeText)];
+                }
             }
 
-            return [new Figure(IdFor(idSource, "figure"), assetId, caption, alternativeText)];
+            return AlternativeTextFallback(alternativeText, idSource);
+        }
+
+        private IEnumerable<string> ReadImageReferences(
+            XElement imageSource,
+            XElement? fallbackImage,
+            string resourcePath)
+        {
+            if (imageSource.Name == XhtmlNamespace + "picture")
+            {
+                foreach (var source in imageSource.Elements(XhtmlNamespace + "source"))
+                {
+                    var declaredType = (string?)source.Attribute("type");
+                    if (declaredType is not null && !EpubImageInspector.IsSupportedDeclaredMediaType(declaredType))
+                    {
+                        diagnostics.Add(Warning(
+                            EpubDiagnosticCodes.UnsupportedImageFormat,
+                            $"Picture source type '{declaredType}' is not supported; the next source or img fallback is considered.",
+                            resourcePath));
+                        continue;
+                    }
+
+                    if (source.Attribute("media") is not null)
+                    {
+                        diagnostics.Add(Warning(
+                            EpubDiagnosticCodes.UnsupportedElement,
+                            "A picture source media condition cannot be evaluated without a rendering viewport; the source was skipped in favor of an unconditional fallback.",
+                            resourcePath));
+                        continue;
+                    }
+
+                    if (FirstSrcSetCandidate((string?)source.Attribute("srcset"), resourcePath) is { } candidate)
+                    {
+                        yield return candidate;
+                    }
+                }
+            }
+
+            var fallbackSource = (string?)fallbackImage?.Attribute("src");
+            if (!string.IsNullOrWhiteSpace(fallbackSource))
+            {
+                yield return fallbackSource;
+            }
+            else
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidReference,
+                    "An img fallback has no src attribute.",
+                    resourcePath));
+            }
+        }
+
+        private string? FirstSrcSetCandidate(string? srcset, string resourcePath)
+        {
+            if (string.IsNullOrWhiteSpace(srcset))
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidReference,
+                    "A picture source has no srcset value.",
+                    resourcePath));
+                return null;
+            }
+
+            var candidates = srcset.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (candidates.Length > 1 || candidates[0].Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length > 1)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.UnsupportedElement,
+                    "Responsive srcset descriptors are not canonical Flow semantics; the first candidate is used deterministically.",
+                    resourcePath));
+            }
+
+            return candidates[0].Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).FirstOrDefault();
+        }
+
+        private async Task<ImportedImage?> TryImportImageAssetAsync(
+            string requestedPath,
+            string usage,
+            CancellationToken cancellationToken)
+        {
+            if (assetIds.TryGetValue(requestedPath, out var existingId))
+            {
+                return new ImportedImage(existingId, requestedPath);
+            }
+
+            var initial = manifest.Values.FirstOrDefault(item => string.Equals(item.Path, requestedPath, StringComparison.Ordinal));
+            if (initial is null)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.MissingResource,
+                    $"The {usage} references '{requestedPath}', which is absent from the manifest.",
+                    requestedPath));
+                return null;
+            }
+
+            var visited = new HashSet<string>(StringComparer.Ordinal);
+            var current = initial;
+            while (visited.Add(current.Id))
+            {
+                if (!entries.TryGetValue(current.Path, out var entry))
+                {
+                    diagnostics.Add(Warning(
+                        EpubDiagnosticCodes.MissingResource,
+                        $"Image manifest item '{current.Id}' references missing archive resource '{current.Path}'.",
+                        current.Path));
+                }
+                else if (entry.Length > limits.MaximumImageBytes)
+                {
+                    diagnostics.Add(Warning(
+                        EpubDiagnosticCodes.ImageBytesExceeded,
+                        $"Image '{current.Path}' has {entry.Length} bytes, exceeding the configured {limits.MaximumImageBytes}-byte image limit.",
+                        current.Path));
+                }
+                else
+                {
+                    await using var stream = entry.Open();
+                    await using var buffer = await CopyWithLimitAsync(stream, limits.MaximumImageBytes, cancellationToken)
+                        .ConfigureAwait(false);
+                    var data = buffer.ToArray();
+                    if (TryValidateImage(current, data, out var inspection))
+                    {
+                        var digest = Convert.ToHexString(SHA256.HashData(data));
+                        if (!assetHashes.TryGetValue(digest, out var assetId))
+                        {
+                            assetId = new AssetId(AllocateId($"asset-{Slug(current.Id)}").Value);
+                            assetHashes.Add(digest, assetId);
+                            Assets[assetId] = new FlowAsset(
+                                assetId,
+                                inspection.MediaType,
+                                Path.GetFileName(current.Path),
+                                data);
+                        }
+                        else
+                        {
+                            diagnostics.Add(new EpubDiagnostic(
+                                EpubDiagnosticCodes.ImageDeduplicated,
+                                EpubDiagnosticSeverity.Information,
+                                $"Image '{current.Path}' has the same SHA-256 bytes as asset '{assetId.Value}' and reuses it.",
+                                current.Path));
+                        }
+
+                        assetIds[current.Path] = assetId;
+                        assetIds[requestedPath] = assetId;
+                        ConsumedResourcePaths.Add(current.Path);
+                        if (!string.Equals(current.Id, initial.Id, StringComparison.Ordinal))
+                        {
+                            diagnostics.Add(Warning(
+                                EpubDiagnosticCodes.ImageFallbackUsed,
+                                $"Image '{initial.Id}' used manifest fallback '{current.Id}' ({current.Path}).",
+                                requestedPath));
+                        }
+
+                        return new ImportedImage(assetId, current.Path);
+                    }
+                }
+
+                if (current.FallbackId is null || !manifest.TryGetValue(current.FallbackId, out current))
+                {
+                    return null;
+                }
+            }
+
+            diagnostics.Add(Warning(
+                EpubDiagnosticCodes.CircularFallback,
+                $"Image fallback chain for '{initial.Id}' is circular and could not produce a safe asset.",
+                requestedPath));
+            return null;
+        }
+
+        private bool TryValidateImage(
+            ManifestItem item,
+            byte[] data,
+            [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out EpubImageInspection? inspection)
+        {
+            if (!EpubImageInspector.TryInspect(data, out inspection, out var failure))
+            {
+                var svg = item.MediaType.Split(';', 2)[0].Trim().Equals("image/svg+xml", StringComparison.OrdinalIgnoreCase)
+                    || failure?.StartsWith("SVG ", StringComparison.Ordinal) == true
+                    || failure?.StartsWith("The SVG XML", StringComparison.Ordinal) == true;
+                var code = svg
+                    ? EpubDiagnosticCodes.UnsafeSvg
+                    : EpubImageInspector.IsSupportedDeclaredMediaType(item.MediaType)
+                        ? EpubDiagnosticCodes.InvalidImageData
+                        : EpubDiagnosticCodes.UnsupportedImageFormat;
+                diagnostics.Add(Warning(
+                    code,
+                    $"Image '{item.Path}' was rejected: {failure}",
+                    item.Path));
+                return false;
+            }
+
+            if (inspection.IsAnimated)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.UnsupportedImageFormat,
+                    $"Animated GIF '{item.Path}' is unsupported; only static GIF is accepted.",
+                    item.Path));
+                inspection = null;
+                return false;
+            }
+
+            if (inspection.Width is { } width && inspection.Height is { } height
+                && (width > limits.MaximumImageWidth
+                    || height > limits.MaximumImageHeight
+                    || (long)width * height > limits.MaximumImagePixels))
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.ImageDimensionsExceeded,
+                    $"Image '{item.Path}' dimensions {width}x{height} exceed configured limits of {limits.MaximumImageWidth}x{limits.MaximumImageHeight} and {limits.MaximumImagePixels} pixels.",
+                    item.Path));
+                inspection = null;
+                return false;
+            }
+
+            if (!EpubImageInspector.MediaTypeMatches(item.MediaType, inspection.MediaType))
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.ImageMediaTypeMismatch,
+                    $"Manifest media type '{item.MediaType}' for '{item.Path}' does not match detected bytes '{inspection.MediaType}'; the detected safe type is used.",
+                    item.Path));
+            }
+
+            return true;
         }
 
         private IEnumerable<DocumentNode> AlternativeTextFallback(string? alternativeText, XElement image)
@@ -1620,6 +2001,13 @@ public sealed class EpubImporter : IEpubImporter
                 }
 
                 var children = ConvertInline(element.Nodes(), resourcePath);
+                if (element.Name.Namespace != XhtmlNamespace)
+                {
+                    ReportUnsupported(element, resourcePath, $"Foreign inline element <{element.Name.LocalName}>");
+                    result.AddRange(children);
+                    continue;
+                }
+
                 switch (element.Name.LocalName.ToLowerInvariant())
                 {
                     case "strong":
@@ -1660,16 +2048,24 @@ public sealed class EpubImporter : IEpubImporter
 
                         break;
                     case "span":
+                        result.AddRange(children);
+                        break;
                     case "small":
+                        ReportUnsupported(element, resourcePath);
+                        result.AddRange(children);
+                        break;
+                    case "abbr":
+                    case "cite":
+                    case "q":
                     case "sub":
                     case "sup":
+                    case "mark":
+                    case "time":
+                        ReportUnsupported(element, resourcePath);
                         result.AddRange(children);
                         break;
                     default:
-                        diagnostics.Add(Warning(
-                            EpubDiagnosticCodes.UnsupportedElement,
-                            $"Inline element <{element.Name.LocalName}> is unsupported; its textual content was preserved.",
-                            resourcePath));
+                        ReportUnsupported(element, resourcePath, $"Inline element <{element.Name.LocalName}>");
                         result.AddRange(children);
                         break;
                 }
@@ -1734,33 +2130,51 @@ public sealed class EpubImporter : IEpubImporter
             }
         }
 
-        private IEnumerable<DocumentNode> FallbackTextBlock(XElement element, string kind)
-        {
-            var text = NormalizedText(element.Value);
-            return text.Length == 0
-                ? []
-                : [new Paragraph(IdFor(element, $"fallback-{kind}"), [new Text(text)])];
-        }
-
         private void ReportUnsupported(XElement element, string resourcePath, string? description = null)
         {
-            diagnostics.Add(Warning(
-                EpubDiagnosticCodes.UnsupportedElement,
-                $"{description ?? $"Element <{element.Name.LocalName}>"} is unsupported; recoverable text was preserved.",
-                resourcePath));
+            var key = new UnsupportedElementKey(
+                resourcePath,
+                element.Name.ToString(),
+                description ?? $"Element <{element.Name.LocalName}>");
+            unsupportedElements[key] = unsupportedElements.TryGetValue(key, out var count) ? count + 1 : 1;
         }
 
         private NodeId IdFor(XElement? element, string kind)
         {
             if (element is not null && elementIds.TryGetValue(element, out var nodeId))
             {
+                RegisterNodeTypography(element, nodeId);
                 return nodeId;
             }
 
-            return AllocateId($"epub-{kind}-{++generatedId}");
+            nodeId = AllocateId($"epub-{kind}-{++generatedId}");
+            if (element is not null)
+            {
+                elementIds[element] = nodeId;
+                RegisterNodeTypography(element, nodeId);
+            }
+
+            return nodeId;
         }
 
-        private NodeId AllocateId(string candidate)
+        private void RegisterNodeTypography(XElement element, NodeId nodeId)
+        {
+            if (cssStyles.TryGetValue(element, out var style))
+            {
+                NodeTypography.TryAdd(nodeId, style);
+            }
+        }
+
+        private NodeId GeneratedIdFor(XElement styleSource, string kind)
+        {
+            var nodeId = AllocateId($"epub-{kind}-{++generatedId}");
+            RegisterNodeTypography(styleSource, nodeId);
+            return nodeId;
+        }
+
+        private NodeId AllocateId(string candidate) => AllocateId(candidate, out _);
+
+        private NodeId AllocateId(string candidate, out bool collision)
         {
             var normalized = Slug(candidate);
             if (normalized.Length == 0 || normalized[0] is < 'a' or > 'z')
@@ -1771,8 +2185,10 @@ public sealed class EpubImporter : IEpubImporter
             normalized = normalized[..Math.Min(normalized.Length, 112)].TrimEnd('-', '_', '.');
             var unique = normalized;
             var suffix = 2;
+            collision = false;
             while (!allocatedIds.Add(unique))
             {
+                collision = true;
                 unique = $"{normalized}-{suffix++}";
             }
 
@@ -1784,14 +2200,20 @@ public sealed class EpubImporter : IEpubImporter
             var name = element.Name.LocalName.ToLowerInvariant();
             return name is "h1" or "h2" or "h3" or "h4" or "h5" or "h6"
                 or "p" or "ol" or "ul" or "li" or "blockquote" or "figure" or "img"
-                or "figcaption" or "section" or "article" or "pre" or "hr";
+                or "picture" or "figcaption" or "section" or "article" or "pre" or "hr";
         }
 
         private static bool IsInlineElement(XElement element)
         {
+            if (element.Name.Namespace != XhtmlNamespace)
+            {
+                return false;
+            }
+
             var name = element.Name.LocalName.ToLowerInvariant();
             return name is "strong" or "b" or "em" or "i" or "u" or "s" or "strike"
-                or "del" or "code" or "a" or "br" or "img" or "span" or "small" or "sub" or "sup";
+                or "del" or "code" or "a" or "br" or "span" or "small" or "abbr"
+                or "cite" or "q" or "sub" or "sup" or "mark" or "time";
         }
 
         private static string Slug(string value)
@@ -1821,5 +2243,14 @@ public sealed class EpubImporter : IEpubImporter
             XElement element => element.Value,
             _ => string.Empty,
         };
+
+        private readonly record struct UnsupportedElementKey(
+            string ResourcePath,
+            string ElementName,
+            string Description);
+
+        private readonly record struct SourceLocationKey(string ResourcePath, string? Fragment);
+
+        private sealed record ImportedImage(AssetId AssetId, string ResourcePath);
     }
 }

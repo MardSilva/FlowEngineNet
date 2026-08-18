@@ -72,7 +72,7 @@ Both the semantic figure-to-asset reference and the referenced asset record ther
 
 The following never participate in `flow-c14n-0.1`:
 
-- `DocumentPresentation`, typography, presentation intentions, and author theme;
+- `DocumentPresentation`, role/node typography, presentation intentions, and author theme;
 - `UserReadingPreferences`;
 - resolved reading styles and Flow defaults;
 - renderer safety constraints;

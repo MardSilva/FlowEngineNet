@@ -10,13 +10,15 @@ public sealed record EpubImportResult
         FlowDocument? document,
         IEnumerable<EpubDiagnostic> diagnostics,
         EpubMetadataReport? metadataReport = null,
-        EpubPackageProcessingReport? processingReport = null)
+        EpubPackageProcessingReport? processingReport = null,
+        EpubSourceMap? sourceMap = null)
     {
         ArgumentNullException.ThrowIfNull(diagnostics);
         Document = document;
         Diagnostics = diagnostics.ToImmutableArray();
         MetadataReport = metadataReport;
         ProcessingReport = processingReport;
+        SourceMap = sourceMap;
     }
 
     /// <summary>Gets the imported document, including a recoverable partial result when available.</summary>
@@ -30,6 +32,9 @@ public sealed record EpubImportResult
 
     /// <summary>Gets typed evidence for manifest resolution and every declared spine position.</summary>
     public EpubPackageProcessingReport? ProcessingReport { get; }
+
+    /// <summary>Gets noncanonical traceability from EPUB resources and fragments to semantic node IDs.</summary>
+    public EpubSourceMap? SourceMap { get; }
 
     /// <summary>Gets whether a document was produced without error diagnostics.</summary>
     public bool IsSuccess => Document is not null && Diagnostics.All(
