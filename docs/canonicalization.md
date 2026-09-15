@@ -4,6 +4,8 @@
 
 Flow 0.1 uses the experimental canonicalization profile `flow-c14n-0.1`. This profile is versioned independently from the human-readable interchange format `flow-json-0.1`.
 
+The human-readable escaping chosen by `.flow.json`, EPUB inspection reports, or import diagnostic reports is not canonicalization. For example, literal `é` and its valid JSON escape `\u00e9` deserialize to the same semantic value and therefore produce the same `flow-c14n-0.1` bytes and document hash. The readable serializers may improve Unicode presentation without changing this profile.
+
 The `.flow.json` representation is not a standardized file format. It is a deterministic, indented development format that can round-trip the current document model, including optional presentation and stored integrity metadata.
 
 ## Canonical byte rules
@@ -49,12 +51,15 @@ Every node contributes its node-type discriminator and stable `NodeId`, followed
 - ordered-list start and list-item order;
 - unordered-list item order;
 - figure asset reference, alternative text, and caption;
+- table caption/head/body/foot relationships, row and cell order, cell kind, positive column/row spans, header scope, header-ID references, and cell block content;
+- block and inline mathematical element names, ordinal attribute names/values, child order, token text, and optional textual alternatives;
+- normalized inline language tags, bidirectional direction/mode, ruby base/annotation/fallback node kinds, and their child order;
 - code text and optional language;
 - TOC title, maximum depth, entry order, entry level, target anchor, and label;
 - inline text and formatting structure;
 - inline code;
 - link target and children;
-- footnote target ID;
+- footnote target ID and, when present, its ordered inline reference label;
 - line-break presence.
 
 ### Assets
@@ -72,7 +77,7 @@ Both the semantic figure-to-asset reference and the referenced asset record ther
 
 The following never participate in `flow-c14n-0.1`:
 
-- `DocumentPresentation`, typography, presentation intentions, and author theme;
+- `DocumentPresentation`, role/node typography, presentation intentions, and author theme;
 - `UserReadingPreferences`;
 - resolved reading styles and Flow defaults;
 - renderer safety constraints;

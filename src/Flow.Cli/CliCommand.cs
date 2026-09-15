@@ -1,3 +1,5 @@
+using Flow.Rendering.Html;
+
 namespace Flow.Cli;
 
 public abstract record CliCommand;
@@ -6,7 +8,13 @@ public sealed record HelpCommand : CliCommand;
 
 public sealed record SampleCommand(string OutputPath) : CliCommand;
 
-public sealed record ImportEpubCommand(string SourcePath, string OutputPath) : CliCommand;
+public sealed record ImportEpubCommand(
+    string SourcePath,
+    string? OutputPath,
+    string? DiagnosticsJsonOutputPath,
+    string? FidelityReportOutputPath = null) : CliCommand;
+
+public sealed record InspectEpubCommand(string SourcePath, string? JsonOutputPath) : CliCommand;
 
 public sealed record InspectCommand(string DocumentPath) : CliCommand;
 
@@ -19,6 +27,11 @@ public sealed record RenderHtmlCommand(
     string OutputPath,
     double ViewportWidth,
     double ViewportHeight) : CliCommand;
+
+public sealed record RenderHtmlBookCommand(
+    string DocumentPath,
+    string OutputDirectory,
+    HtmlBookUiLanguage UiLanguage = HtmlBookUiLanguage.Automatic) : CliCommand;
 
 public sealed record CommandParseResult
 {

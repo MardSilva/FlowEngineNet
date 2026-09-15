@@ -1,4 +1,7 @@
+using System.Buffers;
+using System.Text.Encodings.Web;
 using System.Text.Json;
+using System.Text.Unicode;
 
 namespace Flow.Documents;
 
@@ -14,17 +17,18 @@ public sealed class FlowJsonDocumentSerializer : IFlowDocumentSerializer
         ArgumentNullException.ThrowIfNull(document);
         ArgumentNullException.ThrowIfNull(destination);
 
-        await using var buffer = new MemoryStream();
+        await using var normalizedDestination = new LfNormalizingWriteStream(destination);
         await using (var writer = new Utf8JsonWriter(
-                         buffer,
-                         new JsonWriterOptions { Indented = true }))
+                         normalizedDestination,
+                         new JsonWriterOptions
+                         {
+                             Indented = true,
+                             Encoder = JavaScriptEncoder.Create(UnicodeRanges.All),
+                         }))
         {
-            FlowJsonWriter.Write(writer, document);
+            FlowJsonWriter.Write(writer, document, cancellationToken);
             await writer.FlushAsync(cancellationToken).ConfigureAwait(false);
         }
-
-        var json = buffer.GetBuffer().AsMemory(0, checked((int)buffer.Length));
-        await WriteWithLfLineEndingsAsync(json, destination, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc />
@@ -63,38 +67,104 @@ public sealed class FlowJsonDocumentSerializer : IFlowDocumentSerializer
         }
     }
 
-    private static async Task WriteWithLfLineEndingsAsync(
-        ReadOnlyMemory<byte> source,
-        Stream destination,
-        CancellationToken cancellationToken)
+    private sealed class LfNormalizingWriteStream(Stream destination) : Stream
     {
-        if (source.Span.IndexOf((byte)'\r') < 0)
+        public override bool CanRead => false;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => destination.CanWrite;
+
+        public override long Length => throw new NotSupportedException();
+
+        public override long Position
         {
-            await destination.WriteAsync(source, cancellationToken).ConfigureAwait(false);
-            return;
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
         }
 
-        var normalized = NormalizeLineEndings(source.Span);
-        await destination.WriteAsync(normalized, cancellationToken).ConfigureAwait(false);
-    }
+        public override void Flush() => destination.Flush();
 
-    private static byte[] NormalizeLineEndings(ReadOnlySpan<byte> source)
-    {
-        var normalized = new byte[source.Length];
-        var written = 0;
-        for (var index = 0; index < source.Length; index++)
+        public override Task FlushAsync(CancellationToken cancellationToken) =>
+            destination.FlushAsync(cancellationToken);
+
+        public override void Write(byte[] buffer, int offset, int count) =>
+            Write(buffer.AsSpan(offset, count));
+
+        public override void Write(ReadOnlySpan<byte> buffer)
         {
-            if (source[index] == '\r' && index + 1 < source.Length && source[index + 1] == '\n')
+            var firstCarriageReturn = buffer.IndexOf((byte)'\r');
+            if (firstCarriageReturn < 0)
             {
-                normalized[written++] = (byte)'\n';
-                index++;
-                continue;
+                destination.Write(buffer);
+                return;
             }
 
-            normalized[written++] = source[index];
+            var rented = ArrayPool<byte>.Shared.Rent(buffer.Length);
+            try
+            {
+                var written = RemoveCarriageReturns(buffer, rented);
+                destination.Write(rented.AsSpan(0, written));
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(rented);
+            }
         }
 
-        Array.Resize(ref normalized, written);
-        return normalized;
+        public override ValueTask WriteAsync(
+            ReadOnlyMemory<byte> buffer,
+            CancellationToken cancellationToken = default)
+        {
+            if (buffer.Span.IndexOf((byte)'\r') < 0)
+            {
+                return destination.WriteAsync(buffer, cancellationToken);
+            }
+
+            return WriteNormalizedAsync(buffer, cancellationToken);
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        protected override void Dispose(bool disposing)
+        {
+            // The serializer never owns the caller's destination stream.
+            base.Dispose(disposing);
+        }
+
+        private async ValueTask WriteNormalizedAsync(
+            ReadOnlyMemory<byte> buffer,
+            CancellationToken cancellationToken)
+        {
+            var rented = ArrayPool<byte>.Shared.Rent(buffer.Length);
+            try
+            {
+                var written = RemoveCarriageReturns(buffer.Span, rented);
+                await destination.WriteAsync(rented.AsMemory(0, written), cancellationToken).ConfigureAwait(false);
+            }
+            finally
+            {
+                ArrayPool<byte>.Shared.Return(rented);
+            }
+        }
+
+        private static int RemoveCarriageReturns(ReadOnlySpan<byte> source, Span<byte> destination)
+        {
+            var written = 0;
+            foreach (var value in source)
+            {
+                if (value != (byte)'\r')
+                {
+                    destination[written++] = value;
+                }
+            }
+
+            return written;
+        }
     }
+
 }

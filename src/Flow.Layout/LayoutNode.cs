@@ -10,7 +10,8 @@ public sealed record LayoutNode
         NodeId semanticId,
         DocumentNode semanticNode,
         NodeLayoutIntent intent,
-        IEnumerable<LayoutNode>? children = null)
+        IEnumerable<LayoutNode>? children = null,
+        ResolvedTypographyStyle? typography = null)
     {
         ArgumentNullException.ThrowIfNull(semanticId);
         ArgumentNullException.ThrowIfNull(semanticNode);
@@ -25,6 +26,7 @@ public sealed record LayoutNode
         SemanticNode = semanticNode;
         Intent = intent;
         Children = (children ?? []).ToImmutableArray();
+        Typography = typography;
 
         if (Children.Any(static child => child is null))
         {
@@ -39,4 +41,6 @@ public sealed record LayoutNode
     public NodeLayoutIntent Intent { get; }
 
     public ImmutableArray<LayoutNode> Children { get; }
+
+    public ResolvedTypographyStyle? Typography { get; }
 }

@@ -109,6 +109,18 @@ public sealed class SemanticModelTests
     }
 
     [Fact]
+    public void FootnoteReference_CopiesItsOptionalInlineLabel()
+    {
+        var source = new List<InlineNode> { new Strong([new Text("12")]) };
+
+        var reference = new FootnoteReference(new NodeId("note-twelve"), source);
+        source.Clear();
+
+        Assert.IsType<Strong>(Assert.Single(reference.Label));
+        Assert.Empty(new FootnoteReference(new NodeId("note-with-renderer-label")).Label);
+    }
+
+    [Fact]
     public void PublicModelPropertiesAreReadOnly()
     {
         Type[] modelTypes =
@@ -123,10 +135,16 @@ public sealed class SemanticModelTests
             typeof(Emphasis), typeof(Underline), typeof(Strikethrough), typeof(InlineCode),
             typeof(Link), typeof(FootnoteReference), typeof(LineBreak),
             typeof(TypographyStyle), typeof(TypographySet),
+            typeof(CoverPresentation),
             typeof(HeadingPresentation), typeof(ParagraphPresentation),
             typeof(FigurePresentation), typeof(CaptionPresentation),
             typeof(FootnotePresentation), typeof(CodeBlockPresentation),
-            typeof(TableOfContentsPresentation),
+            typeof(TableOfContentsPresentation), typeof(Table), typeof(TableCaption),
+            typeof(TableHead), typeof(TableBody), typeof(TableFoot), typeof(TableRow),
+            typeof(TableHeaderCell), typeof(TableCell),
+            typeof(MathNode), typeof(MathText), typeof(MathElement), typeof(MathExpression), typeof(InlineMath),
+            typeof(LanguageTag), typeof(LanguageSpan), typeof(BidirectionalSpan), typeof(Ruby),
+            typeof(RubyAnnotation), typeof(RubyFallbackParenthesis),
         ];
 
         var writableProperties = modelTypes
@@ -162,6 +180,28 @@ public sealed class SemanticModelTests
                 new DocumentMetadata("Duplicate assets"),
                 new DocumentContent([]),
                 [first, second]));
+    }
+
+    [Fact]
+    public void DocumentPresentation_CopiesTypedNodeTypographyAndSupportsDecorationFlags()
+    {
+        var nodeId = new NodeId("styled-paragraph");
+        var source = new List<KeyValuePair<NodeId, TypographyStyle>>
+        {
+            KeyValuePair.Create(
+                nodeId,
+                new TypographyStyle(
+                    textDecoration: TextDecoration.Underline | TextDecoration.LineThrough)),
+        };
+
+        var presentation = new DocumentPresentation(nodeTypography: source);
+        source.Clear();
+
+        Assert.Single(presentation.NodeTypography);
+        Assert.Equal(
+            TextDecoration.Underline | TextDecoration.LineThrough,
+            presentation.NodeTypography[nodeId].TextDecoration);
+        Assert.Throws<ArgumentOutOfRangeException>(() => new TypographyStyle(textDecoration: (TextDecoration)8));
     }
 
     private static Paragraph Paragraph(string id, string text) =>

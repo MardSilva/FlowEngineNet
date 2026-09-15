@@ -26,17 +26,33 @@ Implemented:
 - `flow-c14n-0.1` canonicalization and SHA-256 document hashes;
 - experimental local RSA-PSS-SHA256 signatures over canonical bytes;
 - a diagnostic-first, security-bounded EPUB import prototype;
+- non-converting EPUB 2/3 package inspection with deterministic JSON reports;
+- EPUB 3 Navigation Document import with EPUB 2 NCX fallback and stable Flow anchors;
+- expanded OPF metadata import with a typed, noncanonical source report;
+- deterministic EPUB resource/fragment traceability to stable Flow node IDs;
+- byte-validated EPUB covers and JPEG/PNG/static-GIF/WebP/SVG assets, with deterministic SVG sanitization and hash deduplication;
+- XHTML/SVG cover wrappers resolved to safe raster `Figure` nodes with a typed, noncanonical cover intent;
+- a safe EPUB CSS subset translated into typed, noncanonical role/node presentation;
+- exact spine-order processing with XHTML fallback chains and typed inclusion decisions;
+- order-preserving XHTML mixed-content conversion with aggregated semantic-loss diagnostics;
+- immutable semantic tables with captions, row groups, spans, header associations, EPUB import, and accessible HTML output;
+- restricted structural MathML preservation for block and inline expressions, with safe HTML output and explicit semantic-loss diagnostics;
+- canonical inline language ranges, typed bidirectional embedding/isolation/override, and Japanese ruby annotations imported from XHTML;
 - renderer-independent adaptive layout for `ReadingMode.Flow`;
 - deterministic standalone HTML5 rendering with embedded CSS and assets;
+- deterministic, script-free HTML book packages with hierarchical TOC, chapter-local notes, editorial progress, explicit `pt-PT`/`pt-BR`/`en` UI, book-like responsive themes and navigation, deduplicated assets, shared CSS, and integrity manifest;
 - the five-chapter “The Flow Experiment” reference book;
 - a lightweight CLI for sampling, inspection, validation, hashing, and HTML rendering;
+- readable UTF-8 JSON output, deterministic EPUB diagnostic reports, and title-derived portable `.flow.json` names;
+- a typed, deterministic EPUB fidelity sidecar with explicit preserved/transformed/approximated/unsupported/lost evidence;
 - small, medium, and large viewport profiles;
 - responsive figures, semantic ID preservation, and typed layout intentions;
-- unit and semantic-conformance tests.
+- unit and semantic-conformance tests;
+- typed EPUB progress and runtime metrics, cooperative cancellation, and atomic cancellation-safe CLI outputs.
 
 Not implemented yet:
 
-- renderers other than standalone HTML;
+- renderers other than HTML;
 - broad EPUB interoperability and EPUB export;
 - paged and print layout modes;
 - reader or editor applications;
@@ -60,6 +76,29 @@ Importer / .flow.json
 ```
 
 Presentation, reader preferences, viewport state, layout decisions, and renderer output do not participate in the canonical document hash.
+
+## Flow alongside EPUB and PDF
+
+Flow is a normalized semantic model, not a replacement for EPUB's ZIP container or a reason to force readers to convert every book manually. EPUB remains a good distribution format; Flow adds a stable representation that renderers, validators, annotations, accessibility tools, hashes, and signatures can share without depending on the source format.
+
+The intended Reader experience is:
+
+1. Open an EPUB directly on any supported platform.
+2. Import and validate it transparently, preferably in memory.
+3. Keep a compact cache only when that improves startup time or offline use.
+4. Present the same reading and annotation model for EPUB, future PDF import, and native Flow documents.
+
+The readable `.flow.json` format is currently an experimental interchange and debugging format. It is deliberately verbose and is not intended to be the final package installed on a constrained reading device. A compact Flow container may be investigated later, but only if it provides value beyond ZIP compression—for example, normalized semantics across source formats, stable IDs and annotations, integrity data, and renderer-independent assets. It must be cross-platform and must not make a Windows-only converter part of the normal reading workflow.
+
+### Localization boundary
+
+Flow keeps three kinds of text separate:
+
+- authored content, such as a title written as “Table of contents” in the EPUB, is preserved and is never translated silently;
+- generated Reader or renderer interface text, such as navigation labels and actions, can be localized according to an explicit UI language;
+- stable diagnostic codes and serialized model names remain language-neutral, while their human-readable messages may be localized independently.
+
+The HTML book package supports `auto`, `pt-PT`, `pt-BR`, and `en` for generated interface text. `auto` selects Brazilian Portuguese for `pt-BR`, European Portuguese for other `pt` language tags, and English as the deterministic fallback. Authored navigation titles remain unchanged even when the interface uses another language. Recording explicit source provenance for every potentially synthesized label remains future work.
 
 ## Adaptive Flow layout
 
@@ -104,7 +143,7 @@ Console.WriteLine(layout.Profile.ColumnCount);      // 1
 Console.WriteLine(layout.Nodes[0].SemanticId);      // welcome
 ```
 
-The layout operation validates the semantic document first. Invalid IDs, hierarchy, anchors, asset references, footnotes, or table-of-contents destinations prevent a layout from being produced.
+The layout operation validates the semantic document first. Invalid IDs, hierarchy, anchors, asset references, footnotes, or table-of-contents destinations prevent a layout from being produced. EPUB import recognizes cross-document footnotes/endnotes and multiple references, preserves formatted call labels, and reports broken, ambiguous, unreferenced, cyclic, or invalid-backlink relationships explicitly.
 
 ## Solution structure
 
@@ -115,15 +154,15 @@ The layout operation validates the semantic document first. Invalid IDs, hierarc
 | `Flow.Layout` | Style cascade and adaptive Flow layout | Implemented for 0.1 |
 | `Flow.Security` | Canonicalization, hashing, and local RSA signature proof of concept | Implemented for 0.1 |
 | `Flow.Rendering` | Renderer contracts and immutable rendered output | Implemented for 0.1 |
-| `Flow.Rendering.Html` | Deterministic standalone semantic HTML adapter | Implemented for 0.1 |
-| `Flow.Epub` | Diagnostic-first EPUB-to-`FlowDocument` prototype | Implemented subset for 0.1 |
-| `Flow.Cli` | EPUB import, sample, inspect, validate, hash, and HTML rendering commands | EPUB CLI integration in 0.2 alpha |
+| `Flow.Rendering.Html` | Deterministic standalone HTML and multi-file HTML book adapter | Expanded in 0.2 alpha |
+| `Flow.Epub` | Package inspection and diagnostic-first EPUB-to-`FlowDocument` adapter | Expanded subset in 0.2 alpha |
+| `Flow.Cli` | EPUB inspection/import, sample, inspect, validate, hash, and HTML rendering commands | EPUB CLI integration in 0.2 alpha |
 
 Dependencies point inward: the document domain does not reference layout or renderer projects. EPUB and HTML remain adapters at the edge. The approved direct dependency graph is enforced by `Flow.Conformance.Tests`.
 
 ## Requirements and build
 
-The repository pins **.NET SDK 10.0.302** through `global.json`.
+The repository pins **.NET SDK 10.0.401** through `global.json`.
 
 ```powershell
 dotnet restore Flow.sln
@@ -142,10 +181,12 @@ The final clean-directory review passes 134 tests with zero build warnings; see 
 - [Semantic document model](docs/flow-document-model.md)
 - [Adaptive layout](docs/adaptive-layout.md)
 - [Standalone HTML renderer](docs/html-renderer.md)
+- [HTML book package](docs/html-book-package.md)
 - [Command-line interface](docs/cli.md)
 - [Canonicalization and hashing](docs/canonicalization.md)
 - [Experimental document signatures](docs/signatures.md)
 - [Experimental EPUB import](docs/epub-import.md)
+- [EPUB fidelity report](docs/epub-fidelity.md)
 - [0.1 conformance profile](docs/conformance.md)
 - [Known limitations](docs/known-limitations.md)
 - [0.1 release review](docs/0.1-release-review.md)
@@ -157,10 +198,12 @@ The final clean-directory review passes 134 tests with zero build warnings; see 
 The real EPUB cycle now follows these increments:
 
 1. import EPUB through the CLI into a valid, deterministic `.flow.json`;
-2. add navigation, accessibility metadata, CSS, tables, notes, and media fallbacks;
+2. expand accessibility metadata and media fallbacks (TOC navigation, notes, tables, ruby, inline languages, bidirectional semantics, MathML, and a safe typed CSS subset are now imported);
 3. generate a self-contained HTML book with its own TOC and chapter files;
 4. validate fidelity and performance against legal real-world publications;
 5. pass the large-book gate before beginning the PDF importer.
+
+The first five increments now have executable implementations, including measured progress and cancellation behavior. The next work is a legal reproducible corpus and the large-publication gate; this does not yet justify a universal EPUB-support, performance, or accessibility-conformance claim. See [EPUB performance, progress, and cancellation](docs/epub-performance.md).
 
 A document can only be considered end-to-end usable when an EPUB can be imported without silent semantic loss, represented as a valid `FlowDocument`, laid out, rendered, inspected, and round-tripped through the supported Flow format. The repository has not reached that point yet.
 
@@ -176,11 +219,66 @@ Start-Process samples/SampleBook/desktop.html
 To reproduce the pipeline from the semantic source:
 
 ```powershell
-dotnet run --project src/Flow.Cli -- import path/to/book.epub --output book.flow.json
+dotnet run --project src/Flow.Cli -- epub-inspect path/to/book.epub --json epub-report.json
+dotnet run --project src/Flow.Cli -- import path/to/book.epub --diagnostics-json import-report.json --fidelity-report fidelity.json
 dotnet run --project src/Flow.Cli -- inspect samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- validate samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- hash samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- render samples/SampleBook/sample.flow.json --html sample.html --width 390 --height 844
+dotnet run --project src/Flow.Cli -- render samples/SampleBook/sample.flow.json --html-book sample-book
+```
+
+### Import a real EPUB and generate its HTML book
+
+Pass the complete EPUB path to `flow import`. Quotes are recommended because book and directory names frequently contain spaces:
+
+```powershell
+Set-Location 'C:\caminho\para\FlowEngineNet'
+
+$epub = 'C:\caminho\para\Meu livro.epub'
+dotnet run --project .\src\Flow.Cli -- import $epub
+```
+
+When `--output` is omitted, the CLI creates the `.flow.json` beside the EPUB. Its portable file name is derived from the book title, while the original title—including accents—remains in the document metadata. For the example above, the result can be:
+
+```text
+C:\caminho\para\meu_livro.flow.json
+```
+
+The CLI prints the exact generated path. Validate it and create the multi-file HTML book in a directory beside the EPUB:
+
+```powershell
+$flow = 'C:\caminho\para\meu_livro.flow.json'
+$book = 'C:\caminho\para\meu_livro_book'
+
+dotnet run --project .\src\Flow.Cli -- validate $flow
+dotnet run --project .\src\Flow.Cli -- render $flow --html-book $book --ui-language pt-PT
+Start-Process "$book\index.html"
+```
+
+This produces, side by side:
+
+```text
+C:\caminho\para\Meu livro.epub
+C:\caminho\para\meu_livro.flow.json
+C:\caminho\para\meu_livro_book\
+```
+
+`import` and `render` are intentionally separate today: importing creates the Flow document; rendering creates the `book` directory only when requested. This makes failures and intermediate validation visible. A future Reader should perform these steps transparently when opening an EPUB, without requiring the user to run this CLI workflow.
+
+`--ui-language` changes only controls and navigation generated by Flow. It does not translate the title, chapters, TOC labels, notes, or other authored content. Supported values are `auto`, `pt-PT`, `pt-BR`, and `en`. To publish more than one interface language, render separate directories instead of duplicating indexes inside one package:
+
+```powershell
+dotnet run --project .\src\Flow.Cli -- render $flow --html-book 'D:\Livros\meu_livro_pt' --ui-language pt-PT
+dotnet run --project .\src\Flow.Cli -- render $flow --html-book 'D:\Livros\meu_livro_ptbr' --ui-language pt-BR
+dotnet run --project .\src\Flow.Cli -- render $flow --html-book 'D:\Livros\meu_livro_en' --ui-language en
+```
+
+To choose the output paths explicitly:
+
+```powershell
+dotnet run --project .\src\Flow.Cli -- import $epub --output 'D:\Livros\meu_livro.flow.json'
+dotnet run --project .\src\Flow.Cli -- render 'D:\Livros\meu_livro.flow.json' --html-book 'D:\Livros\meu_livro_book'
 ```
 
 The detailed [sample walkthrough](samples/SampleBook/README.md) explains prerequisites, expected output, what to compare, safe experiments, limitations, and how the committed evidence is verified.

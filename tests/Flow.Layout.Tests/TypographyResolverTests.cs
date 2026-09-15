@@ -177,6 +177,41 @@ public sealed class TypographyResolverTests
     }
 
     [Fact]
+    public void ResolveNode_AppliesRoleThenNodeThenReaderAndSafetyPrecedence()
+    {
+        var nodeId = new Flow.Core.NodeId("styled-node");
+        var presentation = new DocumentPresentation(
+            new TypographySet(
+            [
+                KeyValuePair.Create(
+                    TypographyRole.Body,
+                    new TypographyStyle(fontFamily: "Role Serif", fontSize: Length.Px(18))),
+            ]),
+            nodeTypography:
+            [
+                KeyValuePair.Create(
+                    nodeId,
+                    new TypographyStyle(
+                        fontFamily: "Node Serif",
+                        fontSize: Length.Px(20),
+                        textDecoration: TextDecoration.Underline)),
+            ]);
+
+        var resolved = _resolver.ResolveNode(
+            presentation,
+            nodeId,
+            TypographyRole.Body,
+            new UserReadingPreferences(preferredBodyFont: "Reader Serif", fontScale: 1.5),
+            new RendererSafetyConstraints(maximumFontSize: Length.Px(24)));
+
+        Assert.NotNull(resolved);
+        Assert.Equal("Reader Serif", resolved.FontFamily);
+        Assert.Equal(Length.Px(24), resolved.FontSize);
+        Assert.Equal(TextDecoration.Underline, resolved.TextDecoration);
+        Assert.Equal("Node Serif", presentation.NodeTypography[nodeId].FontFamily);
+    }
+
+    [Fact]
     public void PreferencesAndConstraintsRejectUnsafeValues()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => new UserReadingPreferences(fontScale: 0));

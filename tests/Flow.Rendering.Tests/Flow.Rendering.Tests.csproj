@@ -20,6 +20,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Flow.Rendering.Html\Flow.Rendering.Html.csproj" />
+    <ProjectReference Include="..\..\src\Flow.Security\Flow.Security.csproj" />
   </ItemGroup>
 
 </Project>

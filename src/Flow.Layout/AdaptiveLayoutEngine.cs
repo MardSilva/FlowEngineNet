@@ -62,7 +62,13 @@ public sealed class AdaptiveLayoutEngine : ILayoutEngine
             profile.ColumnGap,
             profile.ResponsiveFigures);
         style = new ResolvedReadingStyle(style.Typography, contentMargin, style.Theme);
-        var nodes = document.Content.Children.Select(node => CreateNode(node, document.Presentation, profile));
+        var nodes = document.Content.Children.Select(node => CreateNode(
+            node,
+            parent: null,
+            document.Presentation,
+            profile,
+            context.UserPreferences,
+            context.RendererConstraints));
 
         return new LayoutDocument(
             document.Identity.Id,
@@ -125,14 +131,52 @@ public sealed class AdaptiveLayoutEngine : ILayoutEngine
                 : adaptiveDefault;
     }
 
-    private static LayoutNode CreateNode(
+    private LayoutNode CreateNode(
         DocumentNode node,
+        DocumentNode? parent,
         DocumentPresentation? presentation,
-        LayoutProfile profile)
+        LayoutProfile profile,
+        UserReadingPreferences? userPreferences,
+        RendererSafetyConstraints? rendererConstraints)
     {
-        var children = GetChildren(node).Select(child => CreateNode(child, presentation, profile));
-        return new LayoutNode(node.Id, node, ResolveIntent(node, presentation, profile), children);
+        var children = GetChildren(node).Select(child => CreateNode(
+            child,
+            node,
+            presentation,
+            profile,
+            userPreferences,
+            rendererConstraints));
+        var typography = _typographyResolver.ResolveNode(
+            presentation,
+            node.Id,
+            ResolveTypographyRole(node, parent),
+            userPreferences,
+            rendererConstraints);
+        return new LayoutNode(node.Id, node, ResolveIntent(node, presentation, profile), children, typography);
     }
+
+    private static TypographyRole ResolveTypographyRole(DocumentNode node, DocumentNode? parent) => node switch
+    {
+        Heading { Level: 1 } when parent is Chapter => TypographyRole.ChapterTitle,
+        Heading heading => heading.Level switch
+        {
+            1 => TypographyRole.Heading1,
+            2 => TypographyRole.Heading2,
+            3 => TypographyRole.Heading3,
+            4 => TypographyRole.Heading4,
+            5 => TypographyRole.Heading5,
+            6 => TypographyRole.Heading6,
+            _ => TypographyRole.Body,
+        },
+        Caption => TypographyRole.Caption,
+        TableCaption => TypographyRole.Caption,
+        Footnote => TypographyRole.Footnote,
+        CodeBlock => TypographyRole.Code,
+        BlockQuote => TypographyRole.BlockQuote,
+        Paragraph when parent is BlockQuote => TypographyRole.BlockQuote,
+        Paragraph when parent is Footnote => TypographyRole.Footnote,
+        _ => TypographyRole.Body,
+    };
 
     private static IEnumerable<DocumentNode> GetChildren(DocumentNode node) => node switch
     {
@@ -140,8 +184,36 @@ public sealed class AdaptiveLayoutEngine : ILayoutEngine
         OrderedList orderedList => orderedList.Items,
         UnorderedList unorderedList => unorderedList.Items,
         Figure { Caption: not null } figure => [figure.Caption],
+        Table table => TableChildren(table),
+        TableHead head => head.Rows,
+        TableBody body => body.Rows,
+        TableFoot foot => foot.Rows,
+        TableRow row => row.Cells,
         _ => [],
     };
+
+    private static IEnumerable<DocumentNode> TableChildren(Table table)
+    {
+        if (table.Caption is not null)
+        {
+            yield return table.Caption;
+        }
+
+        if (table.Head is not null)
+        {
+            yield return table.Head;
+        }
+
+        foreach (var body in table.Bodies)
+        {
+            yield return body;
+        }
+
+        if (table.Foot is not null)
+        {
+            yield return table.Foot;
+        }
+    }
 
     private static NodeLayoutIntent ResolveIntent(
         DocumentNode node,

@@ -72,7 +72,10 @@ internal static class MinimalEpubFactory
         string? package = null,
         string? chapterOne = null,
         bool includeSecondChapter = true,
-        bool includeImage = true)
+        bool includeImage = true,
+        IReadOnlyDictionary<string, string>? additionalTextEntries = null,
+        IReadOnlyDictionary<string, byte[]>? additionalBinaryEntries = null,
+        string? chapterTwo = null)
     {
         var result = new MemoryStream();
         using (var archive = new ZipArchive(result, ZipArchiveMode.Create, leaveOpen: true))
@@ -83,7 +86,7 @@ internal static class MinimalEpubFactory
             AddText(archive, "EPUB/text/chapter-1.xhtml", chapterOne ?? ChapterOne);
             if (includeSecondChapter)
             {
-                AddText(archive, "EPUB/text/chapter-2.xhtml", ChapterTwo);
+                AddText(archive, "EPUB/text/chapter-2.xhtml", chapterTwo ?? ChapterTwo);
             }
 
             if (includeImage)
@@ -91,6 +94,24 @@ internal static class MinimalEpubFactory
                 var image = archive.CreateEntry("EPUB/images/flow.png", CompressionLevel.Optimal);
                 using var stream = image.Open();
                 stream.Write(OnePixelPng);
+            }
+
+            if (additionalTextEntries is not null)
+            {
+                foreach (var (path, content) in additionalTextEntries)
+                {
+                    AddText(archive, path, content);
+                }
+            }
+
+            if (additionalBinaryEntries is not null)
+            {
+                foreach (var (path, content) in additionalBinaryEntries)
+                {
+                    var entry = archive.CreateEntry(path, CompressionLevel.Optimal);
+                    using var stream = entry.Open();
+                    stream.Write(content);
+                }
             }
         }
 

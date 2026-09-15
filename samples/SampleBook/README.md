@@ -1,6 +1,6 @@
 # The Flow Experiment
 
-“The Flow Experiment” is the first complete demonstration of the current Flow pipeline. It starts with one semantic document, validates and hashes it, creates layouts for two viewports, and renders two standalone HTML files.
+“The Flow Experiment” is the first complete demonstration of the current Flow pipeline. It starts with one semantic document, validates and hashes it, creates layouts for two viewports, renders two standalone HTML files, and can generate a navigable multi-file HTML book.
 
 The interesting result is not simply that two HTML files exist. It is that both presentations preserve the same document identity, semantic nodes, anchors, links, and canonical hash while adapting to different reading surfaces.
 
@@ -48,7 +48,7 @@ Resize the browser window after opening either file. The generated document incl
 Install the .NET SDK pinned by the repository's `global.json` file:
 
 ```text
-.NET SDK 10.0.302
+.NET SDK 10.0.401
 ```
 
 Confirm the selected SDK from the repository root:
@@ -158,6 +158,27 @@ The large profile keeps a maximum readable content width and increases lateral s
 
 The render commands replace the specified output files. Use different paths if you want to preserve the committed reference artifacts.
 
+### 7. Generate the multi-file HTML book
+
+```powershell
+dotnet run --project src/Flow.Cli -- render samples/SampleBook/sample.flow.json --html-book sample-book
+Start-Process sample-book/index.html
+```
+
+Expected structure:
+
+```text
+sample-book/
+  index.html
+  toc.html
+  chapters/chapter-001.html ... chapter-005.html
+  assets/<sha256>.svg
+  styles/book.css
+  manifest.json
+```
+
+The index provides the entry/title page, `toc.html` is a separate logical page, and each of the five semantic chapters starts in its own file. Previous/contents/next links work without a server or JavaScript. `manifest.json` records the same document identity and canonical hash reported by `flow hash`, plus SHA-256 for every payload file. Repeating the command safely replaces only a directory already marked as a Flow HTML book.
+
 ## What should you compare?
 
 Open both files and check the following:
@@ -220,7 +241,7 @@ The command replaces the target file if it already exists.
 
 ## Current limits
 
-This sample proves the current `.flow.json` → validation/hash → adaptive layout → standalone HTML pipeline. It does not yet prove:
+This sample proves the current `.flow.json` → validation/hash → adaptive layout → standalone and multi-file HTML pipeline. It does not yet prove:
 
 - broad EPUB interoperability or semantic-loss measurements across real publisher publications;
 - editing and saving from a reader application;
@@ -228,7 +249,7 @@ This sample proves the current `.flow.json` → validation/hash → adaptive lay
 - font embedding—the named fonts fall back to locally available fonts;
 - signature trust/transport, provenance, DRM, or publishing services.
 
-The library now has a limited, diagnostic-first EPUB importer tested with a project-generated EPUB. It is not connected to this CLI pipeline and has not been validated against a broad real-world corpus, so the complete “EPUB in → inspect/hash/render” user workflow is still absent.
+The library has a limited, diagnostic-first EPUB importer connected to the CLI, fidelity reports, standalone HTML, and the multi-file HTML package. It has been exercised with a local real-world publication, but not yet against the public reproducible corpus or large-book gate; broad EPUB interoperability remains unproven.
 
 ## Related documentation
 
@@ -237,6 +258,7 @@ The library now has a limited, diagnostic-first EPUB importer tested with a proj
 - [Semantic document model](../../docs/flow-document-model.md)
 - [Adaptive layout](../../docs/adaptive-layout.md)
 - [Standalone HTML renderer](../../docs/html-renderer.md)
+- [HTML book package](../../docs/html-book-package.md)
 - [Canonicalization and hashing](../../docs/canonicalization.md)
 - [EPUB import prototype](../../docs/epub-import.md)
 - [Known limitations](../../docs/known-limitations.md)

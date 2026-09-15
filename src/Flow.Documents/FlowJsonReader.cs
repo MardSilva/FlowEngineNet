@@ -144,6 +144,34 @@ internal static class FlowJsonReader
                 OptionalString(element, "alternativeText", $"{path}.alternativeText")),
             "caption" => new Caption(id, ReadInlineProperty(element, "content", path)),
             "footnote" => new Footnote(id, ReadChildren(element, path)),
+            "table" => new Table(
+                id,
+                ReadTypedNodes<TableBody>(element, "bodies", path, "tableBody"),
+                ReadOptionalNode<TableCaption>(element, "caption", path, "tableCaption"),
+                ReadOptionalNode<TableHead>(element, "head", path, "tableHead"),
+                ReadOptionalNode<TableFoot>(element, "foot", path, "tableFoot")),
+            "tableCaption" => new TableCaption(id, ReadChildren(element, path)),
+            "tableHead" => new TableHead(id, ReadTypedNodes<TableRow>(element, "rows", path, "tableRow")),
+            "tableBody" => new TableBody(id, ReadTypedNodes<TableRow>(element, "rows", path, "tableRow")),
+            "tableFoot" => new TableFoot(id, ReadTypedNodes<TableRow>(element, "rows", path, "tableRow")),
+            "tableRow" => new TableRow(id, ReadTypedNodes<TableCellNode>(element, "cells", path, "tableCell")),
+            "tableHeaderCell" => new TableHeaderCell(
+                id,
+                ReadChildren(element, path),
+                RequiredInt32(element, "columnSpan", $"{path}.columnSpan"),
+                RequiredInt32(element, "rowSpan", $"{path}.rowSpan"),
+                OptionalEnum<TableHeaderScope>(element, "scope", $"{path}.scope"),
+                ReadNodeIds(element, "headers", path)),
+            "tableCell" => new TableCell(
+                id,
+                ReadChildren(element, path),
+                RequiredInt32(element, "columnSpan", $"{path}.columnSpan"),
+                RequiredInt32(element, "rowSpan", $"{path}.rowSpan"),
+                ReadNodeIds(element, "headers", path)),
+            "mathExpression" => new MathExpression(
+                id,
+                ReadMathElement(RequiredProperty(element, "root", $"{path}.root"), $"{path}.root"),
+                OptionalString(element, "alternativeText", $"{path}.alternativeText")),
             "horizontalRule" => new HorizontalRule(id),
             "codeBlock" => new CodeBlock(
                 id,
@@ -179,6 +207,71 @@ internal static class FlowJsonReader
             }
 
             yield return listItem;
+            index++;
+        }
+    }
+
+    private static IEnumerable<TNode> ReadTypedNodes<TNode>(
+        JsonElement parent,
+        string propertyName,
+        string path,
+        string expectedType)
+        where TNode : DocumentNode
+    {
+        var propertyPath = $"{path}.{propertyName}";
+        var index = 0;
+        foreach (var node in ReadNodes(RequiredProperty(parent, propertyName, propertyPath), propertyPath))
+        {
+            if (node is not TNode typedNode)
+            {
+                throw Error(
+                    FlowSerializationDiagnosticCodes.InvalidDocument,
+                    $"Node at '{propertyPath}[{index}]' must have type '{expectedType}'.",
+                    $"{propertyPath}[{index}].type");
+            }
+
+            yield return typedNode;
+            index++;
+        }
+    }
+
+    private static TNode? ReadOptionalNode<TNode>(
+        JsonElement parent,
+        string propertyName,
+        string path,
+        string expectedType)
+        where TNode : DocumentNode
+    {
+        if (!parent.TryGetProperty(propertyName, out var element) || element.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        var propertyPath = $"{path}.{propertyName}";
+        return ReadNode(element, propertyPath) as TNode
+            ?? throw Error(
+                FlowSerializationDiagnosticCodes.InvalidDocument,
+                $"Node at '{propertyPath}' must have type '{expectedType}'.",
+                $"{propertyPath}.type");
+    }
+
+    private static IEnumerable<NodeId> ReadNodeIds(JsonElement parent, string propertyName, string path)
+    {
+        var propertyPath = $"{path}.{propertyName}";
+        var property = RequiredProperty(parent, propertyName, propertyPath);
+        RequireKind(property, JsonValueKind.Array, propertyPath);
+        var index = 0;
+        foreach (var item in property.EnumerateArray())
+        {
+            if (item.ValueKind != JsonValueKind.String)
+            {
+                throw Error(
+                    FlowSerializationDiagnosticCodes.InvalidDocument,
+                    $"Property '{propertyPath}[{index}]' must be a string.",
+                    $"{propertyPath}[{index}]");
+            }
+
+            yield return new NodeId(item.GetString()!);
             index++;
         }
     }
@@ -249,13 +342,96 @@ internal static class FlowJsonReader
                 RequiredString(element, "target", $"{path}.target"),
                 ReadInlineProperty(element, "children", path)),
             "footnoteReference" => new FootnoteReference(
-                new NodeId(RequiredString(element, "targetId", $"{path}.targetId"))),
+                new NodeId(RequiredString(element, "targetId", $"{path}.targetId")),
+                element.TryGetProperty("label", out _)
+                    ? ReadInlineProperty(element, "label", path)
+                    : []),
+            "inlineMath" => new InlineMath(
+                ReadMathElement(RequiredProperty(element, "root", $"{path}.root"), $"{path}.root"),
+                OptionalString(element, "alternativeText", $"{path}.alternativeText")),
+            "languageSpan" => new LanguageSpan(
+                ReadLanguageTag(element, path),
+                ReadInlineProperty(element, "children", path)),
+            "bidirectionalSpan" => new BidirectionalSpan(
+                RequiredEnum<TextDirection>(element, "direction", $"{path}.direction"),
+                RequiredEnum<BidirectionalMode>(element, "mode", $"{path}.mode"),
+                ReadInlineProperty(element, "children", path)),
+            "ruby" => new Ruby(ReadInlineProperty(element, "children", path)),
+            "rubyAnnotation" => new RubyAnnotation(ReadInlineProperty(element, "children", path)),
+            "rubyFallbackParenthesis" => new RubyFallbackParenthesis(ReadInlineProperty(element, "children", path)),
             "lineBreak" => new LineBreak(),
             _ => throw Error(
                 FlowSerializationDiagnosticCodes.UnsupportedNode,
                 $"Unsupported inline node type '{type}' at '{path}'.",
                 $"{path}.type"),
         };
+    }
+
+    private static LanguageTag ReadLanguageTag(JsonElement element, string path)
+    {
+        var value = RequiredString(element, "language", $"{path}.language");
+        if (LanguageTag.TryParse(value, out var languageTag))
+        {
+            return languageTag;
+        }
+
+        throw Error(
+            FlowSerializationDiagnosticCodes.InvalidDocument,
+            $"Language tag '{value}' at '{path}.language' is invalid.",
+            $"{path}.language");
+    }
+
+    private static MathElement ReadMathElement(JsonElement element, string path) =>
+        ReadMathNode(element, path) as MathElement
+        ?? throw Error(
+            FlowSerializationDiagnosticCodes.InvalidDocument,
+            $"Math node at '{path}' must be an element.",
+            path);
+
+    private static MathNode ReadMathNode(JsonElement element, string path)
+    {
+        RequireKind(element, JsonValueKind.Object, path);
+        var type = RequiredString(element, "type", $"{path}.type");
+        if (type == "text")
+        {
+            return new MathText(RequiredString(element, "value", $"{path}.value"));
+        }
+
+        if (type != "element")
+        {
+            throw Error(
+                FlowSerializationDiagnosticCodes.UnsupportedNode,
+                $"Unsupported math node type '{type}' at '{path}'.",
+                $"{path}.type");
+        }
+
+        var attributesElement = RequiredProperty(element, "attributes", $"{path}.attributes");
+        RequireKind(attributesElement, JsonValueKind.Object, $"{path}.attributes");
+        var attributes = attributesElement.EnumerateObject()
+            .Select(property => KeyValuePair.Create(
+                property.Name,
+                property.Value.ValueKind == JsonValueKind.String
+                    ? property.Value.GetString()!
+                    : throw Error(
+                        FlowSerializationDiagnosticCodes.InvalidDocument,
+                        $"Math attribute '{property.Name}' at '{path}' must be a string.",
+                        $"{path}.attributes.{property.Name}")));
+        var childrenElement = RequiredProperty(element, "children", $"{path}.children");
+        RequireKind(childrenElement, JsonValueKind.Array, $"{path}.children");
+        var children = childrenElement.EnumerateArray()
+            .Select((child, index) => ReadMathNode(child, $"{path}.children[{index}]"));
+
+        try
+        {
+            return new MathElement(
+                RequiredString(element, "name", $"{path}.name"),
+                children,
+                attributes);
+        }
+        catch (ArgumentException exception)
+        {
+            throw Error(FlowSerializationDiagnosticCodes.InvalidDocument, exception.Message, path);
+        }
     }
 
     private static DocumentPresentation ReadPresentation(JsonElement element, string path)
@@ -274,7 +450,38 @@ internal static class FlowJsonReader
             ReadFootnotePresentation(element, path),
             ReadCodeBlockPresentation(element, path),
             ReadTableOfContentsPresentation(element, path),
-            OptionalEnum<ReadingTheme>(element, "theme", $"{path}.theme"));
+            OptionalEnum<ReadingTheme>(element, "theme", $"{path}.theme"),
+            ReadNodeTypography(element, path),
+            ReadCoverPresentation(element, path));
+    }
+
+    private static CoverPresentation? ReadCoverPresentation(JsonElement parent, string path)
+    {
+        if (!parent.TryGetProperty("cover", out var element))
+        {
+            return null;
+        }
+
+        RequireKind(element, JsonValueKind.Object, $"{path}.cover");
+        return new CoverPresentation(
+            new Flow.Core.NodeId(RequiredString(element, "figureId", $"{path}.cover.figureId")));
+    }
+
+    private static IEnumerable<KeyValuePair<Flow.Core.NodeId, TypographyStyle>> ReadNodeTypography(
+        JsonElement parent,
+        string path)
+    {
+        if (!parent.TryGetProperty("nodeTypography", out var element))
+        {
+            return [];
+        }
+
+        RequireKind(element, JsonValueKind.Array, $"{path}.nodeTypography");
+        return element.EnumerateArray().Select((item, index) => KeyValuePair.Create(
+            new Flow.Core.NodeId(RequiredString(item, "nodeId", $"{path}.nodeTypography[{index}].nodeId")),
+            ReadTypographyStyle(
+                RequiredProperty(item, "style", $"{path}.nodeTypography[{index}].style"),
+                $"{path}.nodeTypography[{index}].style"))).ToArray();
     }
 
     private static TypographySet ReadTypography(JsonElement element, string path)
@@ -306,7 +513,28 @@ internal static class FlowJsonReader
             OptionalEnum<TextTransform>(element, "textTransform", $"{path}.textTransform"),
             OptionalLength(element, "marginBefore", $"{path}.marginBefore"),
             OptionalLength(element, "marginAfter", $"{path}.marginAfter"),
-            OptionalLength(element, "indent", $"{path}.indent"));
+            OptionalLength(element, "indent", $"{path}.indent"),
+            OptionalTextDecoration(element, "textDecoration", $"{path}.textDecoration"));
+
+    private static TextDecoration? OptionalTextDecoration(JsonElement parent, string name, string path)
+    {
+        if (!parent.TryGetProperty(name, out var property) || property.ValueKind == JsonValueKind.Null)
+        {
+            return null;
+        }
+
+        if (property.ValueKind != JsonValueKind.String
+            || !Enum.TryParse<TextDecoration>(property.GetString(), ignoreCase: false, out var value)
+            || (value & ~(TextDecoration.Underline | TextDecoration.LineThrough)) != 0)
+        {
+            throw Error(
+                FlowSerializationDiagnosticCodes.InvalidDocument,
+                $"Property '{path}' has an unsupported text decoration value.",
+                path);
+        }
+
+        return value;
+    }
 
     private static HeadingPresentation? ReadHeadingPresentation(JsonElement parent, string path) =>
         parent.TryGetProperty("headings", out var element)

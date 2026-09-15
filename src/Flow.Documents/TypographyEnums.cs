@@ -36,6 +36,14 @@ public enum TextTransform
     Capitalize,
 }
 
+[Flags]
+public enum TextDecoration
+{
+    None = 0,
+    Underline = 1,
+    LineThrough = 2,
+}
+
 public enum TypographyRole
 {
     Body,

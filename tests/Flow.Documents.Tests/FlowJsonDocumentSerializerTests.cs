@@ -26,6 +26,49 @@ public sealed class FlowJsonDocumentSerializerTests
     }
 
     [Fact]
+    public async Task SerializeAsync_PreCancelledTokenWritesNoPartialBytes()
+    {
+        await using var destination = new MemoryStream();
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(
+            () => _serializer.SerializeAsync(CreateCompleteDocument(), destination, cancellation.Token));
+
+        Assert.Equal(0, destination.Length);
+    }
+
+    [Fact]
+    public async Task SerializeAsync_WritesUnicodeLiterallyAndEscapesUnsafeJsonText()
+    {
+        var document = new FlowDocument(
+            new DocumentIdentity(new DocumentId("urn:test:readable-unicode")),
+            new DocumentMetadata("Isto é 日本語 العربية 😀"),
+            new DocumentContent(
+            [
+                new Paragraph(
+                    new NodeId("unicode"),
+                    [new Text("aspas \" e linha\nnova <script>alert('x')</script>")]),
+            ]));
+
+        var bytes = await SerializeAsync(document);
+        var json = Encoding.UTF8.GetString(bytes);
+
+        Assert.False(bytes.AsSpan().StartsWith(Encoding.UTF8.Preamble));
+        Assert.Contains("Isto é", json, StringComparison.Ordinal);
+        Assert.Contains("日本語", json, StringComparison.Ordinal);
+        Assert.Contains("العربية", json, StringComparison.Ordinal);
+        Assert.Contains("\\uD83D\\uDE00", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("\\u00E9", json, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("\\u003Cscript\\u003E", json, StringComparison.Ordinal);
+        Assert.Contains("\\n", json, StringComparison.Ordinal);
+
+        await using var source = new MemoryStream(bytes);
+        var restored = await _serializer.DeserializeAsync(source);
+        Assert.Equal(document.Metadata.Title, restored.Metadata.Title);
+    }
+
+    [Fact]
     public async Task RoundTrip_PreservesCompleteDocumentRepresentation()
     {
         var originalBytes = await SerializeAsync(CreateCompleteDocument());
@@ -38,8 +81,59 @@ public sealed class FlowJsonDocumentSerializerTests
         Assert.Equal("The Flow Experiment", restored.Metadata.Title);
         Assert.Equal(2, restored.Assets.Count);
         Assert.Equal(ReadingTheme.Dark, restored.Presentation?.Theme);
+        Assert.Equal(new NodeId("figure-one"), restored.Presentation?.Cover?.FigureId);
         Assert.Equal("ABC123", restored.Integrity?.Hash);
         Assert.IsType<Chapter>(Assert.Single(restored.Content.Children));
+    }
+
+    [Fact]
+    public async Task RoundTrip_PreservesCompleteTableRepresentation()
+    {
+        var headerId = new NodeId("header-product");
+        var table = new Table(
+            new NodeId("table-products"),
+            [
+                new TableBody(
+                    new NodeId("body-primary"),
+                    [
+                        new TableRow(
+                            new NodeId("row-product"),
+                            [
+                                new TableHeaderCell(
+                                    headerId,
+                                    [Paragraph("p-header-product", "Product")],
+                                    columnSpan: 2,
+                                    scope: TableHeaderScope.Column),
+                                new TableCell(
+                                    new NodeId("cell-flow"),
+                                    [Paragraph("p-cell-flow", "Flow")],
+                                    rowSpan: 2,
+                                    headers: [headerId]),
+                                new TableCell(new NodeId("cell-empty"), []),
+                            ]),
+                    ]),
+                new TableBody(new NodeId("body-secondary"), []),
+            ],
+            new TableCaption(new NodeId("caption-products"), [Paragraph("p-caption-products", "Products")]),
+            new TableHead(new NodeId("head-products"), []),
+            new TableFoot(new NodeId("foot-products"), []));
+        var document = new FlowDocument(
+            new DocumentIdentity(new DocumentId("urn:test:table-json")),
+            new DocumentMetadata("Table JSON"),
+            new DocumentContent([new Chapter(new NodeId("chapter-table"), [table])]));
+
+        var first = await SerializeAsync(document);
+        await using var input = new MemoryStream(first);
+        var restored = await _serializer.DeserializeAsync(input);
+        var second = await SerializeAsync(restored);
+
+        Assert.Equal(first, second);
+        var restoredTable = Assert.IsType<Table>(restored.Index.GetLocations(table.Id).Single().Node);
+        Assert.Equal(2, restoredTable.Bodies.Length);
+        var header = Assert.IsType<TableHeaderCell>(restoredTable.Bodies[0].Rows[0].Cells[0]);
+        Assert.Equal(2, header.ColumnSpan);
+        Assert.Equal(TableHeaderScope.Column, header.Scope);
+        Assert.Empty(restoredTable.Bodies[0].Rows[0].Cells[2].Children);
     }
 
     [Fact]
@@ -127,7 +221,7 @@ public sealed class FlowJsonDocumentSerializerTests
                         new Strikethrough([new Text("strike")]),
                         new InlineCode("code"),
                         new Link(headingAnchor.Value, [new Text("link")]),
-                        new FootnoteReference(footnoteId),
+                        new FootnoteReference(footnoteId, [new Strong([new Text("1")])]),
                         new LineBreak(),
                     ]),
                 new BlockQuote(
@@ -176,7 +270,8 @@ public sealed class FlowJsonDocumentSerializerTests
             new FootnotePresentation(FootnotePresentationMode.EndOfSection),
             new CodeBlockPresentation(true, true),
             new TableOfContentsPresentation(true, TableOfContentsLeaderStyle.Dots),
-            ReadingTheme.Dark);
+            ReadingTheme.Dark,
+            cover: new CoverPresentation(new NodeId("figure-one")));
 
         return new FlowDocument(
             new DocumentIdentity(

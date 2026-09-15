@@ -50,7 +50,8 @@ public static class FlowStyleDefaults
             TextTransform.None,
             marginBefore,
             marginAfter,
-            Length.Px(0));
+            Length.Px(0),
+            TextDecoration.None);
     }
 
     private static double GetFontSize(TypographyRole role) => role switch
