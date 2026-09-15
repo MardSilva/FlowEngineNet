@@ -27,6 +27,7 @@ public sealed class FlowCliApplication
             new CliOperations(
                 new FlowJsonDocumentSerializer(),
                 new EpubImporter(),
+                new EpubPublicationInspector(),
                 new DocumentValidator(),
                 new Sha256DocumentIntegrityService(new FlowDocumentCanonicalizer()),
                 new AdaptiveLayoutEngine(),
@@ -54,6 +55,12 @@ public sealed class FlowCliApplication
         {
             return await _operations.ExecuteAsync(parseResult.Command!, output, error, cancellationToken)
                 .ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            await error.WriteLineAsync("FLOWCLI_CANCELLED: The operation was cancelled; no partial final output was kept.")
+                .ConfigureAwait(false);
+            return 130;
         }
         catch (FlowSerializationException exception)
         {

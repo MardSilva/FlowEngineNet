@@ -1,5 +1,17 @@
 namespace Flow.Documents;
 
+/// <summary>Identifies the semantic figure that represents a publication cover.</summary>
+public sealed record CoverPresentation
+{
+    public CoverPresentation(Flow.Core.NodeId figureId)
+    {
+        ArgumentNullException.ThrowIfNull(figureId);
+        FigureId = figureId;
+    }
+
+    public Flow.Core.NodeId FigureId { get; }
+}
+
 public sealed record HeadingPresentation
 {
     public HeadingPresentation(bool? keepWithNext = null, bool? avoidBreakAfter = null)

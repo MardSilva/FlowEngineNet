@@ -6,8 +6,12 @@ internal static class FlowJsonWriter
 {
     internal const string FormatVersion = "flow-json-0.1";
 
-    internal static void Write(Utf8JsonWriter writer, FlowDocument document)
+    internal static void Write(
+        Utf8JsonWriter writer,
+        FlowDocument document,
+        CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         writer.WriteStartObject();
         writer.WriteString("format", FormatVersion);
         WriteIdentity(writer, document.Identity);
@@ -16,13 +20,14 @@ internal static class FlowJsonWriter
         writer.WritePropertyName("content");
         writer.WriteStartObject();
         writer.WritePropertyName("nodes");
-        WriteNodes(writer, document.Content.Children);
+        WriteNodes(writer, document.Content.Children, cancellationToken);
         writer.WriteEndObject();
 
         writer.WritePropertyName("assets");
         writer.WriteStartArray();
         foreach (var asset in document.Assets.Values.OrderBy(static asset => asset.Id.Value, StringComparer.Ordinal))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             writer.WriteStartObject();
             writer.WriteString("id", asset.Id.Value);
             writer.WriteString("mediaType", asset.MediaType);
@@ -32,10 +37,9 @@ internal static class FlowJsonWriter
         }
 
         writer.WriteEndArray();
-
         if (document.Presentation is not null)
         {
-            WritePresentation(writer, document.Presentation);
+            WritePresentation(writer, document.Presentation, cancellationToken);
         }
 
         if (document.Integrity is not null)
@@ -80,18 +84,22 @@ internal static class FlowJsonWriter
         writer.WriteEndObject();
     }
 
-    private static void WriteNodes(Utf8JsonWriter writer, IEnumerable<DocumentNode> nodes)
+    private static void WriteNodes(
+        Utf8JsonWriter writer,
+        IEnumerable<DocumentNode> nodes,
+        CancellationToken cancellationToken)
     {
         writer.WriteStartArray();
         foreach (var node in nodes)
         {
-            WriteNode(writer, node);
+            cancellationToken.ThrowIfCancellationRequested();
+            WriteNode(writer, node, cancellationToken);
         }
 
         writer.WriteEndArray();
     }
 
-    private static void WriteNode(Utf8JsonWriter writer, DocumentNode node)
+    private static void WriteNode(Utf8JsonWriter writer, DocumentNode node, CancellationToken cancellationToken)
     {
         writer.WriteStartObject();
         writer.WriteString("type", GetNodeType(node));
@@ -100,32 +108,32 @@ internal static class FlowJsonWriter
         switch (node)
         {
             case Chapter chapter:
-                WriteChildNodes(writer, chapter.Children);
+                WriteChildNodes(writer, chapter.Children, cancellationToken);
                 break;
             case Section section:
-                WriteChildNodes(writer, section.Children);
+                WriteChildNodes(writer, section.Children, cancellationToken);
                 break;
             case Heading heading:
                 writer.WriteNumber("level", heading.Level);
-                WriteInlineProperty(writer, "content", heading.Content);
+                WriteInlineProperty(writer, "content", heading.Content, cancellationToken);
                 break;
             case Paragraph paragraph:
-                WriteInlineProperty(writer, "content", paragraph.Content);
+                WriteInlineProperty(writer, "content", paragraph.Content, cancellationToken);
                 break;
             case BlockQuote blockQuote:
-                WriteChildNodes(writer, blockQuote.Children);
+                WriteChildNodes(writer, blockQuote.Children, cancellationToken);
                 break;
             case OrderedList orderedList:
                 writer.WriteNumber("start", orderedList.Start);
                 writer.WritePropertyName("items");
-                WriteNodes(writer, orderedList.Items);
+                WriteNodes(writer, orderedList.Items, cancellationToken);
                 break;
             case UnorderedList unorderedList:
                 writer.WritePropertyName("items");
-                WriteNodes(writer, unorderedList.Items);
+                WriteNodes(writer, unorderedList.Items, cancellationToken);
                 break;
             case ListItem listItem:
-                WriteChildNodes(writer, listItem.Children);
+                WriteChildNodes(writer, listItem.Children, cancellationToken);
                 break;
             case Figure figure:
                 writer.WriteString("assetId", figure.AssetId.Value);
@@ -133,15 +141,52 @@ internal static class FlowJsonWriter
                 if (figure.Caption is not null)
                 {
                     writer.WritePropertyName("caption");
-                    WriteNode(writer, figure.Caption);
+                    WriteNode(writer, figure.Caption, cancellationToken);
                 }
 
                 break;
             case Caption caption:
-                WriteInlineProperty(writer, "content", caption.Content);
+                WriteInlineProperty(writer, "content", caption.Content, cancellationToken);
                 break;
             case Footnote footnote:
-                WriteChildNodes(writer, footnote.Children);
+                WriteChildNodes(writer, footnote.Children, cancellationToken);
+                break;
+            case Table table:
+                WriteOptionalNode(writer, "caption", table.Caption, cancellationToken);
+                WriteOptionalNode(writer, "head", table.Head, cancellationToken);
+                writer.WritePropertyName("bodies");
+                WriteNodes(writer, table.Bodies, cancellationToken);
+                WriteOptionalNode(writer, "foot", table.Foot, cancellationToken);
+                break;
+            case TableCaption tableCaption:
+                WriteChildNodes(writer, tableCaption.Children, cancellationToken);
+                break;
+            case TableHead tableHead:
+                WriteNodeArray(writer, "rows", tableHead.Rows, cancellationToken);
+                break;
+            case TableBody tableBody:
+                WriteNodeArray(writer, "rows", tableBody.Rows, cancellationToken);
+                break;
+            case TableFoot tableFoot:
+                WriteNodeArray(writer, "rows", tableFoot.Rows, cancellationToken);
+                break;
+            case TableRow tableRow:
+                WriteNodeArray(writer, "cells", tableRow.Cells, cancellationToken);
+                break;
+            case TableHeaderCell headerCell:
+                WriteCell(writer, headerCell, cancellationToken);
+                if (headerCell.Scope is not null)
+                {
+                    writer.WriteString("scope", headerCell.Scope.Value.ToString());
+                }
+
+                break;
+            case TableCell tableCell:
+                WriteCell(writer, tableCell, cancellationToken);
+                break;
+            case MathExpression mathExpression:
+                WriteMathElement(writer, "root", mathExpression.Root, cancellationToken);
+                WriteOptionalString(writer, "alternativeText", mathExpression.AlternativeText);
                 break;
             case HorizontalRule:
                 break;
@@ -150,16 +195,17 @@ internal static class FlowJsonWriter
                 WriteOptionalString(writer, "language", codeBlock.Language);
                 break;
             case TableOfContents tableOfContents:
-                WriteInlineProperty(writer, "title", tableOfContents.Title);
+                WriteInlineProperty(writer, "title", tableOfContents.Title, cancellationToken);
                 writer.WriteNumber("maximumDepth", tableOfContents.MaximumDepth);
                 writer.WritePropertyName("entries");
                 writer.WriteStartArray();
                 foreach (var entry in tableOfContents.Entries)
                 {
+                    cancellationToken.ThrowIfCancellationRequested();
                     writer.WriteStartObject();
                     writer.WriteNumber("level", entry.Level);
                     writer.WriteString("target", entry.Target.Value);
-                    WriteInlineProperty(writer, "label", entry.Label);
+                    WriteInlineProperty(writer, "label", entry.Label, cancellationToken);
                     writer.WriteEndObject();
                 }
 
@@ -185,34 +231,89 @@ internal static class FlowJsonWriter
         Figure => "figure",
         Caption => "caption",
         Footnote => "footnote",
+        Table => "table",
+        TableCaption => "tableCaption",
+        TableHead => "tableHead",
+        TableBody => "tableBody",
+        TableFoot => "tableFoot",
+        TableRow => "tableRow",
+        TableHeaderCell => "tableHeaderCell",
+        TableCell => "tableCell",
+        MathExpression => "mathExpression",
         HorizontalRule => "horizontalRule",
         CodeBlock => "codeBlock",
         TableOfContents => "tableOfContents",
         _ => throw UnsupportedNode(node.GetType()),
     };
 
-    private static void WriteChildNodes(Utf8JsonWriter writer, IEnumerable<DocumentNode> children)
+    private static void WriteChildNodes(
+        Utf8JsonWriter writer,
+        IEnumerable<DocumentNode> children,
+        CancellationToken cancellationToken)
     {
         writer.WritePropertyName("children");
-        WriteNodes(writer, children);
+        WriteNodes(writer, children, cancellationToken);
+    }
+
+    private static void WriteOptionalNode(
+        Utf8JsonWriter writer,
+        string propertyName,
+        DocumentNode? node,
+        CancellationToken cancellationToken)
+    {
+        if (node is null)
+        {
+            return;
+        }
+
+        writer.WritePropertyName(propertyName);
+        WriteNode(writer, node, cancellationToken);
+    }
+
+    private static void WriteNodeArray(
+        Utf8JsonWriter writer,
+        string propertyName,
+        IEnumerable<DocumentNode> nodes,
+        CancellationToken cancellationToken)
+    {
+        writer.WritePropertyName(propertyName);
+        WriteNodes(writer, nodes, cancellationToken);
+    }
+
+    private static void WriteCell(Utf8JsonWriter writer, TableCellNode cell, CancellationToken cancellationToken)
+    {
+        writer.WriteNumber("columnSpan", cell.ColumnSpan);
+        writer.WriteNumber("rowSpan", cell.RowSpan);
+        writer.WritePropertyName("headers");
+        writer.WriteStartArray();
+        foreach (var header in cell.Headers)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            writer.WriteStringValue(header.Value);
+        }
+
+        writer.WriteEndArray();
+        WriteChildNodes(writer, cell.Children, cancellationToken);
     }
 
     private static void WriteInlineProperty(
         Utf8JsonWriter writer,
         string propertyName,
-        IEnumerable<InlineNode> nodes)
+        IEnumerable<InlineNode> nodes,
+        CancellationToken cancellationToken)
     {
         writer.WritePropertyName(propertyName);
         writer.WriteStartArray();
         foreach (var node in nodes)
         {
-            WriteInline(writer, node);
+            cancellationToken.ThrowIfCancellationRequested();
+            WriteInline(writer, node, cancellationToken);
         }
 
         writer.WriteEndArray();
     }
 
-    private static void WriteInline(Utf8JsonWriter writer, InlineNode node)
+    private static void WriteInline(Utf8JsonWriter writer, InlineNode node, CancellationToken cancellationToken)
     {
         writer.WriteStartObject();
         writer.WriteString("type", GetInlineType(node));
@@ -223,10 +324,19 @@ internal static class FlowJsonWriter
                 writer.WriteString("value", text.Value);
                 break;
             case InlineContainerNode container:
-                WriteInlineProperty(writer, "children", container.Children);
+                WriteInlineProperty(writer, "children", container.Children, cancellationToken);
                 if (container is Link link)
                 {
                     writer.WriteString("target", link.Target);
+                }
+                else if (container is LanguageSpan languageSpan)
+                {
+                    writer.WriteString("language", languageSpan.Language.Value);
+                }
+                else if (container is BidirectionalSpan bidirectionalSpan)
+                {
+                    writer.WriteString("direction", bidirectionalSpan.Direction.ToString());
+                    writer.WriteString("mode", bidirectionalSpan.Mode.ToString());
                 }
 
                 break;
@@ -235,6 +345,14 @@ internal static class FlowJsonWriter
                 break;
             case FootnoteReference footnoteReference:
                 writer.WriteString("targetId", footnoteReference.TargetId.Value);
+                if (!footnoteReference.Label.IsEmpty)
+                {
+                    WriteInlineProperty(writer, "label", footnoteReference.Label, cancellationToken);
+                }
+                break;
+            case InlineMath inlineMath:
+                WriteMathElement(writer, "root", inlineMath.Root, cancellationToken);
+                WriteOptionalString(writer, "alternativeText", inlineMath.AlternativeText);
                 break;
             case LineBreak:
                 break;
@@ -255,11 +373,68 @@ internal static class FlowJsonWriter
         InlineCode => "inlineCode",
         Link => "link",
         FootnoteReference => "footnoteReference",
+        InlineMath => "inlineMath",
+        LanguageSpan => "languageSpan",
+        BidirectionalSpan => "bidirectionalSpan",
+        Ruby => "ruby",
+        RubyAnnotation => "rubyAnnotation",
+        RubyFallbackParenthesis => "rubyFallbackParenthesis",
         LineBreak => "lineBreak",
         _ => throw UnsupportedNode(node.GetType()),
     };
 
-    private static void WritePresentation(Utf8JsonWriter writer, DocumentPresentation presentation)
+    private static void WriteMathElement(
+        Utf8JsonWriter writer,
+        string propertyName,
+        MathElement element,
+        CancellationToken cancellationToken)
+    {
+        writer.WritePropertyName(propertyName);
+        WriteMathNode(writer, element, cancellationToken);
+    }
+
+    private static void WriteMathNode(Utf8JsonWriter writer, MathNode node, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        writer.WriteStartObject();
+        switch (node)
+        {
+            case MathText text:
+                writer.WriteString("type", "text");
+                writer.WriteString("value", text.Value);
+                break;
+            case MathElement element:
+                writer.WriteString("type", "element");
+                writer.WriteString("name", element.Name);
+                writer.WritePropertyName("attributes");
+                writer.WriteStartObject();
+                foreach (var attribute in element.Attributes)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    writer.WriteString(attribute.Key, attribute.Value);
+                }
+
+                writer.WriteEndObject();
+                writer.WritePropertyName("children");
+                writer.WriteStartArray();
+                foreach (var child in element.Children)
+                {
+                    WriteMathNode(writer, child, cancellationToken);
+                }
+
+                writer.WriteEndArray();
+                break;
+            default:
+                throw UnsupportedNode(node.GetType());
+        }
+
+        writer.WriteEndObject();
+    }
+
+    private static void WritePresentation(
+        Utf8JsonWriter writer,
+        DocumentPresentation presentation,
+        CancellationToken cancellationToken)
     {
         writer.WritePropertyName("presentation");
         writer.WriteStartObject();
@@ -268,10 +443,19 @@ internal static class FlowJsonWriter
             writer.WriteString("theme", presentation.Theme.Value.ToString());
         }
 
+        if (presentation.Cover is not null)
+        {
+            writer.WritePropertyName("cover");
+            writer.WriteStartObject();
+            writer.WriteString("figureId", presentation.Cover.FigureId.Value);
+            writer.WriteEndObject();
+        }
+
         writer.WritePropertyName("typography");
         writer.WriteStartArray();
         foreach (var pair in presentation.Typography.Styles.OrderBy(static pair => pair.Key))
         {
+            cancellationToken.ThrowIfCancellationRequested();
             writer.WriteStartObject();
             writer.WriteString("role", pair.Key.ToString());
             writer.WritePropertyName("style");
@@ -280,6 +464,23 @@ internal static class FlowJsonWriter
         }
 
         writer.WriteEndArray();
+        if (!presentation.NodeTypography.IsEmpty)
+        {
+            writer.WritePropertyName("nodeTypography");
+            writer.WriteStartArray();
+            foreach (var pair in presentation.NodeTypography.OrderBy(static pair => pair.Key.Value, StringComparer.Ordinal))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                writer.WriteStartObject();
+                writer.WriteString("nodeId", pair.Key.Value);
+                writer.WritePropertyName("style");
+                WriteTypographyStyle(writer, pair.Value);
+                writer.WriteEndObject();
+            }
+
+            writer.WriteEndArray();
+        }
+
         WriteHeadingPresentation(writer, presentation.Headings);
         WriteParagraphPresentation(writer, presentation.Paragraphs);
         WriteFigurePresentation(writer, presentation.Figures);
@@ -304,6 +505,7 @@ internal static class FlowJsonWriter
         WriteOptionalLength(writer, "marginBefore", style.MarginBefore);
         WriteOptionalLength(writer, "marginAfter", style.MarginAfter);
         WriteOptionalLength(writer, "indent", style.Indent);
+        WriteOptionalEnum(writer, "textDecoration", style.TextDecoration);
         writer.WriteEndObject();
     }
 

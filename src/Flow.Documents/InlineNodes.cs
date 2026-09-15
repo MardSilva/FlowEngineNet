@@ -71,12 +71,21 @@ public sealed record Link : InlineContainerNode
 public sealed record FootnoteReference : InlineNode
 {
     public FootnoteReference(NodeId targetId)
+        : this(targetId, [])
+    {
+    }
+
+    public FootnoteReference(NodeId targetId, IEnumerable<InlineNode> label)
     {
         ArgumentNullException.ThrowIfNull(targetId);
         TargetId = targetId;
+        Label = ImmutableCollections.CopyOf(label, nameof(label));
     }
 
     public NodeId TargetId { get; }
+
+    /// <summary>Gets the source label shown for the note reference, or an empty collection for renderer-generated labeling.</summary>
+    public System.Collections.Immutable.ImmutableArray<InlineNode> Label { get; }
 }
 
 public sealed record LineBreak : InlineNode;

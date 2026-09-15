@@ -10,7 +10,7 @@
 - `Flow.Documents` contains the semantic document model, serialization, anchors, and validation.
 - `Flow.Layout` owns reader state, resolves the style cascade, and transforms documents plus environmental context into renderer-independent layout decisions.
 - `Flow.Rendering` defines rendering contracts.
-- `Flow.Rendering.Html` produces standalone semantic HTML and CSS.
+- `Flow.Rendering.Html` produces standalone semantic HTML and a deterministic multi-file HTML book package.
 - `Flow.Security` owns canonicalization, hashing, and experimental signing abstractions.
 - `Flow.Epub` maps a deliberately limited EPUB subset into the semantic model.
 - `Flow.Cli` is the command-line composition root.
@@ -29,7 +29,7 @@ An importer or serializer creates a `FlowDocument`. The layout engine combines t
 
 ## HTML rendering
 
-`Flow.Rendering` defines the renderer boundary and immutable rendered bytes. `Flow.Rendering.Html` implements the first adapter: deterministic standalone HTML5 with embedded CSS and assets. It consumes resolved layout state without mutating or recanonicalizing the source document. Before rendering, it verifies semantic validity, document/layout identity, and the one-to-one relationship between semantic and layout nodes. See [html-renderer.md](html-renderer.md).
+`Flow.Rendering` defines the renderer boundary and immutable rendered bytes. `Flow.Rendering.Html` implements deterministic standalone HTML5 plus an additive multi-file book package with shared CSS/assets, cross-file anchor rewriting, a renderer-only footnote placement graph, hierarchical TOC, editorial logical progress, localized accessible landmarks, and script-free progressive appearance controls. Both consume resolved layout state without mutating or recanonicalizing the source document. Before rendering, the established standalone mapping verifies semantic validity, document/layout identity, and the one-to-one relationship between semantic and layout nodes. The CLI computes canonical integrity and passes it into the package adapter, avoiding a new HTML-to-Security project dependency. See [html-renderer.md](html-renderer.md) and [html-book-package.md](html-book-package.md).
 
 ## Command-line composition
 

@@ -20,8 +20,8 @@ public sealed class EpubImporterTests
 
         var chapters = document.Content.Children.Cast<Chapter>().ToArray();
         Assert.Equal(2, chapters.Length);
-        Assert.Equal("Começo", Assert.IsType<Text>(Assert.IsType<Heading>(chapters[0].Children[0]).Content[0]).Value);
-        Assert.Equal("Fim", Assert.IsType<Text>(Assert.IsType<Heading>(chapters[1].Children[0]).Content[0]).Value);
+        Assert.Equal("Começo", InlineText(Assert.IsType<Heading>(chapters[0].Children[0]).Content));
+        Assert.Equal("Fim", InlineText(Assert.IsType<Heading>(chapters[1].Children[0]).Content));
         Assert.Contains(chapters[0].Children, static node => node is UnorderedList);
         Assert.Contains(chapters[1].Children, static node => node is OrderedList { Start: 2 });
 
@@ -29,6 +29,7 @@ public sealed class EpubImporterTests
             .Select(static location => location.Node)
             .OfType<Paragraph>()
             .SelectMany(static paragraph => paragraph.Content)
+            .SelectMany(DescendantsAndSelf)
             .OfType<Link>()
             .Single();
         Assert.StartsWith("flow:", link.Target, StringComparison.Ordinal);
@@ -37,10 +38,30 @@ public sealed class EpubImporterTests
 
         var figure = document.Index.Locations.Select(static location => location.Node).OfType<Figure>().Single();
         Assert.Equal("Um pixel do Flow", figure.AlternativeText);
-        Assert.Equal("Figura mínima", Assert.IsType<Text>(figure.Caption!.Content[0]).Value);
+        Assert.Equal("Figura mínima", InlineText(figure.Caption!.Content));
         Assert.Single(document.Assets);
         Assert.Equal("image/png", document.Assets[figure.AssetId].MediaType);
     }
+
+    private static IEnumerable<InlineNode> DescendantsAndSelf(InlineNode node)
+    {
+        yield return node;
+        if (node is InlineContainerNode container)
+        {
+            foreach (var child in container.Children.SelectMany(DescendantsAndSelf))
+            {
+                yield return child;
+            }
+        }
+    }
+
+    private static string InlineText(IEnumerable<InlineNode> nodes) => string.Concat(nodes.Select(static node => node switch
+    {
+        Text text => text.Value,
+        InlineContainerNode container => InlineText(container.Children),
+        InlineCode code => code.Code,
+        _ => string.Empty,
+    }));
 
     [Fact]
     public async Task ImportAsync_RejectsDtdAndExternalEntities()
@@ -83,7 +104,7 @@ public sealed class EpubImporterTests
     {
         const string chapter = """
             <html xmlns="http://www.w3.org/1999/xhtml">
-              <body><h1 id="start">Título</h1><table><tr><td>Texto importante</td></tr></table></body>
+              <body><h1 id="start">Título</h1><form><label>Texto importante</label></form></body>
             </html>
             """;
         await using var epub = MinimalEpubFactory.Create(chapterOne: chapter);

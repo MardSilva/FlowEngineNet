@@ -1,3 +1,6 @@
+using System.Collections.Immutable;
+using Flow.Core;
+
 namespace Flow.Documents;
 
 public sealed record DocumentPresentation
@@ -11,7 +14,9 @@ public sealed record DocumentPresentation
         FootnotePresentation? footnotes = null,
         CodeBlockPresentation? codeBlocks = null,
         TableOfContentsPresentation? tableOfContents = null,
-        ReadingTheme? theme = null)
+        ReadingTheme? theme = null,
+        IEnumerable<KeyValuePair<NodeId, TypographyStyle>>? nodeTypography = null,
+        CoverPresentation? cover = null)
     {
         PresentationIntentValidation.ValidateEnum(theme, nameof(theme));
 
@@ -24,6 +29,19 @@ public sealed record DocumentPresentation
         CodeBlocks = codeBlocks;
         TableOfContents = tableOfContents;
         Theme = theme;
+        Cover = cover;
+        var nodeStyles = ImmutableDictionary.CreateBuilder<NodeId, TypographyStyle>();
+        foreach (var pair in nodeTypography ?? [])
+        {
+            ArgumentNullException.ThrowIfNull(pair.Key);
+            ArgumentNullException.ThrowIfNull(pair.Value);
+            if (!nodeStyles.TryAdd(pair.Key, pair.Value))
+            {
+                throw new ArgumentException($"Node typography ID '{pair.Key}' occurs more than once.", nameof(nodeTypography));
+            }
+        }
+
+        NodeTypography = nodeStyles.ToImmutable();
     }
 
     public TypographySet Typography { get; }
@@ -43,4 +61,10 @@ public sealed record DocumentPresentation
     public TableOfContentsPresentation? TableOfContents { get; }
 
     public ReadingTheme? Theme { get; }
+
+    /// <summary>Gets the optional, noncanonical publication-cover intent.</summary>
+    public CoverPresentation? Cover { get; }
+
+    /// <summary>Gets optional typed author typography for individual semantic nodes.</summary>
+    public ImmutableDictionary<NodeId, TypographyStyle> NodeTypography { get; }
 }

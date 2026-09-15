@@ -54,6 +54,75 @@ public sealed class CanonicalizationTests
     }
 
     [Fact]
+    public void ComputeHash_FootnoteReferenceLabelChangeChangesHash()
+    {
+        var service = CreateIntegrityService();
+
+        var first = service.ComputeHash(CreateFootnoteDocument("1"));
+        var changed = service.ComputeHash(CreateFootnoteDocument("a"));
+
+        Assert.NotEqual(first.Hash, changed.Hash);
+    }
+
+    [Fact]
+    public void ComputeHash_TableSemanticsChangeHash()
+    {
+        var service = CreateIntegrityService();
+
+        var first = service.ComputeHash(CreateTableDocument(columnSpan: 1));
+        var changed = service.ComputeHash(CreateTableDocument(columnSpan: 2));
+
+        Assert.NotEqual(first.Hash, changed.Hash);
+    }
+
+    [Fact]
+    public void ComputeHash_MathStructureChangeChangesHash()
+    {
+        FlowDocument MathDocument(string operatorName) => new(
+            new DocumentIdentity(new DocumentId("urn:flow:test:canonical-math")),
+            new DocumentMetadata("Math"),
+            new DocumentContent(
+            [
+                new MathExpression(
+                    new NodeId("equation"),
+                    new MathElement("math",
+                    [
+                        new MathElement(operatorName, [new MathText("1"), new MathText("2")]),
+                    ])),
+            ]));
+
+        var service = CreateIntegrityService();
+
+        Assert.NotEqual(
+            service.ComputeHash(MathDocument("mfrac")),
+            service.ComputeHash(MathDocument("mrow")));
+    }
+
+    [Fact]
+    public void ComputeHash_InternationalizationSemanticsChangeHash()
+    {
+        FlowDocument InternationalDocument(InlineNode content) => new(
+            new DocumentIdentity(new DocumentId("urn:flow:test:canonical-i18n")),
+            new DocumentMetadata("Internationalization"),
+            new DocumentContent(
+            [
+                new Paragraph(new NodeId("paragraph"), [content]),
+            ]));
+        var service = CreateIntegrityService();
+        var english = InternationalDocument(new LanguageSpan(new LanguageTag("en"), [new Text("Flow")]));
+        var portuguese = InternationalDocument(new LanguageSpan(new LanguageTag("pt"), [new Text("Flow")]));
+        var rtl = InternationalDocument(new BidirectionalSpan(
+            TextDirection.RightToLeft,
+            BidirectionalMode.Isolation,
+            [new Text("Flow")]));
+        var ruby = InternationalDocument(new Ruby([new Text("本"), new RubyAnnotation([new Text("ほん")])]));
+
+        Assert.NotEqual(service.ComputeHash(english), service.ComputeHash(portuguese));
+        Assert.NotEqual(service.ComputeHash(english), service.ComputeHash(rtl));
+        Assert.NotEqual(service.ComputeHash(english), service.ComputeHash(ruby));
+    }
+
+    [Fact]
     public void ComputeHash_CanonicalMetadataAndAssetBytesChangeHash()
     {
         var service = CreateIntegrityService();
@@ -157,4 +226,61 @@ public sealed class CanonicalizationTests
 
     private static FlowAsset Asset(string id, byte[] bytes) =>
         new(new AssetId(id), "application/octet-stream", id, bytes);
+
+    private static FlowDocument CreateFootnoteDocument(string label)
+    {
+        var footnoteId = new NodeId("footnote-one");
+        return new FlowDocument(
+            new DocumentIdentity(new DocumentId("urn:flow:document:canonical-footnote")),
+            new DocumentMetadata("Canonical footnote"),
+            new DocumentContent(
+            [
+                new Chapter(
+                    new NodeId("chapter-one"),
+                    [
+                        new Paragraph(
+                            new NodeId("paragraph-one"),
+                            [new FootnoteReference(footnoteId, [new Text(label)])]),
+                        new Footnote(
+                            footnoteId,
+                            [new Paragraph(new NodeId("footnote-text"), [new Text("Note")])]),
+                    ]),
+            ]));
+    }
+
+    private static FlowDocument CreateTableDocument(int columnSpan)
+    {
+        var headerId = new NodeId("header-one");
+        return new FlowDocument(
+            new DocumentIdentity(new DocumentId("urn:flow:document:canonical-table")),
+            new DocumentMetadata("Canonical table"),
+            new DocumentContent(
+            [
+                new Chapter(
+                    new NodeId("chapter-one"),
+                    [
+                        new Table(
+                            new NodeId("table-one"),
+                            [
+                                new TableBody(
+                                    new NodeId("body-one"),
+                                    [
+                                        new TableRow(
+                                            new NodeId("row-one"),
+                                            [
+                                                new TableHeaderCell(
+                                                    headerId,
+                                                    [new Paragraph(new NodeId("header-text"), [new Text("Header")])],
+                                                    columnSpan: columnSpan,
+                                                    scope: TableHeaderScope.Column),
+                                                new TableCell(
+                                                    new NodeId("cell-one"),
+                                                    [],
+                                                    headers: [headerId]),
+                                            ]),
+                                    ]),
+                            ]),
+                    ]),
+            ]));
+    }
 }
