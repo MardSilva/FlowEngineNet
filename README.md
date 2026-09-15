@@ -187,6 +187,7 @@ The final clean-directory review passes 134 tests with zero build warnings; see 
 - [Experimental document signatures](docs/signatures.md)
 - [Experimental EPUB import](docs/epub-import.md)
 - [EPUB fidelity report](docs/epub-fidelity.md)
+- [Experimental EPUB corpus catalog](docs/epub-corpus.md)
 - [0.1 conformance profile](docs/conformance.md)
 - [Known limitations](docs/known-limitations.md)
 - [0.1 release review](docs/0.1-release-review.md)
@@ -203,7 +204,7 @@ The real EPUB cycle now follows these increments:
 4. validate fidelity and performance against legal real-world publications;
 5. pass the large-book gate before beginning the PDF importer.
 
-The first five increments now have executable implementations, including measured progress and cancellation behavior. The next work is a legal reproducible corpus and the large-publication gate; this does not yet justify a universal EPUB-support, performance, or accessibility-conformance claim. See [EPUB performance, progress, and cancellation](docs/epub-performance.md).
+The first five increments now have executable implementations, including measured progress and cancellation behavior. The deterministic legal-corpus catalog is defined; local discovery, corpus execution, external evidence, and the large-publication gate remain. This does not yet justify a universal EPUB-support, performance, or accessibility-conformance claim. See [EPUB performance, progress, and cancellation](docs/epub-performance.md).
 
 A document can only be considered end-to-end usable when an EPUB can be imported without silent semantic loss, represented as a valid `FlowDocument`, laid out, rendered, inspected, and round-tripped through the supported Flow format. The repository has not reached that point yet.
 

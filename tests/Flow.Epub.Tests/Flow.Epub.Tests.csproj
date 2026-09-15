@@ -25,4 +25,8 @@
     <ProjectReference Include="..\..\src\Flow.Security\Flow.Security.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <None Update="Corpus\epub-corpus.json" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>

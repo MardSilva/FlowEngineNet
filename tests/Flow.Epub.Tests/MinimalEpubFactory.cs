@@ -5,6 +5,8 @@ namespace Flow.Epub.Tests;
 
 internal static class MinimalEpubFactory
 {
+    private static readonly DateTimeOffset StableEntryTimestamp = new(2020, 1, 1, 0, 0, 0, TimeSpan.Zero);
+
     private const string DefaultContainer = """
         <?xml version="1.0" encoding="utf-8"?>
         <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
@@ -91,7 +93,7 @@ internal static class MinimalEpubFactory
 
             if (includeImage)
             {
-                var image = archive.CreateEntry("EPUB/images/flow.png", CompressionLevel.Optimal);
+                var image = CreateEntry(archive, "EPUB/images/flow.png", CompressionLevel.Optimal);
                 using var stream = image.Open();
                 stream.Write(OnePixelPng);
             }
@@ -108,7 +110,7 @@ internal static class MinimalEpubFactory
             {
                 foreach (var (path, content) in additionalBinaryEntries)
                 {
-                    var entry = archive.CreateEntry(path, CompressionLevel.Optimal);
+                    var entry = CreateEntry(archive, path, CompressionLevel.Optimal);
                     using var stream = entry.Open();
                     stream.Write(content);
                 }
@@ -125,8 +127,18 @@ internal static class MinimalEpubFactory
         string content,
         CompressionLevel compressionLevel = CompressionLevel.Optimal)
     {
-        var entry = archive.CreateEntry(path, compressionLevel);
+        var entry = CreateEntry(archive, path, compressionLevel);
         using var stream = entry.Open();
         stream.Write(Encoding.UTF8.GetBytes(content));
+    }
+
+    private static ZipArchiveEntry CreateEntry(
+        ZipArchive archive,
+        string path,
+        CompressionLevel compressionLevel)
+    {
+        var entry = archive.CreateEntry(path, compressionLevel);
+        entry.LastWriteTime = StableEntryTimestamp;
+        return entry;
     }
 }

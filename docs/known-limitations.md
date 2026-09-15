@@ -37,6 +37,8 @@ Flow 0.1 is a research-grade reference implementation. This list is part of the 
 
 ## EPUB interoperability
 
+- `flow-epub-corpus-0.1` currently defines and validates only the deterministic corpus catalog. Local/external discovery, corpus execution, baselines, and EPUBCheck evidence are not implemented yet. A catalog entry records a maintainer's license evidence but does not itself grant redistribution rights.
+
 - Performance measurements are environment-dependent. The importer samples managed heap only at phase boundaries, still buffers the bounded ZIP, and can temporarily retain XML trees, the semantic document, standalone HTML, and package payloads together. Prompt 17 provides cancellation and evidence collection, not a universal maximum publication size or memory guarantee.
 
 - The EPUB importer is a bounded subset prototype, not an EPUB 3.3 conformance checker or general reading system.

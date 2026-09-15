@@ -1,0 +1,42 @@
+{
+  "format": "flow-epub-corpus-0.1",
+  "publications": [
+    {
+      "id": "flow-minimal-epub3",
+      "title": "EPUB mínimo do Flow",
+      "origin": "project:Flow.Epub.Tests/MinimalEpubFactory",
+      "license": {
+        "name": "Flow project fixture",
+        "evidence": "Generated entirely from source code owned by the Flow project"
+      },
+      "kind": "projectFixture",
+      "redistribution": "allowed",
+      "relativePath": "generated/flow-minimal-epub3.epub",
+      "expectedEpubVersion": "epub3",
+      "expectedSizeBytes": 1913,
+      "languages": [
+        "pt-PT"
+      ],
+      "expectedResources": [
+        "png",
+        "xhtml"
+      ],
+      "expectedFeatures": [
+        "figure",
+        "internal-link",
+        "ordered-list",
+        "spine",
+        "unordered-list"
+      ],
+      "expectedResults": [
+        "import-success",
+        "inspection-success",
+        "valid-flow-document"
+      ],
+      "knownLimitations": [
+        "no-navigation-document"
+      ],
+      "sha256": "CA01E664B00E33951AEB616357321E98FE90306FF4686B8FA162A4B2BD782EBE"
+    }
+  ]
+}
