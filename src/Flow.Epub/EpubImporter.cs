@@ -1373,6 +1373,7 @@ public sealed class EpubImporter : IEpubImporter
                     var visualContainer = IsImageSourceElement(element)
                         ? element.Ancestors(XhtmlNamespace + "figure").FirstOrDefault()
                           ?? element.Ancestors(SvgNamespace + "svg").FirstOrDefault()
+                          ?? FindSingleImageParagraph(element)
                         : null;
                     var targetElement = visualContainer
                         ?? (IsFootnoteElement(element) || IsRepresentedNode(element)
@@ -2144,7 +2145,7 @@ public sealed class EpubImporter : IEpubImporter
                 case "h6":
                     return [new Heading(IdFor(element, "heading"), name[1] - '0', ConvertInlineContent(element, resourcePath))];
                 case "p":
-                    return [new Paragraph(IdFor(element, "paragraph"), ConvertInlineContent(element, resourcePath))];
+                    return await ConvertParagraphAsync(element, resourcePath, cancellationToken).ConfigureAwait(false);
                 case "ol":
                     return [await ConvertOrderedListAsync(element, resourcePath, cancellationToken).ConfigureAwait(false)];
                 case "ul":
@@ -2247,6 +2248,165 @@ public sealed class EpubImporter : IEpubImporter
             }
 
             FlushInlineBuffer();
+            return result;
+        }
+
+        private async Task<IReadOnlyList<DocumentNode>> ConvertParagraphAsync(
+            XElement paragraph,
+            string resourcePath,
+            CancellationToken cancellationToken)
+        {
+            var parts = SplitInlineContent(paragraph.Nodes());
+            if (parts.All(static part => part.Image is null))
+            {
+                return [new Paragraph(IdFor(paragraph, "paragraph"), ConvertInlineContent(paragraph, resourcePath))];
+            }
+
+            var converted = new List<ConvertedInlinePart>(parts.Count);
+            foreach (var part in parts)
+            {
+                if (part.Image is not null)
+                {
+                    converted.Add(new ConvertedInlinePart([], part.Image));
+                    continue;
+                }
+
+                var inline = ApplyInternationalization(
+                    paragraph,
+                    ConvertInline(part.Nodes, resourcePath),
+                    resourcePath,
+                    inherit: true);
+                if (HasVisibleText(inline))
+                {
+                    converted.Add(new ConvertedInlinePart(inline, null));
+                }
+            }
+
+            var imageCount = converted.Count(static part => part.Image is not null);
+            var hasText = converted.Any(static part => !part.Inline.IsEmpty);
+            var result = new List<DocumentNode>(converted.Count);
+            var paragraphIdUsed = false;
+
+            foreach (var part in converted)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!part.Inline.IsEmpty)
+                {
+                    var id = paragraphIdUsed
+                        ? GeneratedIdFor(paragraph, "paragraph-continuation")
+                        : IdFor(paragraph, "paragraph");
+                    result.Add(new Paragraph(id, part.Inline));
+                    paragraphIdUsed = true;
+                    continue;
+                }
+
+                var image = part.Image!;
+                ReportUnsupported(
+                    image,
+                    resourcePath,
+                    "Inline image promoted to an ordered Flow Figure between paragraph text segments");
+                var idSource = !hasText && imageCount == 1 ? paragraph : image;
+                result.AddRange(await ConvertInlineImageAsync(
+                    image,
+                    idSource,
+                    resourcePath,
+                    cancellationToken).ConfigureAwait(false));
+            }
+
+            return result;
+        }
+
+        private async Task<IEnumerable<DocumentNode>> ConvertInlineImageAsync(
+            XElement image,
+            XElement idSource,
+            string resourcePath,
+            CancellationToken cancellationToken)
+        {
+            if (image.Name == SvgNamespace + "svg")
+            {
+                return await ConvertSvgImageAsync(
+                    image,
+                    idSource,
+                    caption: null,
+                    fallbackImage: null,
+                    resourcePath,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            if (image.Name == SvgNamespace + "image")
+            {
+                return await ConvertSvgImageElementsAsync(
+                    [image],
+                    idSource,
+                    svg: null,
+                    caption: null,
+                    fallbackImage: null,
+                    resourcePath,
+                    cancellationToken).ConfigureAwait(false);
+            }
+
+            return await ConvertImageAsync(
+                image,
+                idSource,
+                caption: null,
+                resourcePath,
+                cancellationToken).ConfigureAwait(false);
+        }
+
+        private static IReadOnlyList<InlineContentPart> SplitInlineContent(IEnumerable<XNode> nodes)
+        {
+            var result = new List<InlineContentPart>();
+            var buffer = new List<XNode>();
+
+            void Flush()
+            {
+                if (buffer.Count == 0)
+                {
+                    return;
+                }
+
+                result.Add(new InlineContentPart(buffer.ToArray(), null));
+                buffer.Clear();
+            }
+
+            foreach (var node in nodes)
+            {
+                if (node is not XElement element)
+                {
+                    buffer.Add(node);
+                    continue;
+                }
+
+                if (IsExtractableInlineImage(element))
+                {
+                    Flush();
+                    result.Add(new InlineContentPart([], element));
+                    continue;
+                }
+
+                if (!element.Descendants().Any(IsExtractableInlineImage))
+                {
+                    buffer.Add(element);
+                    continue;
+                }
+
+                foreach (var nested in SplitInlineContent(element.Nodes()))
+                {
+                    if (nested.Image is not null)
+                    {
+                        Flush();
+                        result.Add(nested);
+                        continue;
+                    }
+
+                    if (nested.Nodes.Count > 0)
+                    {
+                        buffer.Add(new XElement(element.Name, element.Attributes(), nested.Nodes));
+                    }
+                }
+            }
+
+            Flush();
             return result;
         }
 
@@ -3965,6 +4125,31 @@ public sealed class EpubImporter : IEpubImporter
             || element.Name == SvgNamespace + "svg"
             || element.Name == SvgNamespace + "image";
 
+        private static bool IsExtractableInlineImage(XElement element) =>
+            element.Name == XhtmlNamespace + "img"
+            || element.Name == XhtmlNamespace + "picture"
+            || element.Name == SvgNamespace + "svg"
+            || element.Name == SvgNamespace + "image";
+
+        private static XElement? FindSingleImageParagraph(XElement image)
+        {
+            var paragraph = image.Ancestors(XhtmlNamespace + "p").FirstOrDefault();
+            if (paragraph is null)
+            {
+                return null;
+            }
+
+            var images = paragraph.Descendants().Count(IsImageOccurrence);
+            var hasVisibleText = paragraph.DescendantNodes()
+                .OfType<XText>()
+                .Any(static text => !string.IsNullOrWhiteSpace(text.Value));
+            return images == 1 && !hasVisibleText ? paragraph : null;
+        }
+
+        private static bool IsImageOccurrence(XElement element) =>
+            element.Name == XhtmlNamespace + "img"
+            || element.Name == SvgNamespace + "image";
+
         private static bool IsFootnoteElement(XElement element) =>
             element.Name.Namespace == XhtmlNamespace
             && (HasToken((string?)element.Attribute(EpubNamespace + "type"), "footnote")
@@ -4036,6 +4221,16 @@ public sealed class EpubImporter : IEpubImporter
         private readonly record struct SourceLocationKey(string ResourcePath, string? Fragment);
 
         private readonly record struct SvgImageIssueKey(string Code, string Message, string ResourcePath);
+
+        private sealed record InlineContentPart(IReadOnlyList<XNode> Nodes, XElement? Image);
+
+        private sealed record ConvertedInlinePart(ImmutableArray<InlineNode> Inline, XElement? Image)
+        {
+            internal ConvertedInlinePart(IEnumerable<InlineNode> inline, XElement? image)
+                : this(inline.ToImmutableArray(), image)
+            {
+            }
+        }
 
         private sealed record ImportedImage(AssetId AssetId, string ResourcePath);
     }

@@ -42,6 +42,105 @@ public sealed class EpubImageImportTests
         0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
     ];
 
+    [Fact]
+    public async Task ImportAsync_PreservesInlineImagesAndMixedParagraphOrderAsValidBlocks()
+    {
+        var package = Package("<item id=\"inline\" href=\"images/inline.png\" media-type=\"image/png\" />");
+        const string body = """
+            <p id="mixed">Before <em>middle <span><img id="inline-image" src="../images/inline.png" alt="Inline artwork" /></span> after</em> end.</p>
+            <p id="image-only"><img id="only-image" src="../images/inline.png" alt="Standalone artwork" /></p>
+            """;
+
+        var result = await ImportAsync(
+            package,
+            body,
+            new Dictionary<string, byte[]> { ["EPUB/images/inline.png"] = Png });
+
+        Assert.True(result.IsSuccess, string.Join(Environment.NewLine, result.Diagnostics));
+        var document = Assert.IsType<FlowDocument>(result.Document);
+        var chapter = Assert.IsType<Chapter>(Assert.Single(document.Content.Children));
+        Assert.Collection(
+            chapter.Children,
+            first => Assert.Equal("Before middle ", NodeText(Assert.IsType<Paragraph>(first))),
+            firstImage => Assert.Equal("Inline artwork", Assert.IsType<Figure>(firstImage).AlternativeText),
+            second => Assert.Equal(" after end.", NodeText(Assert.IsType<Paragraph>(second))),
+            secondImage => Assert.Equal("Standalone artwork", Assert.IsType<Figure>(secondImage).AlternativeText));
+
+        var figures = chapter.Children.OfType<Figure>().ToArray();
+        Assert.Equal(2, figures.Length);
+        Assert.Equal(figures[0].AssetId, figures[1].AssetId);
+        Assert.Single(document.Assets);
+        Assert.True(new DocumentValidator().Validate(document).IsValid);
+
+        var promotion = Assert.Single(result.Diagnostics, static item =>
+            item.Code == EpubDiagnosticCodes.UnsupportedElement
+            && item.Message.Contains("Inline image promoted", StringComparison.Ordinal));
+        Assert.Contains("2 times", promotion.Message, StringComparison.Ordinal);
+
+        Assert.True(result.SourceMap!.TryResolve("EPUB/text/chapter-1.xhtml", "mixed", out var mixedId));
+        Assert.Equal(Assert.IsType<Paragraph>(chapter.Children[0]).Id, mixedId);
+        Assert.True(result.SourceMap.TryResolve("EPUB/text/chapter-1.xhtml", "inline-image", out var inlineImageId));
+        Assert.Equal(figures[0].Id, inlineImageId);
+        Assert.True(result.SourceMap.TryResolve("EPUB/text/chapter-1.xhtml", "image-only", out var imageOnlyId));
+        Assert.True(result.SourceMap.TryResolve("EPUB/text/chapter-1.xhtml", "only-image", out var onlyImageId));
+        Assert.Equal(figures[1].Id, imageOnlyId);
+        Assert.Equal(figures[1].Id, onlyImageId);
+
+        var fidelity = new EpubFidelityAnalyzer().Analyze(result);
+        var imageMeasurement = Assert.Single(
+            fidelity.Measurements,
+            static item => item.Metric == EpubFidelityMetric.Images);
+        Assert.Equal(2, imageMeasurement.SourceCount);
+        Assert.Equal(2, imageMeasurement.DestinationCount);
+        Assert.Equal(2, imageMeasurement.TransformedCount);
+        Assert.Equal(0, imageMeasurement.LostCount);
+    }
+
+    [Fact]
+    public async Task ImportAsync_InlineImageRemainsStableThroughJsonLayoutAndHtml()
+    {
+        var package = Package("<item id=\"inline\" href=\"images/inline.png\" media-type=\"image/png\" />");
+        const string body = """
+            <p id="ordered">Alpha <strong>beta<img id="inline-image" src="../images/inline.png" alt="Inline artwork" />gamma</strong> omega.</p>
+            """;
+        var assets = new Dictionary<string, byte[]> { ["EPUB/images/inline.png"] = Png };
+
+        var first = await ImportAsync(package, body, assets);
+        var second = await ImportAsync(package, body, assets);
+        var document = Assert.IsType<FlowDocument>(first.Document);
+        var repeated = Assert.IsType<FlowDocument>(second.Document);
+        var originalNodes = Assert.IsType<Chapter>(Assert.Single(document.Content.Children)).Children;
+        var repeatedNodes = Assert.IsType<Chapter>(Assert.Single(repeated.Content.Children)).Children;
+        Assert.Equal(originalNodes.Select(static node => node.Id), repeatedNodes.Select(static node => node.Id));
+
+        var integrity = new Sha256DocumentIntegrityService(new FlowDocumentCanonicalizer());
+        var originalHash = integrity.ComputeHash(document);
+        await using var json = new MemoryStream();
+        await new FlowJsonDocumentSerializer().SerializeAsync(document, json);
+        json.Position = 0;
+        var restored = await new FlowJsonDocumentSerializer().DeserializeAsync(json);
+        Assert.Equal(originalHash, integrity.ComputeHash(restored));
+
+        var preferences = new UserReadingPreferences();
+        var layout = new AdaptiveLayoutEngine().Layout(
+            restored,
+            new LayoutContext(390, 844, DeviceClass.Phone, userPreferences: preferences));
+        var html = new HtmlDocumentRenderer().RenderToString(restored, layout, preferences);
+        var restoredNodes = Assert.IsType<Chapter>(Assert.Single(restored.Content.Children)).Children;
+        Assert.Collection(
+            restoredNodes,
+            firstParagraph => Assert.Equal("Alpha beta", NodeText(Assert.IsType<Paragraph>(firstParagraph))),
+            image => Assert.IsType<Figure>(image),
+            secondParagraph => Assert.Equal("gamma omega.", NodeText(Assert.IsType<Paragraph>(secondParagraph))));
+        Assert.True(
+            html.IndexOf($"id=\"{restoredNodes[0].Id.Value}\"", StringComparison.Ordinal)
+            < html.IndexOf($"id=\"{restoredNodes[1].Id.Value}\"", StringComparison.Ordinal));
+        Assert.True(
+            html.IndexOf($"id=\"{restoredNodes[1].Id.Value}\"", StringComparison.Ordinal)
+            < html.IndexOf($"id=\"{restoredNodes[2].Id.Value}\"", StringComparison.Ordinal));
+        Assert.Contains("data:image/png;base64,", html, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(true, false, "image/png", "cover.png")]
     [InlineData(false, true, "image/jpeg", "cover.jpg")]
@@ -495,6 +594,18 @@ public sealed class EpubImageImportTests
               <spine><itemref idref="chapter" /></spine>
             </package>
             """;
+
+    private static string NodeText(Paragraph paragraph) => InlineText(paragraph.Content);
+
+    private static string InlineText(IEnumerable<InlineNode> nodes) => string.Concat(nodes.Select(static node => node switch
+    {
+        Text text => text.Value,
+        InlineCode code => code.Code,
+        InlineContainerNode container => InlineText(container.Children),
+        FootnoteReference reference => InlineText(reference.Label),
+        LineBreak => "\n",
+        _ => string.Empty,
+    }));
 
     private static async Task<EpubImportResult> ImportAsync(
         string package,

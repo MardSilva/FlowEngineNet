@@ -33,6 +33,8 @@ The percentage is truncated to six decimal places. When `source` is zero, it is 
 
 Manifest destination counts describe resources accepted by the bounded import pipeline, not a promise that every resource became a canonical asset. Spine counts preserve declared occurrences, including repeated and non-linear entries. EPUB 3 TOC entries take precedence over NCX when both exist, matching the importer.
 
+Each safe image occurrence that becomes a `Figure` counts as a transformed image, even when its bytes are shared with another occurrence through asset deduplication. An image originally placed inside a paragraph is segmented into a figure between ordered text blocks. The image is therefore represented, while the exact inline-versus-block distinction remains an explicit `EPUB010` approximation.
+
 ## CLI
 
 Use the report alongside, or independently from, the diagnostic JSON:

@@ -52,7 +52,7 @@ public sealed class EpubLargePublicationGateExternalTests
         Assert.Empty(failedAutomaticPhases);
         Assert.Equal(EpubLargePublicationGateStatus.Inconclusive, report.Result.Status);
         Assert.Equal(
-            EpubLargePublicationGateStatus.Inconclusive,
+            EpubLargePublicationGateStatus.NotStarted,
             report.Result.Phases.Single(static phase => phase.Kind == EpubLargePublicationGatePhaseKind.HumanReview).Status);
     }
 

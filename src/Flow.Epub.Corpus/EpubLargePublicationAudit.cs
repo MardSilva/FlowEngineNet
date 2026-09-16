@@ -189,7 +189,7 @@ internal static class EpubLargePublicationAuditor
         var links = EnumerateLinks(document).ToArray();
         audits.Add(AuditInternalLinks(document, sourceMap, links, sameResource: true));
         audits.Add(AuditInternalLinks(document, sourceMap, links, sameResource: false));
-        audits.Add(AuditUnclassifiedInternalLinks(sourceMap, links));
+        audits.Add(AuditUnclassifiedInternalLinks(document, sourceMap, links));
         audits.Add(AuditExternalLinks(links, input.MobilePackage, input.DesktopPackage));
         audits.Add(AuditFigures(document));
         audits.Add(AuditCover(document));
@@ -290,7 +290,11 @@ internal static class EpubLargePublicationAuditor
     {
         var candidates = links
             .Where(static item => DocumentAnchor.TryParse(item.Link.Target, out _))
-            .Where(item => IsSameResource(item.Owner.Id, DocumentAnchor.Parse(item.Link.Target).TargetId, sourceMap) == sameResource)
+            .Where(item => IsSameResource(
+                document,
+                item.Owner.Id,
+                DocumentAnchor.Parse(item.Link.Target).TargetId,
+                sourceMap) == sameResource)
             .ToArray();
         var kind = sameResource
             ? EpubLargePublicationAuditKind.InternalLinkSameResource
@@ -325,12 +329,14 @@ internal static class EpubLargePublicationAuditor
     }
 
     private static EpubLargePublicationReferenceAudit AuditUnclassifiedInternalLinks(
+        FlowDocument document,
         EpubSourceMap? sourceMap,
         IEnumerable<NodeLink> links)
     {
         var count = links
             .Where(static item => DocumentAnchor.TryParse(item.Link.Target, out _))
             .Count(item => IsSameResource(
+                document,
                 item.Owner.Id,
                 DocumentAnchor.Parse(item.Link.Target).TargetId,
                 sourceMap) is null);
@@ -472,10 +478,10 @@ internal static class EpubLargePublicationAuditor
             return NotApplicable(EpubLargePublicationAuditKind.FootnoteBacklink, essential: false);
         }
 
-        var resolved = footnotes.Count(footnote => EnumerateInline(footnote)
+        var resolved = footnotes.Count(footnote => EnumerateNodeTree(footnote)
+            .SelectMany(EnumerateInline)
             .OfType<Link>()
-            .Any(link => DocumentAnchor.TryParse(link.Target, out var anchor)
-                && document.TryResolveAnchor(anchor, out _)));
+            .Any(link => IsResolvedFootnoteBacklink(document, footnote, link)));
         return Present(
             EpubLargePublicationAuditKind.FootnoteBacklink,
             footnotes.Length,
@@ -491,7 +497,7 @@ internal static class EpubLargePublicationAuditor
         EpubSourceMap? sourceMap)
     {
         var references = EnumerateFootnoteReferences(document)
-            .Where(item => IsSameResource(item.Owner.Id, item.Reference.TargetId, sourceMap) is false)
+            .Where(item => IsSameResource(document, item.Owner.Id, item.Reference.TargetId, sourceMap) is false)
             .ToArray();
         if (references.Length == 0)
         {
@@ -723,15 +729,64 @@ internal static class EpubLargePublicationAuditor
     }
 
     private static bool? IsSameResource(
+        FlowDocument document,
         Flow.Core.NodeId source,
         Flow.Core.NodeId target,
         EpubSourceMap? sourceMap)
     {
-        var sourcePaths = sourceMap?.GetLocations(source).Select(static item => item.ResourcePath).ToHashSet(StringComparer.Ordinal) ?? [];
-        var targetPaths = sourceMap?.GetLocations(target).Select(static item => item.ResourcePath).ToHashSet(StringComparer.Ordinal) ?? [];
+        var sourcePaths = FindResourcePaths(document, source, sourceMap);
+        var targetPaths = FindResourcePaths(document, target, sourceMap);
         return sourcePaths.Count == 0 || targetPaths.Count == 0
             ? null
             : sourcePaths.Overlaps(targetPaths);
+    }
+
+    private static HashSet<string> FindResourcePaths(
+        FlowDocument document,
+        Flow.Core.NodeId nodeId,
+        EpubSourceMap? sourceMap)
+    {
+        var direct = sourceMap?.GetLocations(nodeId)
+            .Select(static item => item.ResourcePath)
+            .ToHashSet(StringComparer.Ordinal) ?? [];
+        if (direct.Count > 0 || sourceMap is null)
+        {
+            return direct;
+        }
+
+        var inherited = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var location in document.Index.GetLocations(nodeId))
+        {
+            for (var index = location.Anchor.Segments.Length - 2; index >= 0; index--)
+            {
+                var ancestorPaths = sourceMap.GetLocations(location.Anchor.Segments[index]);
+                if (ancestorPaths.IsEmpty)
+                {
+                    continue;
+                }
+
+                inherited.UnionWith(ancestorPaths.Select(static item => item.ResourcePath));
+                break;
+            }
+        }
+
+        return inherited;
+    }
+
+    private static bool IsResolvedFootnoteBacklink(
+        FlowDocument document,
+        Footnote footnote,
+        Link link)
+    {
+        if (!DocumentAnchor.TryParse(link.Target, out var anchor)
+            || !document.TryResolveAnchor(anchor, out var target))
+        {
+            return false;
+        }
+
+        return EnumerateInline(target)
+            .OfType<FootnoteReference>()
+            .Any(reference => reference.TargetId == footnote.Id);
     }
 
     private static bool IsPassiveSvg(ReadOnlySpan<byte> data)
@@ -784,6 +839,55 @@ internal static class EpubLargePublicationAuditor
             {
                 yield return child;
             }
+        }
+    }
+
+    private static IEnumerable<DocumentNode> EnumerateNodeTree(DocumentNode root)
+    {
+        yield return root;
+        foreach (var child in GetChildren(root))
+        {
+            foreach (var descendant in EnumerateNodeTree(child))
+            {
+                yield return descendant;
+            }
+        }
+    }
+
+    private static IEnumerable<DocumentNode> GetChildren(DocumentNode node) => node switch
+    {
+        BlockContainerNode container => container.Children,
+        OrderedList list => list.Items,
+        UnorderedList list => list.Items,
+        Figure { Caption: not null } figure => [figure.Caption],
+        Table table => TableChildren(table),
+        TableHead head => head.Rows,
+        TableBody body => body.Rows,
+        TableFoot foot => foot.Rows,
+        TableRow row => row.Cells,
+        _ => [],
+    };
+
+    private static IEnumerable<DocumentNode> TableChildren(Table table)
+    {
+        if (table.Caption is not null)
+        {
+            yield return table.Caption;
+        }
+
+        if (table.Head is not null)
+        {
+            yield return table.Head;
+        }
+
+        foreach (var body in table.Bodies)
+        {
+            yield return body;
+        }
+
+        if (table.Foot is not null)
+        {
+            yield return table.Foot;
         }
     }
 

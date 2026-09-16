@@ -44,11 +44,19 @@ public sealed class EpubLargePublicationGateExecutorTests
             new[] { EpubLargePublicationGateStatus.Passed, EpubLargePublicationGateStatus.PassedWithWarnings });
         AssertAudit(report, EpubLargePublicationAuditKind.TableOfContentsDestination, found: 3, broken: 0);
         AssertAudit(report, EpubLargePublicationAuditKind.InternalLinkSameResource, found: 24, broken: 0);
-        AssertAudit(report, EpubLargePublicationAuditKind.InternalLinkCrossResource, found: 24, broken: 0);
+        AssertAudit(report, EpubLargePublicationAuditKind.InternalLinkCrossResource, found: 25, broken: 0);
+        Assert.Equal(
+            EpubLargePublicationAuditApplicability.NotApplicable,
+            Audit(report, EpubLargePublicationAuditKind.InternalLinkUnclassified).Applicability);
         AssertAudit(report, EpubLargePublicationAuditKind.ExternalLink, found: 1, broken: 0);
         AssertAudit(report, EpubLargePublicationAuditKind.FigureAsset, found: 2, broken: 0);
         AssertAudit(report, EpubLargePublicationAuditKind.FootnoteReference, found: 1, broken: 0);
         AssertAudit(report, EpubLargePublicationAuditKind.FootnoteCrossResource, found: 1, broken: 0);
+        var backlinks = Audit(report, EpubLargePublicationAuditKind.FootnoteBacklink);
+        Assert.Equal(EpubLargePublicationAuditApplicability.Present, backlinks.Applicability);
+        Assert.Equal(1, backlinks.Counts.Found);
+        Assert.Equal(1, backlinks.Counts.Resolved);
+        Assert.Equal(0, backlinks.Counts.Approximated);
         AssertAudit(report, EpubLargePublicationAuditKind.TableCaption, found: 1, broken: 0);
         AssertAudit(report, EpubLargePublicationAuditKind.TableSpan, found: 1, broken: 0);
         AssertAudit(report, EpubLargePublicationAuditKind.TableHeaderReference, found: 2, broken: 0);
