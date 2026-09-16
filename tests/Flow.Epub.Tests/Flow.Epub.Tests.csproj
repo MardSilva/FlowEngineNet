@@ -28,6 +28,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <None Update="Corpus\epub-corpus-baseline.json" CopyToOutputDirectory="PreserveNewest" />
     <None Update="Corpus\epub-corpus.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 

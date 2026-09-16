@@ -160,6 +160,40 @@ public static class EpubCorpusExecutionReportJsonSerializer
         writer.WriteNumber("htmlPackageCount", evidence.HtmlPackageCount);
         writer.WriteNumber("htmlFileCount", evidence.HtmlFileCount);
         writer.WriteNumber("htmlBytes", evidence.HtmlBytes);
+        writer.WritePropertyName("semantic");
+        if (evidence.Semantic is null)
+        {
+            writer.WriteNullValue();
+        }
+        else
+        {
+            WriteSemanticEvidence(writer, evidence.Semantic);
+        }
+
+        writer.WriteEndObject();
+    }
+
+    private static void WriteSemanticEvidence(Utf8JsonWriter writer, EpubCorpusSemanticEvidence evidence)
+    {
+        writer.WriteStartObject();
+        writer.WriteStartArray("orderedNodeIds");
+        foreach (var id in evidence.OrderedNodeIds)
+        {
+            writer.WriteStringValue(id);
+        }
+
+        writer.WriteEndArray();
+        writer.WriteNumber("sourceLocationCount", evidence.SourceLocationCount);
+        writer.WriteNumber("chapterCount", evidence.ChapterCount);
+        writer.WriteNumber("headingCount", evidence.HeadingCount);
+        writer.WriteNumber("paragraphCount", evidence.ParagraphCount);
+        writer.WriteNumber("tableOfContentsEntryCount", evidence.TableOfContentsEntryCount);
+        writer.WriteNumber("internalLinkCount", evidence.InternalLinkCount);
+        writer.WriteNumber("figureCount", evidence.FigureCount);
+        writer.WriteNumber("footnoteCount", evidence.FootnoteCount);
+        writer.WriteNumber("footnoteReferenceCount", evidence.FootnoteReferenceCount);
+        writer.WriteNumber("tableCount", evidence.TableCount);
+        writer.WriteNumber("tableCellCount", evidence.TableCellCount);
         writer.WriteEndObject();
     }
 

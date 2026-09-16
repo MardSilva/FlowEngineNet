@@ -188,6 +188,7 @@ The final clean-directory review passes 134 tests with zero build warnings; see 
 - [Experimental EPUB import](docs/epub-import.md)
 - [EPUB fidelity report](docs/epub-fidelity.md)
 - [Experimental EPUB corpus catalog](docs/epub-corpus.md)
+- [Public EPUB corpus coverage matrix](docs/epub-corpus-matrix.md)
 - [0.1 conformance profile](docs/conformance.md)
 - [Known limitations](docs/known-limitations.md)
 - [0.1 release review](docs/0.1-release-review.md)
@@ -204,7 +205,7 @@ The real EPUB cycle now follows these increments:
 4. validate fidelity and performance against legal real-world publications;
 5. pass the large-book gate before beginning the PDF importer.
 
-The first five increments now have executable implementations, including measured progress and cancellation behavior. The deterministic legal-corpus catalog, bounded offline discovery, end-to-end corpus executor, and optional local EPUBCheck evidence are defined. Accepted baselines and the large-publication gate remain. This does not yet justify a universal EPUB-support, performance, or accessibility-conformance claim. See [EPUB performance, progress, and cancellation](docs/epub-performance.md) and the [experimental EPUB corpus](docs/epub-corpus.md).
+The EPUB work now includes measured progress and cancellation, a deterministic legal-corpus catalog, bounded offline discovery, end-to-end execution, optional local EPUBCheck evidence, and reviewed baselines for three project-owned fixtures. The next gate is a legally obtained large reflowable publication; it has not been run yet. This still does not justify a universal EPUB-support, performance, or accessibility-conformance claim. See [EPUB performance, progress, and cancellation](docs/epub-performance.md), the [experimental EPUB corpus](docs/epub-corpus.md), and its [public coverage matrix](docs/epub-corpus-matrix.md).
 
 A document can only be considered end-to-end usable when an EPUB can be imported without silent semantic loss, represented as a valid `FlowDocument`, laid out, rendered, inspected, and round-tripped through the supported Flow format. The repository has not reached that point yet.
 

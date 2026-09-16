@@ -158,6 +158,7 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
             await using var source = discovery.OpenRead(publication.Id);
             importResult = await importer.ImportAsync(source, cancellationToken).ConfigureAwait(false);
             state.ImportMetrics = importResult.Metrics;
+            state.SourceMap = importResult.SourceMap;
             document = importResult.Document;
             state.Document = document;
             state.Complete(EpubCorpusExecutionPhase.Import);
@@ -699,6 +700,7 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
         internal FlowDocument? Document;
         internal EpubFidelityReport? Fidelity;
         internal EpubImportMetrics? ImportMetrics;
+        internal EpubSourceMap? SourceMap;
         internal LayoutDocument? MobileLayout;
         internal LayoutDocument? DesktopLayout;
         internal IReadOnlyList<HtmlBookPackage> Packages = [];
@@ -780,7 +782,8 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
                 DesktopLayout is null ? 0 : EnumerateLayoutNodes(DesktopLayout.Nodes).Count(),
                 Packages.Count,
                 htmlFiles,
-                htmlBytes);
+                htmlBytes,
+                CreateSemanticEvidence(Document, SourceMap));
             return new EpubCorpusPublicationExecutionResult(
                 id,
                 HasFailure
@@ -793,6 +796,32 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
                 Diagnostics,
                 metrics,
                 EpubCheckEvidence);
+        }
+
+        private static EpubCorpusSemanticEvidence? CreateSemanticEvidence(
+            FlowDocument? document,
+            EpubSourceMap? sourceMap)
+        {
+            if (document is null)
+            {
+                return null;
+            }
+
+            var nodes = document.Index.Locations.Select(static location => location.Node).ToArray();
+            var inline = EnumerateInlineNodes(document).ToArray();
+            return new EpubCorpusSemanticEvidence(
+                nodes.Select(static node => node.Id.Value),
+                sourceMap?.Locations.Length ?? 0,
+                nodes.OfType<Chapter>().Count(),
+                nodes.OfType<Heading>().Count(),
+                nodes.OfType<Paragraph>().Count(),
+                nodes.OfType<TableOfContents>().Sum(static toc => toc.Entries.Length),
+                inline.OfType<Link>().Count(static link => DocumentAnchor.TryParse(link.Target, out _)),
+                nodes.OfType<Figure>().Count(),
+                nodes.OfType<Footnote>().Count(),
+                inline.OfType<FootnoteReference>().Count(),
+                nodes.OfType<Table>().Count(),
+                nodes.Count(static node => node is TableCell or TableHeaderCell));
         }
     }
 }

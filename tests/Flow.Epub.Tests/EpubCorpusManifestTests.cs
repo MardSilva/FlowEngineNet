@@ -19,7 +19,8 @@ public sealed class EpubCorpusManifestTests
         Assert.True(result.IsSuccess, JoinDiagnostics(result));
         var manifest = Assert.IsType<EpubCorpusManifest>(result.Manifest);
         Assert.Equal(EpubCorpusManifest.CurrentFormat, manifest.Format);
-        var publication = Assert.Single(manifest.Publications);
+        Assert.Equal(3, manifest.Publications.Length);
+        var publication = manifest.Publications.Single(static item => item.Id.Value == "flow-minimal-epub3");
         Assert.Equal("flow-minimal-epub3", publication.Id.Value);
         Assert.Equal("EPUB mínimo do Flow", publication.Title);
         Assert.Equal(EpubCorpusPublicationKind.ProjectFixture, publication.Kind);
@@ -213,12 +214,18 @@ public sealed class EpubCorpusManifestTests
     public void PublicManifestDescribesTheDeterministicProjectFixture()
     {
         using var source = OpenPublicManifest();
-        var publication = Assert.Single(Assert.IsType<EpubCorpusManifest>(serializer.Read(source).Manifest).Publications);
-        using var fixture = MinimalEpubFactory.Create();
-        var bytes = fixture.ToArray();
+        var publications = Assert.IsType<EpubCorpusManifest>(serializer.Read(source).Manifest).Publications;
+        var fixtures = EpubCorpusFixtureFactory.CreateAll();
 
-        Assert.Equal(bytes.LongLength, publication.ExpectedSizeBytes);
-        Assert.Equal(Convert.ToHexString(SHA256.HashData(bytes)), publication.Sha256.Value);
+        Assert.Equal(fixtures.Keys.Order(StringComparer.Ordinal), publications.Select(static item => item.Id.Value));
+        foreach (var publication in publications)
+        {
+            var bytes = fixtures[publication.Id.Value];
+            var actualHash = Convert.ToHexString(SHA256.HashData(bytes));
+            Assert.True(
+                bytes.LongLength == publication.ExpectedSizeBytes && actualHash == publication.Sha256.Value,
+                $"{publication.Id.Value}: size={bytes.LongLength}; sha256={actualHash}");
+        }
     }
 
     [Fact]

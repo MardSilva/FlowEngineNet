@@ -111,7 +111,65 @@ public sealed record EpubCorpusPublicationEvidence(
     int DesktopLayoutNodeCount,
     int HtmlPackageCount,
     int HtmlFileCount,
-    long HtmlBytes);
+    long HtmlBytes,
+    EpubCorpusSemanticEvidence? Semantic = null);
+
+/// <summary>Captures stable semantic evidence used to localize corpus regressions.</summary>
+public sealed record EpubCorpusSemanticEvidence
+{
+    public EpubCorpusSemanticEvidence(
+        IEnumerable<string> orderedNodeIds,
+        int sourceLocationCount,
+        int chapterCount,
+        int headingCount,
+        int paragraphCount,
+        int tableOfContentsEntryCount,
+        int internalLinkCount,
+        int figureCount,
+        int footnoteCount,
+        int footnoteReferenceCount,
+        int tableCount,
+        int tableCellCount)
+    {
+        ArgumentNullException.ThrowIfNull(orderedNodeIds);
+        OrderedNodeIds = orderedNodeIds.ToImmutableArray();
+        SourceLocationCount = sourceLocationCount;
+        ChapterCount = chapterCount;
+        HeadingCount = headingCount;
+        ParagraphCount = paragraphCount;
+        TableOfContentsEntryCount = tableOfContentsEntryCount;
+        InternalLinkCount = internalLinkCount;
+        FigureCount = figureCount;
+        FootnoteCount = footnoteCount;
+        FootnoteReferenceCount = footnoteReferenceCount;
+        TableCount = tableCount;
+        TableCellCount = tableCellCount;
+    }
+
+    public ImmutableArray<string> OrderedNodeIds { get; }
+
+    public int SourceLocationCount { get; }
+
+    public int ChapterCount { get; }
+
+    public int HeadingCount { get; }
+
+    public int ParagraphCount { get; }
+
+    public int TableOfContentsEntryCount { get; }
+
+    public int InternalLinkCount { get; }
+
+    public int FigureCount { get; }
+
+    public int FootnoteCount { get; }
+
+    public int FootnoteReferenceCount { get; }
+
+    public int TableCount { get; }
+
+    public int TableCellCount { get; }
+}
 
 /// <summary>
 /// Contains runtime observations that are useful for capacity analysis but excluded from deterministic comparison.
