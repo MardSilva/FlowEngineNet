@@ -1,6 +1,5 @@
 using System.Collections.Immutable;
 using System.Diagnostics;
-using System.Xml.Linq;
 using Flow.Core;
 using Flow.Documents;
 using Flow.Layout;
@@ -383,7 +382,7 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
                 integrity,
                 new HtmlBookPackageOptions(),
                 cancellationToken);
-            var evidence = VerifyPackage(package, cancellationToken);
+            var evidence = HtmlBookPackageVerifier.Verify(package, cancellationToken);
             state.RecordPackage(evidence, publication.ExpectedFeatures);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -504,103 +503,6 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
         "svg" => static item => item.MediaType == "image/svg+xml",
         _ => null,
     };
-
-    private static PackageEvidence VerifyPackage(HtmlBookPackage package, CancellationToken cancellationToken)
-    {
-        var files = package.Files.Select(static file => file.Path).ToHashSet(StringComparer.Ordinal);
-        var htmlFiles = package.Files
-            .Where(static file => file.MediaType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase))
-            .ToArray();
-        var idsByPath = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
-        var elementNames = new HashSet<string>(StringComparer.Ordinal);
-
-        foreach (var file in htmlFiles)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var document = ParseHtml(file);
-            idsByPath[file.Path] = document.Descendants()
-                .Select(static element => (string?)element.Attribute("id"))
-                .Where(static id => !string.IsNullOrEmpty(id))
-                .Select(static id => id!)
-                .ToHashSet(StringComparer.Ordinal);
-            foreach (var name in document.Descendants().Select(static element => element.Name.LocalName))
-            {
-                elementNames.Add(name);
-            }
-        }
-
-        foreach (var file in htmlFiles)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var currentPath = file.Path;
-            var document = ParseHtml(file);
-            foreach (var attribute in document.Descendants().Attributes()
-                         .Where(static attribute => attribute.Name.LocalName is "href" or "src"))
-            {
-                var target = attribute.Value;
-                if (string.IsNullOrEmpty(target)
-                    || target.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
-                    || Uri.TryCreate(target, UriKind.Absolute, out _))
-                {
-                    continue;
-                }
-
-                var hashIndex = target.IndexOf('#');
-                var pathPart = hashIndex < 0 ? target : target[..hashIndex];
-                var fragment = hashIndex < 0 ? null : Uri.UnescapeDataString(target[(hashIndex + 1)..]);
-                var resolvedPath = string.IsNullOrEmpty(pathPart)
-                    ? currentPath
-                    : ResolvePackagePath(currentPath, Uri.UnescapeDataString(pathPart));
-                if (!files.Contains(resolvedPath))
-                {
-                    throw new InvalidDataException("The HTML package contains an unresolved local file reference.");
-                }
-
-                if (!string.IsNullOrEmpty(fragment)
-                    && idsByPath.TryGetValue(resolvedPath, out var targetIds)
-                    && !targetIds.Contains(fragment))
-                {
-                    throw new InvalidDataException("The HTML package contains an unresolved local fragment reference.");
-                }
-            }
-        }
-
-        return new PackageEvidence(
-            package.Files.Length,
-            package.Files.Sum(static file => (long)file.Content.Length),
-            elementNames);
-    }
-
-    private static XDocument ParseHtml(HtmlBookFile file) =>
-        XDocument.Parse(System.Text.Encoding.UTF8.GetString(file.Content.AsSpan()));
-
-    private static string ResolvePackagePath(string currentPath, string relativePath)
-    {
-        var segments = currentPath.Split('/').SkipLast(1).ToList();
-        foreach (var segment in relativePath.Split('/'))
-        {
-            if (segment is "" or ".")
-            {
-                continue;
-            }
-
-            if (segment == "..")
-            {
-                if (segments.Count == 0)
-                {
-                    throw new InvalidDataException("The HTML package reference escapes its root.");
-                }
-
-                segments.RemoveAt(segments.Count - 1);
-            }
-            else
-            {
-                segments.Add(segment);
-            }
-        }
-
-        return string.Join('/', segments);
-    }
 
     private static void EnsureLayoutPreservesIds(FlowDocument document, LayoutDocument layout)
     {
@@ -797,7 +699,7 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
             }
         }
 
-        internal void RecordPackage(PackageEvidence evidence, IEnumerable<string> expectedFeatures)
+        internal void RecordPackage(HtmlBookPackageEvidence evidence, IEnumerable<string> expectedFeatures)
         {
             HtmlPackageCount++;
             HtmlFileCount += evidence.FileCount;
@@ -897,8 +799,6 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
         bool IdentityPreserved,
         DocumentHash OriginalHash,
         DocumentHash RestoredHash);
-
-    private sealed record PackageEvidence(int FileCount, long Bytes, IReadOnlySet<string> ElementNames);
 
     private sealed class EnvironmentMetricsCollector : IDisposable
     {

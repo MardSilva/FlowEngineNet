@@ -86,6 +86,59 @@ For local or non-redistributable entries, `EpubCorpusQualificationService.WriteL
 
 The normal test suite uses generated fixtures only. The optional xUnit test is marked with category `EpubCorpus`; it does nothing unless `FLOW_EPUB_CORPUS_PATH` is set and that directory contains `epub-corpus.json`. No execution path downloads publications or writes private book bytes into reports or build artifacts.
 
+## Large-publication preflight
+
+`EpubLargePublicationPreflightService` evaluates only candidates explicitly supplied by the host. Each candidate has a neutral corpus ID, a local path, and affirmative legal-use and DRM-free declarations. Inputs inside the repository, missing or non-EPUB files, symbolic links, and files above the existing archive limit are rejected before inspection. The service never searches a personal directory on its own.
+
+Default suitability requires a successful EPUB 2 or EPUB 3 inspection, a linear reading order, XHTML content, a navigation document or NCX, and at least two resource classes. Length is structural evidence rather than a page claim: a candidate needs at least 20 linear spine items, 20 XHTML documents, or at least 512 KiB of XHTML together with five linear spine items. Hosts can supply stricter typed criteria without raising the importer's security limits. Selection is deterministic and prefers richer feature evidence, more resource classes, more XHTML bytes, a longer spine, more XHTML documents, and then larger total uncompressed content.
+
+The path-free `flow-epub-large-preflight-0.1` report contains the candidate ID, SHA-256, EPUB family, manifest and spine counts, linear/non-linear counts, grouped resource counts, archive byte totals, feature evidence, and stable diagnostic codes. It deliberately omits physical paths, file names, title, author, publisher, language, and publication text. TOC and image presence can be inferred from OPF evidence; ordinary links, notes, and tables remain `unknown` until later gate phases inspect semantic content. `EpubLargePublicationPreflightReportJsonSerializer.WriteAtomicallyAsync` writes UTF-8 without BOM and LF while preserving an existing destination if cancellation happens before replacement.
+
+```csharp
+var candidates = new[]
+{
+    new EpubLargePublicationCandidate(
+        new EpubCorpusPublicationId("candidate-001"),
+        localEpubPath,
+        legalUseDeclared: true,
+        drmFreeDeclared: true),
+};
+
+var report = await new EpubLargePublicationPreflightService().EvaluateAsync(
+    candidates,
+    repositoryRoot,
+    cancellationToken: cancellationToken);
+
+await EpubLargePublicationPreflightReportJsonSerializer.WriteAtomicallyAsync(
+    report,
+    localReportPath,
+    cancellationToken);
+```
+
+The optional external test accepts an explicit `|`-separated list of `neutral-id=absolute-epub-path` entries. Setting the variable is an affirmative declaration that every listed copy is legally available for local testing and DRM-free. The report path must remain outside the repository.
+
+```powershell
+$env:FLOW_EPUB_LARGE_CANDIDATES = 'candidate-001=C:\books\one.epub|candidate-002=C:\books\two.epub'
+$env:FLOW_EPUB_LARGE_PREFLIGHT_REPORT = 'C:\flow-local-reports\large-preflight.json'
+dotnet test tests\Flow.Epub.Tests\Flow.Epub.Tests.csproj --filter 'Category=EpubLargePreflightExternal'
+```
+
+## Large-publication gate contract
+
+`IEpubLargePublicationGate` defines the host-independent boundary for the full large-book gate. `EpubLargePublicationGate` implements the automatic part of that contract. It verifies the explicitly supplied local file and its SHA-256, makes a bounded temporary copy, and executes inspection, import, fidelity analysis, validation, Flow JSON round-trip, canonical integrity, mobile layout and HTML, then desktop layout and HTML. The whole sequence runs at least twice. The second run is compared with the first using stable evidence, phase outcomes, diagnostic codes, semantic order and hashes.
+
+Mobile and desktop packages are rendered and verified one at a time. The verifier checks local files and fragments and returns only counts and byte totals; the package itself is released before the next target is created. Round-trip JSON uses a private temporary file that is removed immediately after deserialization. The gate workspace is deleted after success, failure, or cancellation.
+
+`EpubLargePublicationGateResult` always expands its phase list to every planned phase. A phase blocked by an earlier failure therefore remains `NotStarted`, or is recorded explicitly as `Skipped` or `Inconclusive`, instead of disappearing or looking successful. A missing or failed mandatory automatic phase fails the gate. The default options still require human review, so a technically successful automatic run remains `Inconclusive` until that separate review is recorded. Setting `requireHumanReview: false` is intended for automatic regression fixtures, not for claiming that a real publication passed the complete release gate.
+
+The contract keeps automatic checks separate from human review items. Both use stable IDs and typed outcomes: `NotStarted`, `Passed`, `PassedWithWarnings`, `Failed`, `Skipped`, or `Inconclusive`. Diagnostics carry only a stable code, severity, and phase. They do not carry book excerpts or machine paths.
+
+`flow-epub-large-publication-gate-0.1` stores reproducible options, deterministic structural evidence, every phase, automatic checks, human-review items, and diagnostics. Stable evidence includes EPUB size and version, manifest and spine counts, nodes, characters, assets, chapters, Flow JSON bytes, semantic-order and anchor-set hashes, canonical hash, layout counts, and separate mobile/desktop HTML totals. The default projection writes an explicit `nonDeterministicEnvironment` section with `included: false`. Approximate duration, managed heap, and working set are sampled by phase and can be included for local analysis, but remain in that separate section. They are not byte-for-byte baseline evidence or universal pass limits, and the executor does not force garbage collection.
+
+`EpubLargePublicationGateReportJsonSerializer` produces deterministic UTF-8 without BOM, ends with LF, and replaces a destination atomically. The JSON contains neutral candidate identity and hashes, counts, statuses, and diagnostic codes. It does not contain the EPUB path, title, author, licensed text, or generated HTML.
+
+EPUBCheck remains separate evidence. A Flow failure does not become an EPUBCheck failure, and EPUBCheck success cannot turn a failed Flow phase into success. The current automatic gate does not run EPUBCheck itself; hosts can retain the existing corpus evidence alongside the gate report.
+
 For a local run in PowerShell:
 
 ```powershell

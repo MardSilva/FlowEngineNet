@@ -275,6 +275,7 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
             var isNavigation = properties.Contains("nav", StringComparer.Ordinal)
                 || string.Equals(mediaType, NcxMediaType, StringComparison.OrdinalIgnoreCase);
             var exists = entries.ContainsKey(resourcePath);
+            entries.TryGetValue(resourcePath, out var archiveEntry);
             var supported = IsStructurallySupported(mediaType, isNavigation);
             var item = new EpubManifestItemInfo(
                 id,
@@ -286,7 +287,9 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
                 isNavigation,
                 supported,
                 NormalizedOptional((string?)element.Attribute("fallback")),
-                NormalizedOptional((string?)element.Attribute("media-overlay")));
+                NormalizedOptional((string?)element.Attribute("media-overlay")),
+                archiveEntry?.CompressedLength ?? 0,
+                archiveEntry?.Length ?? 0);
             if (!manifestById.TryAdd(id, item))
             {
                 diagnostics.Add(Error(

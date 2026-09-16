@@ -4,6 +4,54 @@ namespace Flow.Epub.Tests;
 
 internal static class EpubCorpusFixtureFactory
 {
+    internal static byte[] CreateLargeGateFixture(int chapterCount = 24)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(chapterCount, 20);
+        var manifest = new System.Text.StringBuilder();
+        var spine = new System.Text.StringBuilder();
+        var entries = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (var index = 1; index <= chapterCount; index++)
+        {
+            manifest.AppendLine($"    <item id=\"chapter-{index}\" href=\"text/chapter-{index}.xhtml\" media-type=\"application/xhtml+xml\" />");
+            spine.AppendLine($"    <itemref idref=\"chapter-{index}\" />");
+            if (index > 1)
+            {
+                entries[$"EPUB/text/chapter-{index}.xhtml"] = Chapter(index, chapterCount);
+            }
+        }
+
+        var package = $"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id">
+              <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                <dc:identifier id="book-id">urn:flow:fixture:large-gate</dc:identifier>
+                <dc:title>Fixture longa do gate</dc:title>
+                <dc:language>pt-BR</dc:language>
+                <meta property="dcterms:modified">2026-01-01T00:00:00Z</meta>
+              </metadata>
+              <manifest>
+            {manifest}  </manifest>
+              <spine>
+            {spine}  </spine>
+            </package>
+            """;
+        using var stream = MinimalEpubFactory.Create(
+            package: package,
+            chapterOne: Chapter(1, chapterCount),
+            includeSecondChapter: false,
+            includeImage: false,
+            additionalTextEntries: entries);
+        return stream.ToArray();
+
+        static string Chapter(int index, int total) => $"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <html xmlns="http://www.w3.org/1999/xhtml" lang="pt-BR"><head><title>Capítulo {index}</title></head><body>
+              <h1 id="chapter-{index}">Capítulo {index}</h1>
+              <p id="paragraph-{index}">Conteúdo determinístico {index} de {total} para o teste automático do gate.</p>
+            </body></html>
+            """;
+    }
+
     internal static ImmutableDictionary<string, byte[]> CreateAll() => new Dictionary<string, byte[]>(StringComparer.Ordinal)
     {
         ["flow-epub2-ncx"] = CreateEpub2Ncx(),
