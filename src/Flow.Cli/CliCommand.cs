@@ -12,7 +12,10 @@ public sealed record ImportEpubCommand(
     string SourcePath,
     string? OutputPath,
     string? DiagnosticsJsonOutputPath,
-    string? FidelityReportOutputPath = null) : CliCommand;
+    string? FidelityReportOutputPath = null,
+    string? MetadataJsonOutputPath = null,
+    string? ProcessingJsonOutputPath = null,
+    string? SourceMapJsonOutputPath = null) : CliCommand;
 
 public sealed record InspectEpubCommand(string SourcePath, string? JsonOutputPath) : CliCommand;
 

@@ -93,6 +93,9 @@ public sealed class CliOperations
                 "  flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>] [--fidelity-report <fidelity.json>]")
             .ConfigureAwait(false);
         await output.WriteLineAsync(
+                "    [--metadata-json <metadata.json>] [--processing-json <processing.json>] [--source-map-json <source-map.json>]")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(
                 "    Without --output, the file name is derived from the imported book title.")
             .ConfigureAwait(false);
         await output.WriteLineAsync("  flow epub-inspect <book.epub> [--json <report.json>]")
@@ -217,6 +220,15 @@ public sealed class CliOperations
         var fidelityPath = command.FidelityReportOutputPath is null
             ? null
             : Path.GetFullPath(command.FidelityReportOutputPath);
+        var metadataPath = command.MetadataJsonOutputPath is null
+            ? null
+            : Path.GetFullPath(command.MetadataJsonOutputPath);
+        var processingPath = command.ProcessingJsonOutputPath is null
+            ? null
+            : Path.GetFullPath(command.ProcessingJsonOutputPath);
+        var sourceMapPath = command.SourceMapJsonOutputPath is null
+            ? null
+            : Path.GetFullPath(command.SourceMapJsonOutputPath);
         if (!string.Equals(Path.GetExtension(sourcePath), ".epub", StringComparison.OrdinalIgnoreCase))
         {
             await error.WriteLineAsync("FLOWCLI_UNSUPPORTED_INPUT: The import command currently accepts only .epub files.")
@@ -265,6 +277,19 @@ public sealed class CliOperations
             return 1;
         }
 
+        if (!await ValidateEvidenceOutputPathsAsync(
+                sourcePath,
+                outputPath,
+                diagnosticsPath,
+                fidelityPath,
+                metadataPath,
+                processingPath,
+                sourceMapPath,
+                error).ConfigureAwait(false))
+        {
+            return 1;
+        }
+
         await using var source = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         var import = await _epubImporter.ImportAsync(source, progress: null, cancellationToken).ConfigureAwait(false);
         var pipelineMetrics = import.Metrics;
@@ -294,6 +319,20 @@ public sealed class CliOperations
             return 1;
         }
 
+
+        if (!await ValidateEvidenceOutputPathsAsync(
+                sourcePath,
+                outputPath,
+                diagnosticsPath,
+                fidelityPath,
+                metadataPath,
+                processingPath,
+                sourceMapPath,
+                error).ConfigureAwait(false))
+        {
+            return 1;
+        }
+
         if (diagnosticsPath is not null)
         {
             EnsureParentDirectory(diagnosticsPath);
@@ -314,6 +353,15 @@ public sealed class CliOperations
                 .ConfigureAwait(false);
             await output.WriteLineAsync($"Fidelity report: {fidelityPath}").ConfigureAwait(false);
         }
+
+        await WriteImportEvidenceSidecarsAsync(
+                import,
+                metadataPath,
+                processingPath,
+                sourceMapPath,
+                output,
+                cancellationToken)
+            .ConfigureAwait(false);
 
         await WriteEpubDiagnosticsAsync(
                 import.Diagnostics,
@@ -730,6 +778,138 @@ public sealed class CliOperations
                 File.Delete(temporaryPath);
             }
         }
+    }
+
+    private static async Task WriteImportEvidenceSidecarsAsync(
+        EpubImportResult import,
+        string? metadataPath,
+        string? processingPath,
+        string? sourceMapPath,
+        TextWriter output,
+        CancellationToken cancellationToken)
+    {
+        if (metadataPath is not null)
+        {
+            EnsureParentDirectory(metadataPath);
+            await WriteImportEvidenceAtomicallyAsync(
+                    import,
+                    metadataPath,
+                    EpubImportEvidenceJsonWriter.WriteMetadataAsync,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await output.WriteLineAsync($"Metadata JSON: {metadataPath}").ConfigureAwait(false);
+        }
+
+        if (processingPath is not null)
+        {
+            EnsureParentDirectory(processingPath);
+            await WriteImportEvidenceAtomicallyAsync(
+                    import,
+                    processingPath,
+                    EpubImportEvidenceJsonWriter.WriteProcessingAsync,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await output.WriteLineAsync($"Processing JSON: {processingPath}").ConfigureAwait(false);
+        }
+
+        if (sourceMapPath is not null)
+        {
+            EnsureParentDirectory(sourceMapPath);
+            await WriteImportEvidenceAtomicallyAsync(
+                    import,
+                    sourceMapPath,
+                    EpubImportEvidenceJsonWriter.WriteSourceMapAsync,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            await output.WriteLineAsync($"Source map JSON: {sourceMapPath}").ConfigureAwait(false);
+        }
+    }
+
+    private static async Task WriteImportEvidenceAtomicallyAsync(
+        EpubImportResult import,
+        string outputPath,
+        Func<EpubImportResult, Stream, CancellationToken, Task> write,
+        CancellationToken cancellationToken)
+    {
+        var temporaryPath = $"{outputPath}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            await using (var destination = new FileStream(
+                             temporaryPath,
+                             FileMode.CreateNew,
+                             FileAccess.Write,
+                             FileShare.None))
+            {
+                await write(import, destination, cancellationToken).ConfigureAwait(false);
+            }
+
+            File.Move(temporaryPath, outputPath, overwrite: true);
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
+        }
+    }
+
+    private static async Task<bool> ValidateEvidenceOutputPathsAsync(
+        string sourcePath,
+        string? documentPath,
+        string? diagnosticsPath,
+        string? fidelityPath,
+        string? metadataPath,
+        string? processingPath,
+        string? sourceMapPath,
+        TextWriter error)
+    {
+        var evidenceOutputs = new (string Option, string? Path)[]
+        {
+            ("--metadata-json", metadataPath),
+            ("--processing-json", processingPath),
+            ("--source-map-json", sourceMapPath),
+        };
+        foreach (var item in evidenceOutputs)
+        {
+            if (item.Path is not null && PathsEqual(sourcePath, item.Path))
+            {
+                await error.WriteLineAsync(
+                        $"FLOWCLI_INVALID_OUTPUT: The {item.Option} report path must differ from the EPUB source path.")
+                    .ConfigureAwait(false);
+                return false;
+            }
+        }
+
+        var outputs = new (string Option, string? Path)[]
+        {
+            ("--output", documentPath),
+            ("--diagnostics-json", diagnosticsPath),
+            ("--fidelity-report", fidelityPath),
+            ("--metadata-json", metadataPath),
+            ("--processing-json", processingPath),
+            ("--source-map-json", sourceMapPath),
+        };
+        for (var left = 0; left < outputs.Length; left++)
+        {
+            if (outputs[left].Path is null)
+            {
+                continue;
+            }
+
+            for (var right = left + 1; right < outputs.Length; right++)
+            {
+                if (outputs[right].Path is not null && PathsEqual(outputs[left].Path!, outputs[right].Path!))
+                {
+                    await error.WriteLineAsync(
+                            $"FLOWCLI_INVALID_OUTPUT: {outputs[left].Option} and {outputs[right].Option} must use different paths.")
+                        .ConfigureAwait(false);
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
     private static async Task WriteHtmlBookPackageAtomicallyAsync(

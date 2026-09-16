@@ -45,6 +45,7 @@ Implemented:
 - a lightweight CLI for sampling, inspection, validation, hashing, and HTML rendering;
 - readable UTF-8 JSON output, deterministic EPUB diagnostic reports, and title-derived portable `.flow.json` names;
 - a typed, deterministic EPUB fidelity sidecar with explicit preserved/transformed/approximated/unsupported/lost evidence;
+- deterministic noncanonical EPUB metadata, package-processing, and source-map sidecars for editorial diagnostics;
 - small, medium, and large viewport profiles;
 - responsive figures, semantic ID preservation, and typed layout intentions;
 - unit and semantic-conformance tests;
@@ -248,6 +249,17 @@ C:\caminho\para\meu_livro.flow.json
 ```
 
 For a noisy publication, pass `--diagnostics-json <report.json>`. The terminal then shows totals, counts by stable diagnostic code, and at most 40 detail lines; the JSON file still contains every finding.
+
+The optional `--metadata-json`, `--processing-json`, and `--source-map-json` sidecars expose the source evidence retained by the importer without adding it to the canonical Flow document:
+
+```powershell
+dotnet run --project .\src\Flow.Cli -- import $epub `
+  --metadata-json '.\metadata.json' `
+  --processing-json '.\processing.json' `
+  --source-map-json '.\source-map.json'
+```
+
+The metadata report keeps OPF values and refinements. The processing report explains every manifest and spine decision. The source map connects EPUB resource paths and fragments to stable Flow node IDs. These files are deterministic diagnostic/editorial evidence; changing or deleting them does not change the `.flow.json` or its hash.
 
 The CLI prints the exact generated path. Validate it and create the multi-file HTML book in a directory beside the EPUB:
 

@@ -289,6 +289,167 @@ public sealed class FlowCliIntegrationTests
     }
 
     [Fact]
+    public async Task Import_WritesDeterministicNoncanonicalEvidenceSidecarsWithoutChangingDocumentBytes()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var epubPath = workspace.PathOf("evidence.epub");
+        var documentPath = workspace.PathOf("evidence.flow.json");
+        var metadataOne = workspace.PathOf("metadata-one.json");
+        var metadataTwo = workspace.PathOf("metadata-two.json");
+        var processingOne = workspace.PathOf("processing-one.json");
+        var processingTwo = workspace.PathOf("processing-two.json");
+        var sourceMapOne = workspace.PathOf("source-map-one.json");
+        var sourceMapTwo = workspace.PathOf("source-map-two.json");
+        CreateMinimalEpub(epubPath, "Evidência é útil");
+        var application = FlowCliApplication.CreateDefault();
+
+        var baseline = await RunAsync(application, ["import", epubPath, "--output", documentPath]);
+        Assert.Equal(0, baseline.ExitCode);
+        var documentBytes = await File.ReadAllBytesAsync(documentPath);
+
+        var first = await RunAsync(
+            application,
+            [
+                "import",
+                epubPath,
+                "--output",
+                documentPath,
+                "--metadata-json",
+                metadataOne,
+                "--processing-json",
+                processingOne,
+                "--source-map-json",
+                sourceMapOne,
+            ]);
+        var second = await RunAsync(
+            application,
+            [
+                "import",
+                epubPath,
+                "--output",
+                documentPath,
+                "--metadata-json",
+                metadataTwo,
+                "--processing-json",
+                processingTwo,
+                "--source-map-json",
+                sourceMapTwo,
+            ]);
+
+        Assert.Equal(0, first.ExitCode);
+        Assert.Equal(0, second.ExitCode);
+        Assert.Contains($"Metadata JSON: {metadataOne}", first.Output, StringComparison.Ordinal);
+        Assert.Contains($"Processing JSON: {processingOne}", first.Output, StringComparison.Ordinal);
+        Assert.Contains($"Source map JSON: {sourceMapOne}", first.Output, StringComparison.Ordinal);
+        Assert.Equal(documentBytes, await File.ReadAllBytesAsync(documentPath));
+        Assert.Equal(await File.ReadAllBytesAsync(metadataOne), await File.ReadAllBytesAsync(metadataTwo));
+        Assert.Equal(await File.ReadAllBytesAsync(processingOne), await File.ReadAllBytesAsync(processingTwo));
+        Assert.Equal(await File.ReadAllBytesAsync(sourceMapOne), await File.ReadAllBytesAsync(sourceMapTwo));
+
+        AssertJsonEncoding(metadataOne);
+        AssertJsonEncoding(processingOne);
+        AssertJsonEncoding(sourceMapOne);
+        Assert.DoesNotContain(workspace.Root, await File.ReadAllTextAsync(metadataOne), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(workspace.Root, await File.ReadAllTextAsync(processingOne), StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(workspace.Root, await File.ReadAllTextAsync(sourceMapOne), StringComparison.OrdinalIgnoreCase);
+
+        using var metadata = JsonDocument.Parse(await File.ReadAllBytesAsync(metadataOne));
+        Assert.Equal("flow-epub-metadata-0.1", metadata.RootElement.GetProperty("format").GetString());
+        Assert.True(metadata.RootElement.GetProperty("available").GetBoolean());
+        Assert.Equal(
+            "urn:flow:test:real-epub",
+            metadata.RootElement.GetProperty("metadata").GetProperty("selectedIdentifier").GetString());
+        Assert.Equal(
+            "Evidência é útil",
+            metadata.RootElement.GetProperty("metadata").GetProperty("titles")[0].GetProperty("value").GetString());
+
+        using var processing = JsonDocument.Parse(await File.ReadAllBytesAsync(processingOne));
+        Assert.Equal("flow-epub-package-processing-0.1", processing.RootElement.GetProperty("format").GetString());
+        var processingPayload = processing.RootElement.GetProperty("processing");
+        Assert.Equal(1, processingPayload.GetProperty("manifest").GetArrayLength());
+        Assert.Equal(0, processingPayload.GetProperty("spine")[0].GetProperty("position").GetInt32());
+        Assert.Equal(
+            "EPUB/text/chapter.xhtml",
+            processingPayload.GetProperty("spine")[0].GetProperty("selectedResourcePath").GetString());
+
+        using var sourceMap = JsonDocument.Parse(await File.ReadAllBytesAsync(sourceMapOne));
+        Assert.Equal("flow-epub-source-map-0.1", sourceMap.RootElement.GetProperty("format").GetString());
+        var sourceMapPayload = sourceMap.RootElement.GetProperty("sourceMap");
+        Assert.Equal(
+            sourceMapPayload.GetProperty("locationCount").GetInt32(),
+            sourceMapPayload.GetProperty("locations").GetArrayLength());
+        Assert.Contains(
+            sourceMapPayload.GetProperty("locations").EnumerateArray(),
+            static location => location.GetProperty("fragment").GetString() == "opening"
+                && location.GetProperty("nodeId").GetString() == "chapter-chapter-opening");
+    }
+
+    [Fact]
+    public async Task Import_FailedInputWritesUnavailableEvidenceSidecarsWithoutPartialFiles()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var epubPath = workspace.PathOf("invalid-evidence.epub");
+        var metadataPath = workspace.PathOf("metadata.json");
+        var processingPath = workspace.PathOf("processing.json");
+        var sourceMapPath = workspace.PathOf("source-map.json");
+        await File.WriteAllTextAsync(epubPath, "not a ZIP archive");
+
+        var result = await RunAsync(
+            FlowCliApplication.CreateDefault(),
+            [
+                "import",
+                epubPath,
+                "--metadata-json",
+                metadataPath,
+                "--processing-json",
+                processingPath,
+                "--source-map-json",
+                sourceMapPath,
+            ]);
+
+        Assert.Equal(1, result.ExitCode);
+        foreach (var (path, payloadName) in new[]
+        {
+            (metadataPath, "metadata"),
+            (processingPath, "processing"),
+            (sourceMapPath, "sourceMap"),
+        })
+        {
+            Assert.True(File.Exists(path));
+            using var report = JsonDocument.Parse(await File.ReadAllBytesAsync(path));
+            Assert.False(report.RootElement.GetProperty("importSucceeded").GetBoolean());
+            Assert.False(report.RootElement.GetProperty("available").GetBoolean());
+            Assert.Equal(JsonValueKind.Null, report.RootElement.GetProperty(payloadName).ValueKind);
+        }
+
+        Assert.Empty(Directory.GetFiles(workspace.Root, "*.tmp"));
+    }
+
+    [Fact]
+    public async Task Import_RejectsEvidenceOutputPathCollisionsBeforeWriting()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var epubPath = workspace.PathOf("collision.epub");
+        var sharedPath = workspace.PathOf("shared.json");
+        CreateMinimalEpub(epubPath);
+
+        var result = await RunAsync(
+            FlowCliApplication.CreateDefault(),
+            [
+                "import",
+                epubPath,
+                "--metadata-json",
+                sharedPath,
+                "--source-map-json",
+                sharedPath,
+            ]);
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("--metadata-json and --source-map-json must use different paths", result.Error, StringComparison.Ordinal);
+        Assert.False(File.Exists(sharedPath));
+    }
+
+    [Fact]
     public async Task Import_FailedInputStillWritesPartialFidelityReportAtomically()
     {
         using var workspace = new TemporaryWorkspace();
@@ -607,6 +768,9 @@ public sealed class FlowCliIntegrationTests
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("0.2.0-alpha.1 (experimental)", result.Output, StringComparison.Ordinal);
         Assert.Contains("flow import <book.epub>", result.Output, StringComparison.Ordinal);
+        Assert.Contains("--metadata-json <metadata.json>", result.Output, StringComparison.Ordinal);
+        Assert.Contains("--processing-json <processing.json>", result.Output, StringComparison.Ordinal);
+        Assert.Contains("--source-map-json <source-map.json>", result.Output, StringComparison.Ordinal);
         Assert.Contains("flow epub-inspect <book.epub>", result.Output, StringComparison.Ordinal);
         Assert.Contains("flow validate <document>", result.Output, StringComparison.Ordinal);
         Assert.Contains("Exit codes: 0 success, 1 command/input failure, 2 semantic validation failure.", result.Output, StringComparison.Ordinal);
@@ -641,6 +805,13 @@ public sealed class FlowCliIntegrationTests
     private static string OutputValue(string output, string prefix) =>
         output.Split('\n', StringSplitOptions.RemoveEmptyEntries)
             .Single(line => line.StartsWith(prefix, StringComparison.Ordinal))[prefix.Length..].Trim();
+
+    private static void AssertJsonEncoding(string path)
+    {
+        var bytes = File.ReadAllBytes(path);
+        Assert.False(bytes.AsSpan().StartsWith(Encoding.UTF8.Preamble));
+        Assert.DoesNotContain((byte)'\r', bytes);
+    }
 
     private static string[] DirectorySnapshot(string root) => Directory.GetFiles(root, "*", SearchOption.AllDirectories)
         .Select(path =>

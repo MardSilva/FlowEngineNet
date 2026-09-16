@@ -26,10 +26,19 @@ public sealed class CliCommandParserTests
                 "library/book.flow.json",
                 "--fidelity-report",
                 "fidelity.json",
+                "--metadata-json",
+                "metadata.json",
+                "--processing-json",
+                "processing.json",
+                "--source-map-json",
+                "source-map.json",
             ]).Command);
         Assert.Equal("library/book.flow.json", importWithOutput.OutputPath);
         Assert.Equal("import-report.json", importWithOutput.DiagnosticsJsonOutputPath);
         Assert.Equal("fidelity.json", importWithOutput.FidelityReportOutputPath);
+        Assert.Equal("metadata.json", importWithOutput.MetadataJsonOutputPath);
+        Assert.Equal("processing.json", importWithOutput.ProcessingJsonOutputPath);
+        Assert.Equal("source-map.json", importWithOutput.SourceMapJsonOutputPath);
         var epubInspect = Assert.IsType<InspectEpubCommand>(
             _parser.Parse(["epub-inspect", "book.epub", "--json", "report.json"]).Command);
         Assert.Equal("report.json", epubInspect.JsonOutputPath);
@@ -101,6 +110,12 @@ public sealed class CliCommandParserTests
             "FLOWCLI_DUPLICATE_OPTION:",
             _parser.Parse(
                 ["import", "book.epub", "--output", "one.json", "--output", "two.json"])
+                .Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_DUPLICATE_OPTION:",
+            _parser.Parse(
+                ["import", "book.epub", "--source-map-json", "one.json", "--source-map-json", "two.json"])
                 .Error,
             StringComparison.Ordinal);
         Assert.StartsWith(

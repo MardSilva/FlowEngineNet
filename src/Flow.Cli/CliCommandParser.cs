@@ -40,6 +40,9 @@ public sealed class CliCommandParser
         string? outputPath = null;
         string? diagnosticsJsonOutputPath = null;
         string? fidelityReportOutputPath = null;
+        string? metadataJsonOutputPath = null;
+        string? processingJsonOutputPath = null;
+        string? sourceMapJsonOutputPath = null;
         for (var index = 2; index < arguments.Count; index += 2)
         {
             if (index + 1 >= arguments.Count || string.IsNullOrWhiteSpace(arguments[index + 1]))
@@ -61,7 +64,17 @@ public sealed class CliCommandParser
                 case "--fidelity-report" when fidelityReportOutputPath is null:
                     fidelityReportOutputPath = value;
                     break;
-                case "--output" or "--diagnostics-json" or "--fidelity-report":
+                case "--metadata-json" when metadataJsonOutputPath is null:
+                    metadataJsonOutputPath = value;
+                    break;
+                case "--processing-json" when processingJsonOutputPath is null:
+                    processingJsonOutputPath = value;
+                    break;
+                case "--source-map-json" when sourceMapJsonOutputPath is null:
+                    sourceMapJsonOutputPath = value;
+                    break;
+                case "--output" or "--diagnostics-json" or "--fidelity-report" or "--metadata-json"
+                    or "--processing-json" or "--source-map-json":
                     return CommandParseResult.Failure(
                         $"FLOWCLI_DUPLICATE_OPTION: Option '{option}' was specified more than once.");
                 default:
@@ -71,7 +84,14 @@ public sealed class CliCommandParser
         }
 
         return CommandParseResult.Success(
-            new ImportEpubCommand(arguments[1], outputPath, diagnosticsJsonOutputPath, fidelityReportOutputPath));
+            new ImportEpubCommand(
+                arguments[1],
+                outputPath,
+                diagnosticsJsonOutputPath,
+                fidelityReportOutputPath,
+                metadataJsonOutputPath,
+                processingJsonOutputPath,
+                sourceMapJsonOutputPath));
     }
 
     private static CommandParseResult ParseEpubInspect(IReadOnlyList<string> arguments) =>
@@ -230,7 +250,7 @@ public sealed class CliCommandParser
         "Usage: flow render <document> (--html <output> --width <n> --height <n> | --html-book <output-directory> [--ui-language <auto|en|pt-PT|pt-BR>])";
 
     private const string ImportUsage =
-        "Usage: flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>] [--fidelity-report <fidelity.json>]";
+        "Usage: flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>] [--fidelity-report <fidelity.json>] [--metadata-json <metadata.json>] [--processing-json <processing.json>] [--source-map-json <source-map.json>]";
 
     private const string EpubInspectUsage = "Usage: flow epub-inspect <book.epub> [--json <report.json>]";
 }
