@@ -20,9 +20,11 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\Flow.Epub\Flow.Epub.csproj" />
+    <ProjectReference Include="..\..\src\Flow.Epub.Corpus\Flow.Epub.Corpus.csproj" />
     <ProjectReference Include="..\..\src\Flow.Layout\Flow.Layout.csproj" />
     <ProjectReference Include="..\..\src\Flow.Rendering.Html\Flow.Rendering.Html.csproj" />
     <ProjectReference Include="..\..\src\Flow.Security\Flow.Security.csproj" />
+    <ProjectReference Include="..\Flow.EpubCheck.FakeTool\Flow.EpubCheck.FakeTool.csproj" ReferenceOutputAssembly="false" />
   </ItemGroup>
 
   <ItemGroup>
