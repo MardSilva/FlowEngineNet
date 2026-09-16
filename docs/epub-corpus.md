@@ -129,15 +129,70 @@ dotnet test tests\Flow.Epub.Tests\Flow.Epub.Tests.csproj --filter 'Category=Epub
 
 Mobile and desktop packages are rendered and verified one at a time. The verifier checks local files and fragments and returns only counts and byte totals; the package itself is released before the next target is created. Round-trip JSON uses a private temporary file that is removed immediately after deserialization. The gate workspace is deleted after success, failure, or cancellation.
 
+The structural-audit phase follows references across the complete pipeline. It compares spine entries with semantic chapters and chapter pages without treating titles or file names as identity, keeps spine order authoritative, resolves TOC entries and internal links, verifies that external links survive in both HTML packages without loading them, and checks figures, covers, passive SVG assets, asset deduplication, notes, table structure, IDs, source locations, layouts, and rendered HTML. Table captions, spans, and header references are reported separately; cross-resource footnotes are also a separate family.
+
+Each reference family records `found`, `resolved`, `broken`, `ambiguous`, `approximated`, and `skipped` as mutually exclusive counts. `Absent` means that an optional semantic construct was not found, while `NotApplicable` means that the check had no relevant input. A broken or ambiguous essential reference fails the automatic gate. Repeated failures are aggregated into stable diagnostic codes, and the report contains counts only—never EPUB text, HTML, paths, titles, or authors.
+
 `EpubLargePublicationGateResult` always expands its phase list to every planned phase. A phase blocked by an earlier failure therefore remains `NotStarted`, or is recorded explicitly as `Skipped` or `Inconclusive`, instead of disappearing or looking successful. A missing or failed mandatory automatic phase fails the gate. The default options still require human review, so a technically successful automatic run remains `Inconclusive` until that separate review is recorded. Setting `requireHumanReview: false` is intended for automatic regression fixtures, not for claiming that a real publication passed the complete release gate.
 
 The contract keeps automatic checks separate from human review items. Both use stable IDs and typed outcomes: `NotStarted`, `Passed`, `PassedWithWarnings`, `Failed`, `Skipped`, or `Inconclusive`. Diagnostics carry only a stable code, severity, and phase. They do not carry book excerpts or machine paths.
 
-`flow-epub-large-publication-gate-0.1` stores reproducible options, deterministic structural evidence, every phase, automatic checks, human-review items, and diagnostics. Stable evidence includes EPUB size and version, manifest and spine counts, nodes, characters, assets, chapters, Flow JSON bytes, semantic-order and anchor-set hashes, canonical hash, layout counts, and separate mobile/desktop HTML totals. The default projection writes an explicit `nonDeterministicEnvironment` section with `included: false`. Approximate duration, managed heap, and working set are sampled by phase and can be included for local analysis, but remain in that separate section. They are not byte-for-byte baseline evidence or universal pass limits, and the executor does not force garbage collection.
+`flow-epub-large-publication-gate-0.1` stores reproducible options, deterministic structural evidence, every phase, automatic checks, human-review items, and diagnostics. Stable evidence includes EPUB size and version, manifest and spine counts, nodes, characters, assets, chapters, Flow JSON bytes, semantic-order and anchor-set hashes, canonical hash, layout counts, separate mobile/desktop HTML totals, and the typed reference-audit counts. The default projection writes an explicit `nonDeterministicEnvironment` section with `included: false`. Approximate duration, managed heap, and working set are sampled by phase and can be included for local analysis, but remain in that separate section. They are not byte-for-byte baseline evidence or universal pass limits, and the executor does not force garbage collection.
 
 `EpubLargePublicationGateReportJsonSerializer` produces deterministic UTF-8 without BOM, ends with LF, and replaces a destination atomically. The JSON contains neutral candidate identity and hashes, counts, statuses, and diagnostic codes. It does not contain the EPUB path, title, author, licensed text, or generated HTML.
 
 EPUBCheck remains separate evidence. A Flow failure does not become an EPUBCheck failure, and EPUBCheck success cannot turn a failed Flow phase into success. The current automatic gate does not run EPUBCheck itself; hosts can retain the existing corpus evidence alongside the gate report.
+
+## Assisted local review
+
+`IEpubLargePublicationReviewPackageGenerator` prepares the material needed to review a large publication without adding licensed artifacts to the repository. The caller must provide the candidate, its expected SHA-256, the repository root to protect, and an absolute output directory outside that root. The generator verifies legal-use and DRM-free declarations, checks the source hash, imports and validates the document, then writes mobile and desktop HTML packages sequentially.
+
+The destination contains:
+
+- `mobile/` and `desktop/`, each with a complete HTML book package;
+- `review.html`, a script-free page with direct local links to the beginning, middle and end, plus representative TOC, link, image, cover, note and table targets when present;
+- `review-checklist.json`, a versioned human checklist whose items accept `approved`, `rejected`, `not-applicable` or `inconclusive`;
+- `review-manifest.json`, which relates the local artifacts to the neutral candidate ID, source EPUB SHA-256, canonical FlowDocument SHA-256, canonicalization version and package hashes.
+
+The checklist starts as `inconclusive` for every applicable decision. The generator never converts visual inspection into an automatic pass. A structurally absent optional feature starts as `not-applicable`. Reports contain only IDs, relative targets, statuses and hashes; they do not contain publication text, titles, authors, physical source paths or generated HTML.
+
+Generation takes place in a sibling staging directory. The completed directory replaces the destination only after every file has been written. A failure or cancellation removes staging data and leaves a previous destination intact. To avoid replacing unrelated files, an existing directory is accepted only when it contains a recognized Flow review manifest. Existing reparse points, relative output paths, file-system roots, destinations that contain the source EPUB, and destinations inside the protected repository are rejected. The generator does not launch a browser or execute scripts.
+
+Minimal host-side usage:
+
+```csharp
+var options = new EpubLargePublicationReviewOptions(
+    candidate.Id,
+    expectedSourceSha256,
+    @"C:\flow-local-reviews\candidate-001",
+    repositoryRoot,
+    HtmlBookUiLanguage.PortugueseBrazil);
+
+var generator = new EpubLargePublicationReviewPackageGenerator();
+var result = await generator.GenerateAsync(candidate, options, cancellationToken);
+```
+
+The result returns the local destination and content-free hashes for correlation. It does not update the automatic gate or mark the human-review phase as passed; that decision remains separate and must be recorded by the reviewer.
+
+### Optional real-publication gate
+
+The external large gate remains inactive during normal builds. A maintainer can run one explicitly selected local publication by setting four process-local variables:
+
+```powershell
+$env:FLOW_EPUB_LARGE_GATE_CANDIDATE = 'candidate-001=C:\books\selected.epub'
+$env:FLOW_EPUB_LARGE_GATE_SHA256 = '<64 hexadecimal characters>'
+$env:FLOW_EPUB_LARGE_GATE_REPORT = 'C:\flow-local-reports\candidate-001-gate.json'
+$env:FLOW_EPUB_LARGE_REVIEW_OUTPUT = 'C:\flow-local-reports\candidate-001-review'
+
+dotnet test tests/Flow.Epub.Tests/Flow.Epub.Tests.csproj `
+  --filter 'Category=EpubLargeGateExternal'
+```
+
+The test always writes the gate report before evaluating the automatic result. It also prepares the local review directory when import and rendering can complete, even if a fidelity assertion later fails. The test fails on any incomplete automatic phase and leaves human decisions inconclusive. Clear the four variables after the run so they do not affect later test sessions.
+
+The first private long-publication run exercised 39 linear chapters, 3,868 semantic nodes and more than 1.1 million imported characters. Reading order, validation, canonical round-trip, deterministic repetition, TOC destinations, notes, tables, assets, mobile/desktop layouts and HTML IDs passed. Fidelity failed because 41 of 56 XHTML image occurrences had no destination representation; the current importer preserves block figures but cannot represent those inline image occurrences semantically. This is a required fidelity correction, not a reason to lower the gate.
+
+The same run completed without memory or output-package failure. Its environment-specific samples did not justify implementing ZIP spooling or progressive HTML writing before correcting fidelity. Those measurements are local observations, not support limits or performance guarantees.
 
 For a local run in PowerShell:
 

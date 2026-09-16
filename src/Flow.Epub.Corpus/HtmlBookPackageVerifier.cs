@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using System.Xml.Linq;
 using Flow.Rendering.Html;
 
@@ -16,6 +17,7 @@ internal static class HtmlBookPackageVerifier
             .ToArray();
         var idsByPath = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
         var elementNames = new HashSet<string>(StringComparer.Ordinal);
+        var externalReferences = new Dictionary<string, int>(StringComparer.Ordinal);
 
         foreach (var file in htmlFiles)
         {
@@ -42,9 +44,14 @@ internal static class HtmlBookPackageVerifier
             {
                 var target = attribute.Value;
                 if (string.IsNullOrEmpty(target)
-                    || target.StartsWith("data:", StringComparison.OrdinalIgnoreCase)
-                    || Uri.TryCreate(target, UriKind.Absolute, out _))
+                    || target.StartsWith("data:", StringComparison.OrdinalIgnoreCase))
                 {
+                    continue;
+                }
+
+                if (Uri.TryCreate(target, UriKind.Absolute, out _))
+                {
+                    externalReferences[target] = externalReferences.GetValueOrDefault(target) + 1;
                     continue;
                 }
 
@@ -71,7 +78,17 @@ internal static class HtmlBookPackageVerifier
         return new HtmlBookPackageEvidence(
             package.Files.Length,
             package.Files.Sum(static file => (long)file.Content.Length),
-            elementNames);
+            elementNames,
+            idsByPath
+                .SelectMany(static pair => pair.Value.Select(id => (Id: id, Path: pair.Key)))
+                .GroupBy(static item => item.Id, StringComparer.Ordinal)
+                .ToImmutableDictionary(
+                    static group => group.Key,
+                    static group => group.Select(static item => item.Path)
+                        .Order(StringComparer.Ordinal)
+                        .ToImmutableArray(),
+                    StringComparer.Ordinal),
+            externalReferences.ToImmutableDictionary(StringComparer.Ordinal));
     }
 
     private static XDocument ParseHtml(HtmlBookFile file) =>
@@ -109,4 +126,6 @@ internal static class HtmlBookPackageVerifier
 internal sealed record HtmlBookPackageEvidence(
     int FileCount,
     long Bytes,
-    IReadOnlySet<string> ElementNames);
+    IReadOnlySet<string> ElementNames,
+    ImmutableDictionary<string, ImmutableArray<string>> PathsById,
+    ImmutableDictionary<string, int> ExternalReferences);

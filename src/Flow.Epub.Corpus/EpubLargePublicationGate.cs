@@ -216,7 +216,11 @@ public sealed record EpubLargePublicationGateEvidence(
     long MobileHtmlBytes = 0,
     int DesktopLayoutNodeCount = 0,
     int DesktopHtmlFileCount = 0,
-    long DesktopHtmlBytes = 0);
+    long DesktopHtmlBytes = 0)
+{
+    /// <summary>Gets deterministic, content-free evidence from the deep structural audit.</summary>
+    public ImmutableArray<EpubLargePublicationReferenceAudit> ReferenceAudits { get; init; } = [];
+}
 
 /// <summary>Contains an approximate observation for one phase in one environment.</summary>
 public sealed record EpubLargePublicationGatePhaseObservation(

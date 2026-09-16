@@ -30,26 +30,57 @@ internal static class EpubCorpusFixtureFactory
                 <meta property="dcterms:modified">2026-01-01T00:00:00Z</meta>
               </metadata>
               <manifest>
+                <item id="nav" href="nav.xhtml" media-type="application/xhtml+xml" properties="nav" />
+                <item id="shared-image" href="images/flow.png" media-type="image/png" />
             {manifest}  </manifest>
               <spine>
             {spine}  </spine>
             </package>
             """;
+        entries["EPUB/nav.xhtml"] = $"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>Sumário</title></head><body>
+              <nav epub:type="toc"><ol>
+                <li><a href="text/chapter-1.xhtml#chapter-1">Começo</a></li>
+                <li><a href="text/chapter-{chapterCount / 2}.xhtml#chapter-{chapterCount / 2}">Meio</a></li>
+                <li><a href="text/chapter-{chapterCount}.xhtml#chapter-{chapterCount}">Fim</a></li>
+              </ol></nav>
+            </body></html>
+            """;
         using var stream = MinimalEpubFactory.Create(
             package: package,
             chapterOne: Chapter(1, chapterCount),
             includeSecondChapter: false,
-            includeImage: false,
+            includeImage: true,
             additionalTextEntries: entries);
         return stream.ToArray();
 
-        static string Chapter(int index, int total) => $"""
+        static string Chapter(int index, int total)
+        {
+            var next = index == total ? 1 : index + 1;
+            var figure = index is 1 || index == total / 2
+                ? "<figure><img src=\"../images/flow.png\" alt=\"Imagem compartilhada\" /><figcaption>Imagem repetida</figcaption></figure>"
+                : string.Empty;
+            var note = index == total / 2
+                ? $"<p id=\"note-owner-{index}\">Referência <a epub:type=\"noteref\" href=\"chapter-{index + 1}.xhtml#note-{index}\">[1]</a>.</p>"
+                : index == (total / 2) + 1
+                    ? $"<aside id=\"note-{total / 2}\" epub:type=\"footnote\"><p>Nota da fixture. <a href=\"chapter-{total / 2}.xhtml#note-owner-{total / 2}\">Voltar</a></p></aside>"
+                    : string.Empty;
+            var table = index == total
+                ? "<table><caption>Dados</caption><thead><tr><th id=\"header-final\" scope=\"col\" colspan=\"2\">Campos</th></tr></thead><tbody><tr><td headers=\"header-final\">Valor A</td><td headers=\"header-final\">Valor B</td></tr></tbody></table>"
+                : string.Empty;
+            var external = index == 1 ? "<a href=\"https://example.invalid/reference\">Referência externa</a>." : string.Empty;
+            return $"""
             <?xml version="1.0" encoding="utf-8"?>
-            <html xmlns="http://www.w3.org/1999/xhtml" lang="pt-BR"><head><title>Capítulo {index}</title></head><body>
+            <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="pt-BR"><head><title>Capítulo {index}</title></head><body>
               <h1 id="chapter-{index}">Capítulo {index}</h1>
-              <p id="paragraph-{index}">Conteúdo determinístico {index} de {total} para o teste automático do gate.</p>
+              <p id="paragraph-{index}">Conteúdo determinístico {index} de {total}. <a href="#chapter-{index}">Mesmo capítulo</a> e <a href="chapter-{next}.xhtml#chapter-{next}">capítulo seguinte</a>. {external}</p>
+              {figure}
+              {note}
+              {table}
             </body></html>
             """;
+        }
     }
 
     internal static ImmutableDictionary<string, byte[]> CreateAll() => new Dictionary<string, byte[]>(StringComparer.Ordinal)

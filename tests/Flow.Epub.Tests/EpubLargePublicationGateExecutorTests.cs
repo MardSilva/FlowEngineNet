@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using System.Text;
+using System.Xml.Linq;
 using Flow.Core;
 using Flow.Documents;
 using Flow.Epub.Corpus;
@@ -37,6 +39,25 @@ public sealed class EpubLargePublicationGateExecutorTests
         Assert.Equal(
             EpubLargePublicationGateStatus.Passed,
             Phase(report, EpubLargePublicationGatePhaseKind.DesktopHtmlPackage));
+        Assert.Contains(
+            Phase(report, EpubLargePublicationGatePhaseKind.StructuralAudit),
+            new[] { EpubLargePublicationGateStatus.Passed, EpubLargePublicationGateStatus.PassedWithWarnings });
+        AssertAudit(report, EpubLargePublicationAuditKind.TableOfContentsDestination, found: 3, broken: 0);
+        AssertAudit(report, EpubLargePublicationAuditKind.InternalLinkSameResource, found: 24, broken: 0);
+        AssertAudit(report, EpubLargePublicationAuditKind.InternalLinkCrossResource, found: 24, broken: 0);
+        AssertAudit(report, EpubLargePublicationAuditKind.ExternalLink, found: 1, broken: 0);
+        AssertAudit(report, EpubLargePublicationAuditKind.FigureAsset, found: 2, broken: 0);
+        AssertAudit(report, EpubLargePublicationAuditKind.FootnoteReference, found: 1, broken: 0);
+        AssertAudit(report, EpubLargePublicationAuditKind.FootnoteCrossResource, found: 1, broken: 0);
+        AssertAudit(report, EpubLargePublicationAuditKind.TableCaption, found: 1, broken: 0);
+        AssertAudit(report, EpubLargePublicationAuditKind.TableSpan, found: 1, broken: 0);
+        AssertAudit(report, EpubLargePublicationAuditKind.TableHeaderReference, found: 2, broken: 0);
+        Assert.Equal(
+            EpubLargePublicationAuditApplicability.Absent,
+            Audit(report, EpubLargePublicationAuditKind.CoverAsset).Applicability);
+        Assert.Equal(
+            EpubLargePublicationAuditApplicability.NotApplicable,
+            Audit(report, EpubLargePublicationAuditKind.SvgAssetSafety).Applicability);
         Assert.Contains(
             report.Result.EnvironmentObservations!.Phases,
             static item => item.Phase == EpubLargePublicationGatePhaseKind.Import && item.DurationTicks >= 0);
@@ -143,6 +164,53 @@ public sealed class EpubLargePublicationGateExecutorTests
         Assert.Empty(Directory.EnumerateFileSystemEntries(workspace.GateRoot));
     }
 
+    [Fact]
+    public async Task ReorderedSemanticChapters_FailsBecauseSpineOrderRemainsAuthoritative()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var bytes = EpubCorpusFixtureFactory.CreateLargeGateFixture(20);
+        var candidate = workspace.AddCandidate("reordered-chapters", bytes);
+        var gate = CreateGate(workspace, importer: new ReorderedChapterImporter());
+
+        var report = await gate.ExecuteAsync(candidate, Options(candidate.Id, bytes, requireHumanReview: false));
+
+        Assert.Equal(EpubLargePublicationGateStatus.Failed, report.Result.Status);
+        Assert.Equal(
+            EpubLargePublicationGateStatus.Failed,
+            Phase(report, EpubLargePublicationGatePhaseKind.StructuralAudit));
+        Assert.True(Audit(report, EpubLargePublicationAuditKind.ReadingOrder).Counts.Broken > 0);
+        Assert.Single(
+            report.Result.Diagnostics,
+            static item => item.Code == EpubLargePublicationGateDiagnosticCodes.EssentialReferenceBroken
+                && item.Phase == EpubLargePublicationGatePhaseKind.StructuralAudit);
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(1)]
+    [InlineData(2)]
+    public async Task MissingSemanticHtmlId_AtBeginningMiddleOrEnd_FailsStructuralAudit(int position)
+    {
+        using var workspace = new TemporaryWorkspace();
+        var bytes = EpubCorpusFixtureFactory.CreateLargeGateFixture(21);
+        var candidate = workspace.AddCandidate($"missing-html-id-{position}", bytes);
+        var gate = CreateGate(workspace, renderer: new MissingChapterIdRenderer(position));
+
+        var report = await gate.ExecuteAsync(candidate, Options(candidate.Id, bytes, requireHumanReview: false));
+
+        Assert.Equal(EpubLargePublicationGateStatus.Failed, report.Result.Status);
+        Assert.Equal(
+            EpubLargePublicationGateStatus.Passed,
+            Phase(report, EpubLargePublicationGatePhaseKind.MobileHtmlPackage));
+        Assert.Equal(
+            EpubLargePublicationGateStatus.Failed,
+            Phase(report, EpubLargePublicationGatePhaseKind.StructuralAudit));
+        Assert.True(Audit(report, EpubLargePublicationAuditKind.ChapterHtmlPage).Counts.Broken > 0);
+        Assert.Contains(
+            report.Result.Diagnostics,
+            static item => item.Code == EpubLargePublicationGateDiagnosticCodes.EssentialReferenceBroken);
+    }
+
     [Theory]
     [InlineData("inspection", EpubLargePublicationGatePhaseKind.Inspection)]
     [InlineData("import", EpubLargePublicationGatePhaseKind.Import)]
@@ -226,6 +294,23 @@ public sealed class EpubLargePublicationGateExecutorTests
         EpubLargePublicationGatePhaseKind phase) =>
         report.Result.Phases.Single(item => item.Kind == phase).Status;
 
+    private static EpubLargePublicationReferenceAudit Audit(
+        EpubLargePublicationGateReport report,
+        EpubLargePublicationAuditKind kind) =>
+        report.Result.Evidence.ReferenceAudits.Single(item => item.Kind == kind);
+
+    private static void AssertAudit(
+        EpubLargePublicationGateReport report,
+        EpubLargePublicationAuditKind kind,
+        int found,
+        int broken)
+    {
+        var audit = Audit(report, kind);
+        Assert.Equal(EpubLargePublicationAuditApplicability.Present, audit.Applicability);
+        Assert.Equal(found, audit.Counts.Found);
+        Assert.Equal(broken, audit.Counts.Broken);
+    }
+
     private sealed class ThrowingSerializer : IFlowDocumentSerializer
     {
         public Task SerializeAsync(FlowDocument document, Stream destination, CancellationToken cancellationToken = default) =>
@@ -242,6 +327,73 @@ public sealed class EpubLargePublicationGateExecutorTests
             LayoutDocument layout,
             UserReadingPreferences userPreferences,
             HtmlBookIntegrity integrity) => throw new InvalidDataException("Injected renderer failure.");
+    }
+
+    private sealed class MissingChapterIdRenderer(int position) : IHtmlBookPackageRenderer
+    {
+        private readonly HtmlBookPackageRenderer inner = new();
+
+        public HtmlBookPackage Render(
+            FlowDocument document,
+            LayoutDocument layout,
+            UserReadingPreferences userPreferences,
+            HtmlBookIntegrity integrity)
+        {
+            var package = inner.Render(document, layout, userPreferences, integrity);
+            var chapterFiles = package.Files
+                .Where(static file => file.Path.StartsWith("chapters/", StringComparison.Ordinal)
+                    && file.MediaType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(static file => file.Path, StringComparer.Ordinal)
+                .ToArray();
+            var target = position switch
+            {
+                0 => chapterFiles[0],
+                1 => chapterFiles[chapterFiles.Length / 2],
+                _ => chapterFiles[^1],
+            };
+            var targetDocument = Parse(target);
+            var removedIds = targetDocument.Descendants()
+                .Attributes("id")
+                .Select(static attribute => attribute.Value)
+                .ToHashSet(StringComparer.Ordinal);
+
+            var files = package.Files.Select(file => Rewrite(file, target.Path, removedIds)).ToArray();
+            return new HtmlBookPackage(files);
+
+            static HtmlBookFile Rewrite(HtmlBookFile file, string targetPath, IReadOnlySet<string> removedIds)
+            {
+                if (!file.MediaType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase))
+                {
+                    return file;
+                }
+
+                var html = Parse(file);
+                if (file.Path == targetPath)
+                {
+                    foreach (var id in html.Descendants().Attributes("id").ToArray())
+                    {
+                        id.Remove();
+                    }
+                }
+
+                foreach (var href in html.Descendants().Attributes("href").ToArray())
+                {
+                    var separator = href.Value.LastIndexOf('#');
+                    if (separator >= 0 && removedIds.Contains(href.Value[(separator + 1)..]))
+                    {
+                        href.Value = href.Value[..separator];
+                    }
+                }
+
+                return new HtmlBookFile(
+                    file.Path,
+                    file.MediaType,
+                    Encoding.UTF8.GetBytes(html.ToString(SaveOptions.DisableFormatting)));
+            }
+
+            static XDocument Parse(HtmlBookFile file) =>
+                XDocument.Parse(Encoding.UTF8.GetString(file.Content.AsSpan()));
+        }
     }
 
     private sealed class CancellingInspector(CancellationTokenSource cancellation) : IEpubPublicationInspector
@@ -322,6 +474,30 @@ public sealed class EpubLargePublicationGateExecutorTests
                 original.Integrity);
             return new EpubImportResult(
                 changed,
+                imported.Diagnostics,
+                imported.MetadataReport,
+                imported.ProcessingReport,
+                imported.SourceMap);
+        }
+    }
+
+    private sealed class ReorderedChapterImporter : IEpubImporter
+    {
+        private readonly EpubImporter inner = new();
+
+        public async Task<EpubImportResult> ImportAsync(Stream source, CancellationToken cancellationToken = default)
+        {
+            var imported = await inner.ImportAsync(source, cancellationToken);
+            var original = Assert.IsType<FlowDocument>(imported.Document);
+            var reordered = new FlowDocument(
+                original.Identity,
+                original.Metadata,
+                new DocumentContent(original.Content.Children.Reverse()),
+                original.Assets.Values,
+                original.Presentation,
+                original.Integrity);
+            return new EpubImportResult(
+                reordered,
                 imported.Diagnostics,
                 imported.MetadataReport,
                 imported.ProcessingReport,

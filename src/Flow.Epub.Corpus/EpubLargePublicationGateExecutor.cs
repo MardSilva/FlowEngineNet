@@ -31,6 +31,9 @@ public static class EpubLargePublicationGateDiagnosticCodes
     public const string NonDeterministicResult = "ELG018";
     public const string StructuralAuditPending = "ELG019";
     public const string HumanReviewPending = "ELG020";
+    public const string EssentialReferenceBroken = "ELG021";
+    public const string EssentialReferenceAmbiguous = "ELG022";
+    public const string ReferenceApproximated = "ELG023";
 }
 
 /// <summary>Runs one verified EPUB repeatedly through the complete automatic Flow pipeline.</summary>
@@ -363,7 +366,7 @@ public sealed class EpubLargePublicationGate : IEpubLargePublicationGate
             canonicalHash.Algorithm,
             canonicalHash.Hash,
             canonicalHash.CanonicalizationVersion);
-        await RenderTargetAsync(
+        var mobile = await RenderTargetAsync(
                 run,
                 document,
                 new LayoutContext(390, 844, DeviceClass.Phone),
@@ -372,7 +375,7 @@ public sealed class EpubLargePublicationGate : IEpubLargePublicationGate
                 integrity,
                 cancellationToken)
             .ConfigureAwait(false);
-        await RenderTargetAsync(
+        var desktop = await RenderTargetAsync(
                 run,
                 document,
                 new LayoutContext(1600, 1000, DeviceClass.Desktop),
@@ -381,6 +384,40 @@ public sealed class EpubLargePublicationGate : IEpubLargePublicationGate
                 integrity,
                 cancellationToken)
             .ConfigureAwait(false);
+        var audit = run.Execute(
+            EpubLargePublicationGatePhaseKind.StructuralAudit,
+            () => EpubLargePublicationAuditor.Audit(
+                new EpubLargePublicationAuditInput(
+                    import?.ProcessingReport,
+                    import?.SourceMap,
+                    document,
+                    restored!,
+                    mobile?.Layout,
+                    mobile?.Package,
+                    desktop?.Layout,
+                    desktop?.Package),
+                cancellationToken),
+            EpubLargePublicationGateDiagnosticCodes.EssentialReferenceBroken,
+            cancellationToken);
+        if (audit is not null)
+        {
+            run.ReferenceAudits = audit.Audits;
+            if (audit.HasEssentialFailure)
+            {
+                run.Fail(
+                    EpubLargePublicationGatePhaseKind.StructuralAudit,
+                    audit.Audits.Any(static item => item.Essential && item.Counts.Ambiguous > 0)
+                        ? EpubLargePublicationGateDiagnosticCodes.EssentialReferenceAmbiguous
+                        : EpubLargePublicationGateDiagnosticCodes.EssentialReferenceBroken);
+            }
+            else if (audit.HasApproximation)
+            {
+                run.Warn(
+                    EpubLargePublicationGatePhaseKind.StructuralAudit,
+                    EpubLargePublicationGateDiagnosticCodes.ReferenceApproximated);
+            }
+        }
+
         return run;
     }
 
@@ -434,7 +471,7 @@ public sealed class EpubLargePublicationGate : IEpubLargePublicationGate
         return originalHash;
     }
 
-    private async Task RenderTargetAsync(
+    private async Task<RenderTargetResult?> RenderTargetAsync(
         GateRun run,
         FlowDocument document,
         LayoutContext context,
@@ -456,7 +493,7 @@ public sealed class EpubLargePublicationGate : IEpubLargePublicationGate
         if (layout is null)
         {
             run.Skip(packagePhase);
-            return;
+            return null;
         }
 
         run.SetLayoutNodeCount(layoutPhase, EnumerateLayoutNodes(layout.Nodes).Count());
@@ -478,7 +515,10 @@ public sealed class EpubLargePublicationGate : IEpubLargePublicationGate
         if (packageEvidence is not null)
         {
             run.SetPackageEvidence(packagePhase, packageEvidence);
+            return new RenderTargetResult(layout, packageEvidence);
         }
+
+        return new RenderTargetResult(layout, null);
     }
 
     private static EpubLargePublicationGateResult BuildResult(
@@ -492,7 +532,6 @@ public sealed class EpubLargePublicationGate : IEpubLargePublicationGate
         var phases = Enum.GetValues<EpubLargePublicationGatePhaseKind>()
             .Where(static phase => phase is not EpubLargePublicationGatePhaseKind.Preflight
                 and not EpubLargePublicationGatePhaseKind.DeterminismComparison
-                and not EpubLargePublicationGatePhaseKind.StructuralAudit
                 and not EpubLargePublicationGatePhaseKind.HumanReview)
             .Select(phase => new EpubLargePublicationGatePhase(
                 phase,
@@ -500,9 +539,6 @@ public sealed class EpubLargePublicationGate : IEpubLargePublicationGate
             .Prepend(new EpubLargePublicationGatePhase(
                 EpubLargePublicationGatePhaseKind.Preflight,
                 EpubLargePublicationGateStatus.Passed))
-            .Append(new EpubLargePublicationGatePhase(
-                EpubLargePublicationGatePhaseKind.StructuralAudit,
-                EpubLargePublicationGateStatus.Skipped))
             .Append(new EpubLargePublicationGatePhase(
                 EpubLargePublicationGatePhaseKind.DeterminismComparison,
                 deterministic ? EpubLargePublicationGateStatus.Passed : EpubLargePublicationGateStatus.Failed))
@@ -514,10 +550,6 @@ public sealed class EpubLargePublicationGate : IEpubLargePublicationGate
             .ToArray();
 
         var diagnostics = runs.SelectMany(static run => run.Diagnostics).ToList();
-        diagnostics.Add(new EpubLargePublicationGateDiagnostic(
-            EpubLargePublicationGateDiagnosticCodes.StructuralAuditPending,
-            EpubLargePublicationGateDiagnosticSeverity.Information,
-            EpubLargePublicationGatePhaseKind.StructuralAudit));
         if (!deterministic)
         {
             diagnostics.Add(Error(
@@ -652,6 +684,7 @@ public sealed class EpubLargePublicationGate : IEpubLargePublicationGate
         or EpubLargePublicationGatePhaseKind.MobileHtmlPackage
         or EpubLargePublicationGatePhaseKind.DesktopLayout
         or EpubLargePublicationGatePhaseKind.DesktopHtmlPackage
+        or EpubLargePublicationGatePhaseKind.StructuralAudit
         or EpubLargePublicationGatePhaseKind.DeterminismComparison;
 
     private static FileStream OpenSource(string path) =>
@@ -742,6 +775,8 @@ public sealed class EpubLargePublicationGate : IEpubLargePublicationGate
 
     private sealed record RoundTripResult(FlowDocument Document, int Bytes);
 
+    private sealed record RenderTargetResult(LayoutDocument Layout, HtmlBookPackageEvidence? Package);
+
     private sealed class GateRun(long sourceBytes)
     {
         private readonly Dictionary<EpubLargePublicationGatePhaseKind, EpubLargePublicationGateStatus> statuses = [];
@@ -767,6 +802,7 @@ public sealed class EpubLargePublicationGate : IEpubLargePublicationGate
         internal int DesktopLayoutNodeCount;
         internal int DesktopHtmlFileCount;
         internal long DesktopHtmlBytes;
+        internal System.Collections.Immutable.ImmutableArray<EpubLargePublicationReferenceAudit> ReferenceAudits = [];
 
         internal EpubLargePublicationGateStatus Status(EpubLargePublicationGatePhaseKind phase) =>
             statuses.GetValueOrDefault(phase, EpubLargePublicationGateStatus.NotStarted);
@@ -987,7 +1023,10 @@ public sealed class EpubLargePublicationGate : IEpubLargePublicationGate
             MobileHtmlBytes,
             DesktopLayoutNodeCount,
             DesktopHtmlFileCount,
-            DesktopHtmlBytes);
+            DesktopHtmlBytes)
+        {
+            ReferenceAudits = ReferenceAudits,
+        };
 
         internal string StableFingerprint()
         {
@@ -999,7 +1038,9 @@ public sealed class EpubLargePublicationGate : IEpubLargePublicationGate
             var diagnosticValues = Diagnostics
                 .Select(static item => $"{item.Phase}:{item.Code}:{item.Severity}")
                 .Order(StringComparer.Ordinal);
-            return string.Join('|', new[] { evidence.ToString() }.Concat(phaseValues).Concat(diagnosticValues));
+            var auditValues = ReferenceAudits.Select(static item =>
+                $"{item.Kind}:{item.Applicability}:{item.Essential}:{item.Counts.Found}:{item.Counts.Resolved}:{item.Counts.Broken}:{item.Counts.Ambiguous}:{item.Counts.Approximated}:{item.Counts.Skipped}");
+            return string.Join('|', new[] { evidence.ToString() }.Concat(phaseValues).Concat(diagnosticValues).Concat(auditValues));
         }
 
     }

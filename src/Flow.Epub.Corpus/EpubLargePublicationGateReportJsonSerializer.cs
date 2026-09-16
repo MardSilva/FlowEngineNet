@@ -131,6 +131,25 @@ public static class EpubLargePublicationGateReportJsonSerializer
         writer.WriteNumber("desktopLayoutNodeCount", evidence.DesktopLayoutNodeCount);
         writer.WriteNumber("desktopHtmlFileCount", evidence.DesktopHtmlFileCount);
         writer.WriteNumber("desktopHtmlBytes", evidence.DesktopHtmlBytes);
+        writer.WriteStartArray("referenceAudits");
+        foreach (var audit in evidence.ReferenceAudits.OrderBy(static item => item.Kind))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("kind", Token(audit.Kind));
+            writer.WriteString("applicability", Token(audit.Applicability));
+            writer.WriteBoolean("essential", audit.Essential);
+            writer.WriteStartObject("counts");
+            writer.WriteNumber("found", audit.Counts.Found);
+            writer.WriteNumber("resolved", audit.Counts.Resolved);
+            writer.WriteNumber("broken", audit.Counts.Broken);
+            writer.WriteNumber("ambiguous", audit.Counts.Ambiguous);
+            writer.WriteNumber("approximated", audit.Counts.Approximated);
+            writer.WriteNumber("skipped", audit.Counts.Skipped);
+            writer.WriteEndObject();
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
         writer.WriteEndObject();
     }
 

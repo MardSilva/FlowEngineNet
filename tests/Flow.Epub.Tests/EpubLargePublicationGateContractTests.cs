@@ -173,6 +173,40 @@ public sealed class EpubLargePublicationGateContractTests
     }
 
     [Fact]
+    public void ReferenceAudit_EnforcesExclusiveCountsAndDistinguishesApplicability()
+    {
+        Assert.Throws<ArgumentException>(() => new EpubLargePublicationReferenceCounts(2, 2, 1, 0, 0, 0));
+
+        var absent = new EpubLargePublicationReferenceAudit(
+            EpubLargePublicationAuditKind.CoverAsset,
+            EpubLargePublicationAuditApplicability.Absent,
+            new EpubLargePublicationReferenceCounts(0, 0, 0, 0, 0, 0),
+            essential: false);
+        var notApplicable = new EpubLargePublicationReferenceAudit(
+            EpubLargePublicationAuditKind.SvgAssetSafety,
+            EpubLargePublicationAuditApplicability.NotApplicable,
+            new EpubLargePublicationReferenceCounts(0, 0, 0, 0, 0, 0),
+            essential: true);
+
+        Assert.NotEqual(absent.Applicability, notApplicable.Applicability);
+        Assert.Throws<ArgumentException>(() => new EpubLargePublicationReferenceAudit(
+            EpubLargePublicationAuditKind.CoverAsset,
+            EpubLargePublicationAuditApplicability.Absent,
+            new EpubLargePublicationReferenceCounts(1, 1, 0, 0, 0, 0),
+            essential: false));
+    }
+
+    [Fact]
+    public void Serialization_WritesContentFreeReferenceAuditCounts()
+    {
+        var text = Encoding.UTF8.GetString(EpubLargePublicationGateReportJsonSerializer.Serialize(CreateReport()));
+
+        Assert.Contains("\"referenceAudits\"", text, StringComparison.Ordinal);
+        Assert.Contains("\"found\": 3", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("licensed chapter text", text, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void GateInterface_HasNoCliOrTestFrameworkDependency()
     {
         var assemblyReferences = typeof(IEpubLargePublicationGate).Assembly
@@ -249,7 +283,17 @@ public sealed class EpubLargePublicationGateContractTests
                 MobileHtmlBytes: 2_000_000,
                 DesktopLayoutNodeCount: 4_500,
                 DesktopHtmlFileCount: 80,
-                DesktopHtmlBytes: 2_100_000),
+                DesktopHtmlBytes: 2_100_000)
+            {
+                ReferenceAudits =
+                [
+                    new EpubLargePublicationReferenceAudit(
+                        EpubLargePublicationAuditKind.TableOfContentsDestination,
+                        EpubLargePublicationAuditApplicability.Present,
+                        new EpubLargePublicationReferenceCounts(3, 2, 1, 0, 0, 0),
+                        essential: true),
+                ],
+            },
             phases ??
             [
                 new(EpubLargePublicationGatePhaseKind.Inspection, EpubLargePublicationGateStatus.Failed),
