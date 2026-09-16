@@ -30,7 +30,13 @@ public sealed class EpubRealPublicationQualificationTests
         }
 
         Assert.True(inspection.IsSuccess);
-        var bytes = await File.ReadAllBytesAsync(sourcePath);
+        string sourceHash;
+        await using (var source = File.OpenRead(sourcePath))
+        {
+            sourceHash = Convert.ToHexString(await SHA256.HashDataAsync(source));
+        }
+
+        var sourceLength = new FileInfo(sourcePath).Length;
         var publication = new EpubCorpusPublication(
             new EpubCorpusPublicationId("local-real-epub"),
             "Local real EPUB",
@@ -42,7 +48,7 @@ public sealed class EpubRealPublicationQualificationTests
             EpubCorpusRedistribution.Prohibited,
             "private/local-real.epub",
             inspection.Package?.VersionFamily ?? EpubVersionFamily.Unknown,
-            bytes.LongLength,
+            sourceLength,
             [inspection.Package?.Language ?? "und"],
             ["xhtml"],
             ["spine"],
@@ -57,7 +63,7 @@ public sealed class EpubRealPublicationQualificationTests
                 "valid-flow-document",
             ],
             [],
-            new EpubCorpusSha256(Convert.ToHexString(SHA256.HashData(bytes))));
+            new EpubCorpusSha256(sourceHash));
         var manifest = new EpubCorpusManifest(EpubCorpusManifest.CurrentFormat, [publication]);
         var qualification = await new EpubCorpusQualificationService().QualifyAsync(
             manifest,

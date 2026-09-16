@@ -205,9 +205,9 @@ The real EPUB cycle now follows these increments:
 4. validate fidelity and performance against legal real-world publications;
 5. pass the large-book gate before beginning the PDF importer.
 
-The EPUB work now includes measured progress and cancellation, a deterministic legal-corpus catalog, bounded offline discovery, end-to-end execution, optional local EPUBCheck evidence, and reviewed baselines for three project-owned fixtures. The next gate is a legally obtained large reflowable publication; it has not been run yet. This still does not justify a universal EPUB-support, performance, or accessibility-conformance claim. See [EPUB performance, progress, and cancellation](docs/epub-performance.md), the [experimental EPUB corpus](docs/epub-corpus.md), and its [public coverage matrix](docs/epub-corpus-matrix.md).
+The EPUB work now includes measured progress and cancellation, a deterministic legal-corpus catalog, bounded offline discovery, end-to-end execution, optional local EPUBCheck evidence, and reviewed baselines for three project-owned fixtures. A private real-world publication can also be qualified locally twice, with stable chapter-order samples and no book bytes or machine paths entering the repository. The next gate is a legally obtained large reflowable publication; it has not been run yet. This still does not justify a universal EPUB-support, performance, or accessibility-conformance claim. See [EPUB performance, progress, and cancellation](docs/epub-performance.md), the [experimental EPUB corpus](docs/epub-corpus.md), and its [public coverage matrix](docs/epub-corpus-matrix.md).
 
-A document can only be considered end-to-end usable when an EPUB can be imported without silent semantic loss, represented as a valid `FlowDocument`, laid out, rendered, inspected, and round-tripped through the supported Flow format. The repository has not reached that point yet.
+The qualified fixtures and the locally supplied real publication now complete that end-to-end path for the documented subset: import without measured silent loss, a valid `FlowDocument`, round-trip, layout, inspection, and rendering. Broader EPUB coverage and the large-book gate remain open, so this is not yet an “open any EPUB” guarantee.
 
 ## CLI quick start
 
@@ -246,6 +246,8 @@ When `--output` is omitted, the CLI creates the `.flow.json` beside the EPUB. It
 ```text
 C:\caminho\para\meu_livro.flow.json
 ```
+
+For a noisy publication, pass `--diagnostics-json <report.json>`. The terminal then shows totals, counts by stable diagnostic code, and at most 40 detail lines; the JSON file still contains every finding.
 
 The CLI prints the exact generated path. Validate it and create the multi-file HTML book in a directory beside the EPUB:
 

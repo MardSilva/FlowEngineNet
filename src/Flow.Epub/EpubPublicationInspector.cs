@@ -551,6 +551,7 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
     private static bool IsStructurallySupported(string mediaType, bool isNavigation) =>
         isNavigation
         || string.Equals(mediaType, "application/xhtml+xml", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(mediaType, "text/css", StringComparison.OrdinalIgnoreCase)
         || mediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
 
     private static string? FirstMetadataValue(XElement? metadata, XName name) =>

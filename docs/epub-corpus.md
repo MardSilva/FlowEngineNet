@@ -80,7 +80,7 @@ The executor currently recognizes these expectation tokens:
 
 The checked-in public baseline is `tests/Flow.Epub.Tests/Corpus/epub-corpus-baseline.json`. CI regenerates all fixtures, runs the corpus twice, and compares the observed evidence with that file on Windows and Linux. A baseline change should therefore be reviewed as a semantic change, not refreshed automatically to make a test pass.
 
-For local or non-redistributable entries, `EpubCorpusQualificationService.WriteLocalDetailedReportAsync` writes a detailed report atomically with environment observations in a clearly marked non-deterministic section. The report contains catalog IDs and sanitized EPUB-internal resources, never the book bytes or physical source path.
+For local or non-redistributable entries, `EpubCorpusQualificationService.WriteLocalDetailedReportAsync` writes `flow-epub-corpus-qualification-0.1` atomically. It records repeated-run determinism, baseline differences, fidelity loss, expectation failures, optional EPUBCheck evidence, and a first/middle/last sample of the ordered chapter IDs. Environment observations stay in a clearly marked non-deterministic section. The report contains catalog IDs and sanitized EPUB-internal resources, never the book bytes or physical source path.
 
 The normal test suite uses generated fixtures only. The optional xUnit test is marked with category `EpubCorpus`; it does nothing unless `FLOW_EPUB_CORPUS_PATH` is set and that directory contains `epub-corpus.json`. No execution path downloads publications or writes private book bytes into reports or build artifacts.
 
@@ -92,6 +92,20 @@ dotnet test tests/Flow.Epub.Tests/Flow.Epub.Tests.csproj --filter 'Category=Epub
 ```
 
 The external directory and its catalog remain local. Clear the variable after the run with `Remove-Item Env:FLOW_EPUB_CORPUS_PATH` when it should not affect later test sessions.
+
+### Qualify one private publication directly
+
+The `EpubCorpusExternal` test is intended for a book that a developer may inspect locally but cannot add to the repository. It creates an in-memory catalog entry, hashes the source as a stream, copies the verified input to the normal isolated workspace, and runs the complete qualification twice. The detailed report must also stay outside the repository.
+
+```powershell
+$env:FLOW_EPUB_REAL_BOOK_PATH = 'C:\path\to\book.epub'
+$env:FLOW_EPUB_REAL_REPORT_PATH = Join-Path $env:TEMP 'flow-epub-qualification.json'
+dotnet test tests/Flow.Epub.Tests/Flow.Epub.Tests.csproj --filter 'Category=EpubCorpusExternal'
+Remove-Item Env:FLOW_EPUB_REAL_BOOK_PATH
+Remove-Item Env:FLOW_EPUB_REAL_REPORT_PATH
+```
+
+If `FLOW_EPUB_REAL_BOOK_PATH` is absent, the test returns without doing external work. This keeps CI offline and independent of private files.
 
 ### Add a publication safely
 

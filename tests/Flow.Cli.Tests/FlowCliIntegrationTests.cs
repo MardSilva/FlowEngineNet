@@ -204,6 +204,42 @@ public sealed class FlowCliIntegrationTests
     }
 
     [Fact]
+    public async Task Import_WithManyDiagnosticsSummarizesConsoleAndPreservesEveryJsonDetail()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var epubPath = workspace.PathOf("diagnostic-heavy.epub");
+        var documentPath = workspace.PathOf("diagnostic-heavy.flow.json");
+        var diagnosticsPath = workspace.PathOf("diagnostics.json");
+        CreateDiagnosticHeavyEpub(epubPath, chapterCount: 45);
+
+        var result = await RunAsync(
+            FlowCliApplication.CreateDefault(),
+            [
+                "import",
+                epubPath,
+                "--output",
+                documentPath,
+                "--diagnostics-json",
+                diagnosticsPath,
+            ]);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("Diagnostics: 0 information, 45 warnings, 0 errors.", result.Output, StringComparison.Ordinal);
+        Assert.Contains("Diagnostic codes: EPUB010=45", result.Output, StringComparison.Ordinal);
+        Assert.Contains("Console detail limited to 40 of 45 diagnostics", result.Output, StringComparison.Ordinal);
+        Assert.Equal(40, result.Error.Split("Warning EPUB010", StringSplitOptions.None).Length - 1);
+
+        using var report = JsonDocument.Parse(await File.ReadAllBytesAsync(diagnosticsPath));
+        var diagnostics = report.RootElement.GetProperty("diagnostics").EnumerateArray().ToArray();
+        Assert.Equal(45, diagnostics.Length);
+        Assert.All(
+            diagnostics,
+            static diagnostic => Assert.Equal(
+                EpubDiagnosticCodes.UnsupportedElement,
+                diagnostic.GetProperty("code").GetString()));
+    }
+
+    [Fact]
     public async Task Import_WritesDeterministicFidelityReportAlongsideDiagnostics()
     {
         using var workspace = new TemporaryWorkspace();
@@ -660,6 +696,64 @@ public sealed class FlowCliIntegrationTests
                 <p id="opening">O primeiro parágrafo importado pelo Flow.</p>
               </body>
             </html>
+            """);
+    }
+
+    private static void CreateDiagnosticHeavyEpub(string path, int chapterCount)
+    {
+        using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
+        AddText(archive, "mimetype", "application/epub+zip", CompressionLevel.NoCompression);
+        AddText(
+            archive,
+            "META-INF/container.xml",
+            """
+            <?xml version="1.0" encoding="utf-8"?>
+            <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+              <rootfiles>
+                <rootfile full-path="EPUB/package.opf" media-type="application/oebps-package+xml" />
+              </rootfiles>
+            </container>
+            """);
+
+        var manifest = new StringBuilder();
+        var spine = new StringBuilder();
+        for (var index = 1; index <= chapterCount; index++)
+        {
+            manifest.AppendLine($"    <item id=\"chapter-{index}\" href=\"text/chapter-{index}.xhtml\" media-type=\"application/xhtml+xml\" />");
+            spine.AppendLine($"    <itemref idref=\"chapter-{index}\" />");
+            AddText(
+                archive,
+                $"EPUB/text/chapter-{index}.xhtml",
+                $$"""
+                <?xml version="1.0" encoding="utf-8"?>
+                <html xmlns="http://www.w3.org/1999/xhtml" lang="pt-BR">
+                  <head><title>Capítulo {{index}}</title></head>
+                  <body>
+                    <h1 id="chapter-{{index}}">Capítulo {{index}}</h1>
+                    <unknown>Texto preservado do capítulo {{index}}.</unknown>
+                  </body>
+                </html>
+                """);
+        }
+
+        AddText(
+            archive,
+            "EPUB/package.opf",
+            $$"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id">
+              <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                <dc:identifier id="book-id">urn:flow:test:diagnostic-heavy</dc:identifier>
+                <dc:title>Diagnósticos agregados</dc:title>
+                <dc:language>pt-BR</dc:language>
+              </metadata>
+              <manifest>
+            {{manifest.ToString().TrimEnd()}}
+              </manifest>
+              <spine>
+            {{spine.ToString().TrimEnd()}}
+              </spine>
+            </package>
             """);
     }
 
