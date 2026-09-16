@@ -187,7 +187,8 @@ public sealed record EpubCorpusEnvironmentMetrics(
     long AssetBytes,
     int SpineDocumentsProcessed,
     int NodesProduced,
-    long CharactersProduced);
+    long CharactersProduced,
+    long ApproximatePeakWorkingSetBytes = 0);
 
 /// <summary>Contains the complete result for one stable corpus publication ID.</summary>
 public sealed record EpubCorpusPublicationExecutionResult

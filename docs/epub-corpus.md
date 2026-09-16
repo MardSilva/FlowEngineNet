@@ -62,6 +62,8 @@ An available publication is copied to an isolated system-temporary directory and
 
 `Flow.Epub.Corpus` is a separate orchestration project. This keeps `Flow.Epub` independent of layout, integrity, and rendering while allowing `EpubCorpusExecutor` to run one verified temporary copy through structural inspection, import, document validation, fidelity analysis, Flow JSON round-trip, canonical hash comparison, mobile and desktop layout, and two deterministic HTML book packages.
 
+The Flow JSON round-trip uses a private per-publication temporary file rather than a complete JSON `MemoryStream`. The file is deleted as soon as deserialization and hash comparison finish. Mobile and desktop layouts and packages are then produced and verified one at a time; only node counts, file counts, byte totals, and required-element evidence survive each package phase. The workspace is removed when processing succeeds, fails, or is cancelled.
+
 Every publication ends as `Passed`, `Failed`, `Skipped`, or `Inconclusive`. A missing local book is skipped. A corrupt archive, discovery hash mismatch, invalid Flow document, unstable round-trip hash, broken generated package reference, or unmet declared expectation fails only that publication. An expectation token the current executor does not understand is reported as inconclusive instead of being treated as success. Processing then continues with the other catalog entries.
 
 The executor currently recognizes these expectation tokens:
@@ -70,7 +72,7 @@ The executor currently recognizes these expectation tokens:
 - features: `spine`, `table-of-contents`/`toc`, `figure`/`image`, `internal-link`, `ordered-list`, `unordered-list`, `footnote`/`note`, `table`, and `cover`;
 - results: `inspection-success`, `import-success`, `valid-flow-document`, `roundtrip-stable`, `canonical-hash-stable`, `mobile-layout`, `desktop-layout`, and `html-book-package`.
 
-`flow-epub-corpus-execution-0.1` records completed phases, stable diagnostics, structural counts, document identity, canonical hash, output sizes, and a corpus summary. Its default JSON projection excludes elapsed time and managed-memory samples, uses UTF-8 without BOM and LF, contains no physical paths, and can be written atomically with `EpubCorpusExecutionReportJsonSerializer.WriteAtomicallyAsync`. Environment-dependent observations can be included under the explicitly non-deterministic `nonDeterministicEnvironment` section and must not be used for byte-for-byte baseline comparison.
+`flow-epub-corpus-execution-0.1` records completed phases, stable diagnostics, structural counts, document identity, canonical hash, output sizes, and a corpus summary. Its default JSON projection excludes elapsed time, sampled managed heap, and sampled process working set, uses UTF-8 without BOM and LF, contains no physical paths, and can be written atomically with `EpubCorpusExecutionReportJsonSerializer.WriteAtomicallyAsync`. Environment-dependent observations can be included under the explicitly non-deterministic `nonDeterministicEnvironment` section and must not be used for byte-for-byte baseline comparison. These samples are phase-boundary observations, not exact allocation measurements or portable pass limits; the executor never forces garbage collection to improve them.
 
 ## Qualification and reviewed baselines
 

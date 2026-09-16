@@ -212,6 +212,7 @@ public static class EpubCorpusExecutionReportJsonSerializer
         {
             writer.WriteNumber("totalDurationTicks", metrics.TotalDurationTicks);
             writer.WriteNumber("approximatePeakManagedBytes", metrics.ApproximatePeakManagedBytes);
+            writer.WriteNumber("approximatePeakWorkingSetBytes", metrics.ApproximatePeakWorkingSetBytes);
             writer.WriteNumber("archiveEntryCount", metrics.ArchiveEntryCount);
             writer.WriteNumber("compressedBytes", metrics.CompressedBytes);
             writer.WriteNumber("uncompressedBytes", metrics.UncompressedBytes);

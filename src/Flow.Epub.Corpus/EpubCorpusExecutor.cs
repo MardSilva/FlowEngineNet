@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Xml.Linq;
 using Flow.Core;
 using Flow.Documents;
@@ -22,6 +23,7 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
     private readonly ILayoutEngine layoutEngine;
     private readonly IHtmlBookPackageRenderer htmlRenderer;
     private readonly IEpubCheckAdapter epubCheckAdapter;
+    private readonly string temporaryDirectoryRoot;
 
     public EpubCorpusExecutor()
         : this(
@@ -48,7 +50,8 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
         IDocumentIntegrityService integrityService,
         ILayoutEngine layoutEngine,
         IHtmlBookPackageRenderer htmlRenderer,
-        IEpubCheckAdapter? epubCheckAdapter = null)
+        IEpubCheckAdapter? epubCheckAdapter = null,
+        string? temporaryDirectoryRoot = null)
     {
         ArgumentNullException.ThrowIfNull(discoveryService);
         ArgumentNullException.ThrowIfNull(inspector);
@@ -69,6 +72,7 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
         this.layoutEngine = layoutEngine;
         this.htmlRenderer = htmlRenderer;
         this.epubCheckAdapter = epubCheckAdapter ?? new EpubCheckProcessAdapter();
+        this.temporaryDirectoryRoot = Path.GetFullPath(temporaryDirectoryRoot ?? Path.GetTempPath());
     }
 
     public async Task<EpubCorpusExecutionReport> ExecuteAsync(
@@ -104,7 +108,7 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
             {
                 throw;
             }
-            catch (Exception exception)
+            catch (Exception exception) when (exception is not OutOfMemoryException)
             {
                 results.Add(CreateUnexpectedFailure(publication.Id, exception));
             }
@@ -119,7 +123,10 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
         CancellationToken cancellationToken)
     {
         var state = new ExecutionState(publication.Id);
+        using var environment = new EnvironmentMetricsCollector();
+        using var workspace = PublicationWorkspace.Create(temporaryDirectoryRoot, publication.Id);
         state.Complete(EpubCorpusExecutionPhase.Discovery);
+        environment.Sample();
 
         EpubPublicationInspection? inspection = null;
         try
@@ -145,11 +152,12 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception exception) when (exception is not OutOfMemoryException)
         {
             state.Fail(EpubCorpusExecutionDiagnosticCodes.InspectionFailed, EpubCorpusExecutionPhase.Inspection,
                 "Structural inspection failed before it could produce a complete result.");
         }
+        environment.Sample();
 
         EpubImportResult? importResult = null;
         FlowDocument? document = null;
@@ -175,16 +183,19 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception exception) when (exception is not OutOfMemoryException)
         {
             state.Fail(EpubCorpusExecutionDiagnosticCodes.ImportFailed, EpubCorpusExecutionPhase.Import,
                 "EPUB import failed before it could produce a complete result.");
         }
+        environment.Sample();
 
         if (document is null)
         {
             VerifyExpectations(state, publication, inspection, null, null, null, cancellationToken);
             await AddExternalEvidenceAsync(state, publication, discovery, cancellationToken).ConfigureAwait(false);
+            environment.Sample();
+            state.Environment = environment.Snapshot(state.ImportMetrics);
             return state.Build();
         }
 
@@ -208,6 +219,7 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
         {
             state.HasFailure = true;
         }
+        environment.Sample();
 
         EpubFidelityReport? fidelity = null;
         if (importResult is not null)
@@ -222,91 +234,111 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
             {
                 throw;
             }
-            catch (Exception)
+            catch (Exception exception) when (exception is not OutOfMemoryException)
             {
                 state.Fail(EpubCorpusExecutionDiagnosticCodes.FidelityFailed, EpubCorpusExecutionPhase.Fidelity,
                     "Fidelity analysis failed before it could produce a complete report.");
             }
         }
+        environment.Sample();
 
-        FlowDocument? restored = null;
         try
         {
-            using var json = new MemoryStream();
-            await serializer.SerializeAsync(document, json, cancellationToken).ConfigureAwait(false);
-            state.FlowJsonBytes = checked((int)json.Length);
-            json.Position = 0;
-            restored = await serializer.DeserializeAsync(json, cancellationToken).ConfigureAwait(false);
+            var roundTrip = await RoundTripAsync(document, workspace.RoundTripPath, cancellationToken).ConfigureAwait(false);
+            state.FlowJsonBytes = roundTrip.FlowJsonBytes;
             state.Complete(EpubCorpusExecutionPhase.Serialization);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            throw;
-        }
-        catch (Exception)
-        {
-            state.Fail(EpubCorpusExecutionDiagnosticCodes.RoundTripFailed, EpubCorpusExecutionPhase.Serialization,
-                "The Flow JSON round trip failed.");
-        }
-
-        if (restored is not null)
-        {
-            if (document.Identity != restored.Identity)
+            if (!roundTrip.IdentityPreserved)
             {
                 state.Fail(EpubCorpusExecutionDiagnosticCodes.IdentityMismatch, EpubCorpusExecutionPhase.Integrity,
                     "Document identity changed during the Flow JSON round trip.");
             }
 
-            var originalHash = integrityService.ComputeHash(document);
-            var restoredHash = integrityService.ComputeHash(restored);
-            state.CanonicalHash = originalHash.Hash;
+            state.CanonicalHash = roundTrip.OriginalHash.Hash;
             state.Complete(EpubCorpusExecutionPhase.Integrity);
-            if (originalHash != restoredHash)
+            if (roundTrip.OriginalHash != roundTrip.RestoredHash)
             {
                 state.Fail(EpubCorpusExecutionDiagnosticCodes.CanonicalHashMismatch, EpubCorpusExecutionPhase.Integrity,
                     "Canonical document hash changed during the Flow JSON round trip.");
             }
         }
-
-        LayoutDocument? mobileLayout = null;
-        LayoutDocument? desktopLayout = null;
-        if (validation.IsValid)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            mobileLayout = TryLayout(state, document, new LayoutContext(390, 844, DeviceClass.Phone), EpubCorpusExecutionPhase.MobileLayout, cancellationToken);
-            desktopLayout = TryLayout(state, document, new LayoutContext(1600, 1000, DeviceClass.Desktop), EpubCorpusExecutionPhase.DesktopLayout, cancellationToken);
+            throw;
         }
-
-        var packages = new List<HtmlBookPackage>(2);
-        if (mobileLayout is not null && desktopLayout is not null && state.CanonicalHash is not null)
+        catch (Exception exception) when (exception is not OutOfMemoryException)
         {
-            try
-            {
-                var hash = integrityService.ComputeHash(document);
-                var integrity = new HtmlBookIntegrity(hash.Algorithm, hash.Hash, hash.CanonicalizationVersion);
-                packages.Add(htmlRenderer.Render(document, mobileLayout, DefaultReadingPreferences, integrity, new HtmlBookPackageOptions(), cancellationToken));
-                packages.Add(htmlRenderer.Render(document, desktopLayout, DefaultReadingPreferences, integrity, new HtmlBookPackageOptions(), cancellationToken));
-                foreach (var package in packages)
-                {
-                    VerifyPackage(package);
-                }
+            state.Fail(EpubCorpusExecutionDiagnosticCodes.RoundTripFailed, EpubCorpusExecutionPhase.Serialization,
+                "The Flow JSON round trip failed.");
+        }
+        environment.Sample();
 
-                state.Packages = packages;
+        if (validation.IsValid && state.CanonicalHash is not null)
+        {
+            var hash = integrityService.ComputeHash(document);
+            var integrity = new HtmlBookIntegrity(hash.Algorithm, hash.Hash, hash.CanonicalizationVersion);
+            TryProducePackage(state, publication, document, new LayoutContext(390, 844, DeviceClass.Phone),
+                EpubCorpusExecutionPhase.MobileLayout, integrity, cancellationToken);
+            environment.Sample();
+            TryProducePackage(state, publication, document, new LayoutContext(1600, 1000, DeviceClass.Desktop),
+                EpubCorpusExecutionPhase.DesktopLayout, integrity, cancellationToken);
+            environment.Sample();
+            if (state.HtmlPackageCount == 2)
+            {
                 state.Complete(EpubCorpusExecutionPhase.HtmlBookPackage);
             }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (Exception)
-            {
-                state.Fail(EpubCorpusExecutionDiagnosticCodes.HtmlPackageFailed, EpubCorpusExecutionPhase.HtmlBookPackage,
-                    "HTML book package generation or internal reference verification failed.");
-            }
         }
 
-        VerifyExpectations(state, publication, inspection, document, validation, packages, cancellationToken);
+        VerifyExpectations(state, publication, inspection, document, validation, state.HtmlPackageCount, cancellationToken);
         await AddExternalEvidenceAsync(state, publication, discovery, cancellationToken).ConfigureAwait(false);
+        environment.Sample();
+        state.Environment = environment.Snapshot(state.ImportMetrics);
         return state.Build();
+    }
+
+    private async Task<RoundTripEvidence> RoundTripAsync(
+        FlowDocument document,
+        string temporaryPath,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            await using (var output = new FileStream(
+                             temporaryPath,
+                             FileMode.CreateNew,
+                             FileAccess.Write,
+                             FileShare.None,
+                             64 * 1024,
+                             FileOptions.Asynchronous | FileOptions.SequentialScan))
+            {
+                await serializer.SerializeAsync(document, output, cancellationToken).ConfigureAwait(false);
+            }
+
+            var length = checked((int)new FileInfo(temporaryPath).Length);
+            FlowDocument restored;
+            await using (var input = new FileStream(
+                             temporaryPath,
+                             FileMode.Open,
+                             FileAccess.Read,
+                             FileShare.Read,
+                             64 * 1024,
+                             FileOptions.Asynchronous | FileOptions.SequentialScan))
+            {
+                restored = await serializer.DeserializeAsync(input, cancellationToken).ConfigureAwait(false);
+            }
+
+            return new RoundTripEvidence(
+                length,
+                document.Identity == restored.Identity,
+                integrityService.ComputeHash(document),
+                integrityService.ComputeHash(restored));
+        }
+        finally
+        {
+            if (File.Exists(temporaryPath))
+            {
+                File.Delete(temporaryPath);
+            }
+        }
     }
 
     private async Task AddExternalEvidenceAsync(
@@ -328,11 +360,13 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
         state.Complete(EpubCorpusExecutionPhase.ExternalConformance);
     }
 
-    private LayoutDocument? TryLayout(
+    private void TryProducePackage(
         ExecutionState state,
+        EpubCorpusPublication publication,
         FlowDocument document,
         LayoutContext context,
         EpubCorpusExecutionPhase phase,
+        HtmlBookIntegrity integrity,
         CancellationToken cancellationToken)
     {
         try
@@ -340,21 +374,36 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
             cancellationToken.ThrowIfCancellationRequested();
             var layout = layoutEngine.Layout(document, context);
             EnsureLayoutPreservesIds(document, layout);
-            state.SetLayout(phase, layout);
+            state.SetLayoutNodeCount(phase, EnumerateLayoutNodes(layout.Nodes).Count());
             state.Complete(phase);
-            return layout;
+            var package = htmlRenderer.Render(
+                document,
+                layout,
+                DefaultReadingPreferences,
+                integrity,
+                new HtmlBookPackageOptions(),
+                cancellationToken);
+            var evidence = VerifyPackage(package, cancellationToken);
+            state.RecordPackage(evidence, publication.ExpectedFeatures);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
             throw;
         }
-        catch (Exception)
+        catch (Exception exception) when (exception is not OutOfMemoryException)
         {
-            state.Fail(EpubCorpusExecutionDiagnosticCodes.LayoutFailed, phase,
-                phase == EpubCorpusExecutionPhase.MobileLayout
-                    ? "Mobile layout generation failed."
-                    : "Desktop layout generation failed.");
-            return null;
+            if (!state.Completed.Contains(phase))
+            {
+                state.Fail(EpubCorpusExecutionDiagnosticCodes.LayoutFailed, phase,
+                    phase == EpubCorpusExecutionPhase.MobileLayout
+                        ? "Mobile layout generation failed."
+                        : "Desktop layout generation failed.");
+            }
+            else
+            {
+                state.Fail(EpubCorpusExecutionDiagnosticCodes.HtmlPackageFailed, EpubCorpusExecutionPhase.HtmlBookPackage,
+                    "HTML book package generation or internal reference verification failed.");
+            }
         }
     }
 
@@ -364,7 +413,7 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
         EpubPublicationInspection? inspection,
         FlowDocument? document,
         ValidationResult? validation,
-        IReadOnlyList<HtmlBookPackage>? packages,
+        int? htmlPackageCount,
         CancellationToken cancellationToken)
     {
         foreach (var resource in publication.ExpectedResources)
@@ -406,9 +455,9 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
             {
                 state.ExpectationFailed(feature, "Expected semantic feature was not preserved.");
             }
-            else if (packages is not null)
+            else if (htmlPackageCount > 0 && !state.PackageHasFeatureInEveryVerifiedPackage(feature))
             {
-                VerifyDeclaredFeatureInPackages(state, feature, packages);
+                state.ExpectationFailed(feature, "Expected feature was not found in every generated HTML book package.");
             }
         }
 
@@ -424,9 +473,9 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
                 "roundtrip-stable" => state.Completed.Contains(EpubCorpusExecutionPhase.Serialization),
                 "canonical-hash-stable" => state.Completed.Contains(EpubCorpusExecutionPhase.Integrity)
                     && !state.Diagnostics.Any(static item => item.Code == EpubCorpusExecutionDiagnosticCodes.CanonicalHashMismatch),
-                "mobile-layout" => state.MobileLayout is not null,
-                "desktop-layout" => state.DesktopLayout is not null,
-                "html-book-package" => packages?.Count == 2,
+                "mobile-layout" => state.MobileLayoutNodeCount > 0,
+                "desktop-layout" => state.DesktopLayoutNodeCount > 0,
+                "html-book-package" => htmlPackageCount == 2,
                 _ => null,
             };
 
@@ -456,49 +505,35 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
         _ => null,
     };
 
-    private static void VerifyDeclaredFeatureInPackages(
-        ExecutionState state,
-        string feature,
-        IReadOnlyList<HtmlBookPackage> packages)
+    private static PackageEvidence VerifyPackage(HtmlBookPackage package, CancellationToken cancellationToken)
     {
-        string? elementName = feature switch
-        {
-            "table-of-contents" or "toc" => "nav",
-            "figure" or "image" or "cover" => "img",
-            "ordered-list" => "ol",
-            "unordered-list" => "ul",
-            "footnote" or "note" => "section",
-            "table" => "table",
-            _ => null,
-        };
-        if (elementName is null)
-        {
-            return;
-        }
-
-        if (!packages.All(package => PackageContainsElement(package, elementName)))
-        {
-            state.ExpectationFailed(feature, "Expected feature was not found in every generated HTML book package.");
-        }
-    }
-
-    private static bool PackageContainsElement(HtmlBookPackage package, string localName) => package.Files
-        .Where(static file => file.MediaType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase))
-        .Select(static file => XDocument.Parse(System.Text.Encoding.UTF8.GetString(file.Content.AsSpan())))
-        .Any(document => document.Descendants().Any(element => element.Name.LocalName == localName));
-
-    private static void VerifyPackage(HtmlBookPackage package)
-    {
-        var files = package.Files.ToDictionary(static file => file.Path, StringComparer.Ordinal);
-        var documents = package.Files
+        var files = package.Files.Select(static file => file.Path).ToHashSet(StringComparer.Ordinal);
+        var htmlFiles = package.Files
             .Where(static file => file.MediaType.StartsWith("text/html", StringComparison.OrdinalIgnoreCase))
-            .ToDictionary(
-                static file => file.Path,
-                static file => XDocument.Parse(System.Text.Encoding.UTF8.GetString(file.Content.AsSpan())),
-                StringComparer.Ordinal);
+            .ToArray();
+        var idsByPath = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
+        var elementNames = new HashSet<string>(StringComparer.Ordinal);
 
-        foreach (var (currentPath, document) in documents)
+        foreach (var file in htmlFiles)
         {
+            cancellationToken.ThrowIfCancellationRequested();
+            var document = ParseHtml(file);
+            idsByPath[file.Path] = document.Descendants()
+                .Select(static element => (string?)element.Attribute("id"))
+                .Where(static id => !string.IsNullOrEmpty(id))
+                .Select(static id => id!)
+                .ToHashSet(StringComparer.Ordinal);
+            foreach (var name in document.Descendants().Select(static element => element.Name.LocalName))
+            {
+                elementNames.Add(name);
+            }
+        }
+
+        foreach (var file in htmlFiles)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var currentPath = file.Path;
+            var document = ParseHtml(file);
             foreach (var attribute in document.Descendants().Attributes()
                          .Where(static attribute => attribute.Name.LocalName is "href" or "src"))
             {
@@ -516,20 +551,28 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
                 var resolvedPath = string.IsNullOrEmpty(pathPart)
                     ? currentPath
                     : ResolvePackagePath(currentPath, Uri.UnescapeDataString(pathPart));
-                if (!files.ContainsKey(resolvedPath))
+                if (!files.Contains(resolvedPath))
                 {
                     throw new InvalidDataException("The HTML package contains an unresolved local file reference.");
                 }
 
                 if (!string.IsNullOrEmpty(fragment)
-                    && documents.TryGetValue(resolvedPath, out var targetDocument)
-                    && !targetDocument.Descendants().Any(element => (string?)element.Attribute("id") == fragment))
+                    && idsByPath.TryGetValue(resolvedPath, out var targetIds)
+                    && !targetIds.Contains(fragment))
                 {
                     throw new InvalidDataException("The HTML package contains an unresolved local fragment reference.");
                 }
             }
         }
+
+        return new PackageEvidence(
+            package.Files.Length,
+            package.Files.Sum(static file => (long)file.Content.Length),
+            elementNames);
     }
+
+    private static XDocument ParseHtml(HtmlBookFile file) =>
+        XDocument.Parse(System.Text.Encoding.UTF8.GetString(file.Content.AsSpan()));
 
     private static string ResolvePackagePath(string currentPath, string relativePath)
     {
@@ -701,13 +744,17 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
         internal EpubFidelityReport? Fidelity;
         internal EpubImportMetrics? ImportMetrics;
         internal EpubSourceMap? SourceMap;
-        internal LayoutDocument? MobileLayout;
-        internal LayoutDocument? DesktopLayout;
-        internal IReadOnlyList<HtmlBookPackage> Packages = [];
+        internal int MobileLayoutNodeCount;
+        internal int DesktopLayoutNodeCount;
+        internal int HtmlPackageCount;
+        internal int HtmlFileCount;
+        internal long HtmlBytes;
+        internal readonly Dictionary<string, int> PackageFeatureCounts = new(StringComparer.Ordinal);
         internal int ValidationDiagnosticCount;
         internal int FlowJsonBytes;
         internal string? CanonicalHash;
         internal EpubCheckEvidence? EpubCheckEvidence;
+        internal EpubCorpusEnvironmentMetrics? Environment;
 
         internal void Add(EpubCorpusExecutionDiagnostic diagnostic)
         {
@@ -738,34 +785,42 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
             message,
             resource: expectation));
 
-        internal void SetLayout(EpubCorpusExecutionPhase phase, LayoutDocument layout)
+        internal void SetLayoutNodeCount(EpubCorpusExecutionPhase phase, int count)
         {
             if (phase == EpubCorpusExecutionPhase.MobileLayout)
             {
-                MobileLayout = layout;
+                MobileLayoutNodeCount = count;
             }
             else
             {
-                DesktopLayout = layout;
+                DesktopLayoutNodeCount = count;
             }
+        }
+
+        internal void RecordPackage(PackageEvidence evidence, IEnumerable<string> expectedFeatures)
+        {
+            HtmlPackageCount++;
+            HtmlFileCount += evidence.FileCount;
+            HtmlBytes += evidence.Bytes;
+            foreach (var feature in expectedFeatures.Distinct(StringComparer.Ordinal))
+            {
+                var elementName = ExpectedHtmlElement(feature);
+                if (elementName is not null && evidence.ElementNames.Contains(elementName))
+                {
+                    PackageFeatureCounts[feature] = PackageFeatureCounts.GetValueOrDefault(feature) + 1;
+                }
+            }
+        }
+
+        internal bool PackageHasFeatureInEveryVerifiedPackage(string feature)
+        {
+            var elementName = ExpectedHtmlElement(feature);
+            return elementName is null
+                   || PackageFeatureCounts.GetValueOrDefault(feature) == HtmlPackageCount;
         }
 
         internal EpubCorpusPublicationExecutionResult Build()
         {
-            var htmlFiles = Packages.Sum(static package => package.Files.Length);
-            var htmlBytes = Packages.SelectMany(static package => package.Files).Sum(static file => (long)file.Content.Length);
-            var metrics = ImportMetrics is null
-                ? null
-                : new EpubCorpusEnvironmentMetrics(
-                    ImportMetrics.TotalDuration.Ticks,
-                    ImportMetrics.ApproximatePeakManagedBytes,
-                    ImportMetrics.ArchiveEntryCount,
-                    ImportMetrics.CompressedBytes,
-                    ImportMetrics.UncompressedBytes,
-                    ImportMetrics.AssetBytes,
-                    ImportMetrics.SpineDocumentsProcessed,
-                    ImportMetrics.NodesProduced,
-                    ImportMetrics.CharactersProduced);
             var evidence = new EpubCorpusPublicationEvidence(
                 Inspection?.Package?.VersionFamily.ToString(),
                 Inspection?.Manifest.Length ?? 0,
@@ -778,11 +833,11 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
                 Document?.Identity.Id.Value,
                 CanonicalHash,
                 FlowJsonBytes,
-                MobileLayout is null ? 0 : EnumerateLayoutNodes(MobileLayout.Nodes).Count(),
-                DesktopLayout is null ? 0 : EnumerateLayoutNodes(DesktopLayout.Nodes).Count(),
-                Packages.Count,
-                htmlFiles,
-                htmlBytes,
+                MobileLayoutNodeCount,
+                DesktopLayoutNodeCount,
+                HtmlPackageCount,
+                HtmlFileCount,
+                HtmlBytes,
                 CreateSemanticEvidence(Document, SourceMap));
             return new EpubCorpusPublicationExecutionResult(
                 id,
@@ -794,7 +849,7 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
                 Completed,
                 evidence,
                 Diagnostics,
-                metrics,
+                Environment,
                 EpubCheckEvidence);
         }
 
@@ -823,6 +878,87 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
                 nodes.OfType<Table>().Count(),
                 nodes.Count(static node => node is TableCell or TableHeaderCell),
                 nodes.OfType<Chapter>().Select(static chapter => chapter.Id.Value));
+        }
+    }
+
+    private static string? ExpectedHtmlElement(string feature) => feature switch
+    {
+        "table-of-contents" or "toc" => "nav",
+        "figure" or "image" or "cover" => "img",
+        "ordered-list" => "ol",
+        "unordered-list" => "ul",
+        "footnote" or "note" => "section",
+        "table" => "table",
+        _ => null,
+    };
+
+    private sealed record RoundTripEvidence(
+        int FlowJsonBytes,
+        bool IdentityPreserved,
+        DocumentHash OriginalHash,
+        DocumentHash RestoredHash);
+
+    private sealed record PackageEvidence(int FileCount, long Bytes, IReadOnlySet<string> ElementNames);
+
+    private sealed class EnvironmentMetricsCollector : IDisposable
+    {
+        private readonly Stopwatch stopwatch = Stopwatch.StartNew();
+        private long approximatePeakManagedBytes;
+        private long approximatePeakWorkingSetBytes;
+
+        internal void Sample()
+        {
+            approximatePeakManagedBytes = Math.Max(approximatePeakManagedBytes, GC.GetTotalMemory(false));
+            approximatePeakWorkingSetBytes = Math.Max(approximatePeakWorkingSetBytes, Environment.WorkingSet);
+        }
+
+        internal EpubCorpusEnvironmentMetrics Snapshot(EpubImportMetrics? importMetrics)
+        {
+            Sample();
+            return new EpubCorpusEnvironmentMetrics(
+                stopwatch.Elapsed.Ticks,
+                approximatePeakManagedBytes,
+                importMetrics?.ArchiveEntryCount ?? 0,
+                importMetrics?.CompressedBytes ?? 0,
+                importMetrics?.UncompressedBytes ?? 0,
+                importMetrics?.AssetBytes ?? 0,
+                importMetrics?.SpineDocumentsProcessed ?? 0,
+                importMetrics?.NodesProduced ?? 0,
+                importMetrics?.CharactersProduced ?? 0,
+                approximatePeakWorkingSetBytes);
+        }
+
+        public void Dispose() => stopwatch.Stop();
+    }
+
+    private sealed class PublicationWorkspace : IDisposable
+    {
+        private PublicationWorkspace(string path)
+        {
+            Path = path;
+            RoundTripPath = System.IO.Path.Combine(path, "roundtrip.flow.json");
+        }
+
+        internal string Path { get; }
+
+        internal string RoundTripPath { get; }
+
+        internal static PublicationWorkspace Create(string root, EpubCorpusPublicationId publicationId)
+        {
+            Directory.CreateDirectory(root);
+            var safeId = string.Concat(publicationId.Value.Select(static character =>
+                char.IsAsciiLetterOrDigit(character) || character is '-' or '_' ? character : '-'));
+            var path = System.IO.Path.Combine(root, $"flow-corpus-{safeId}-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(path);
+            return new PublicationWorkspace(path);
+        }
+
+        public void Dispose()
+        {
+            if (Directory.Exists(Path))
+            {
+                Directory.Delete(Path, recursive: true);
+            }
         }
     }
 }

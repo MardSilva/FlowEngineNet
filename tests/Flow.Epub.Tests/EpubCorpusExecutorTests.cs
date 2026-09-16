@@ -32,6 +32,8 @@ public sealed class EpubCorpusExecutorTests
         Assert.Equal(2, result.Evidence.HtmlPackageCount);
         Assert.True(result.Evidence.HtmlFileCount > 0);
         Assert.NotNull(result.EnvironmentMetrics);
+        Assert.True(result.EnvironmentMetrics.ApproximatePeakManagedBytes > 0);
+        Assert.True(result.EnvironmentMetrics.ApproximatePeakWorkingSetBytes > 0);
     }
 
     [Fact]
@@ -86,6 +88,82 @@ public sealed class EpubCorpusExecutorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_RoundTripWorkspaceIsCleanedAfterSuccessFailureAndCancellation()
+    {
+        using var workspace = new CorpusExecutionWorkspace();
+        var publication = workspace.AddValidFixture("temporary-cleanup");
+
+        var successful = await CreateExecutor(temporaryDirectoryRoot: workspace.TemporaryRoot)
+            .ExecuteAsync(workspace.Manifest(publication), workspace.Options());
+        Assert.Equal(EpubCorpusExecutionStatus.Passed, Assert.Single(successful.Publications).Status);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(workspace.TemporaryRoot));
+
+        var failed = await CreateExecutor(
+                serializer: new FailingSerializer(),
+                temporaryDirectoryRoot: workspace.TemporaryRoot)
+            .ExecuteAsync(workspace.Manifest(publication), workspace.Options());
+        Assert.Equal(EpubCorpusExecutionStatus.Failed, Assert.Single(failed.Publications).Status);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(workspace.TemporaryRoot));
+
+        using var cancellation = new CancellationTokenSource();
+        var cancellingExecutor = CreateExecutor(
+            serializer: new CancellingSerializer(cancellation),
+            temporaryDirectoryRoot: workspace.TemporaryRoot);
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cancellingExecutor.ExecuteAsync(
+            workspace.Manifest(publication),
+            workspace.Options(),
+            cancellation.Token));
+        Assert.Empty(Directory.EnumerateFileSystemEntries(workspace.TemporaryRoot));
+    }
+
+    [Fact]
+    public async Task ExecuteAsync_MemoryFailureIsPropagatedAndTemporaryWorkspaceIsCleaned()
+    {
+        using var workspace = new CorpusExecutionWorkspace();
+        var publication = workspace.AddValidFixture("memory-failure");
+        var executor = CreateExecutor(
+            serializer: new MemoryFailingSerializer(),
+            temporaryDirectoryRoot: workspace.TemporaryRoot);
+
+        await Assert.ThrowsAsync<OutOfMemoryException>(() => executor.ExecuteAsync(
+            workspace.Manifest(publication),
+            workspace.Options()));
+
+        Assert.Empty(Directory.EnumerateFileSystemEntries(workspace.TemporaryRoot));
+    }
+
+    [Fact]
+    [Trait("Category", "Regression")]
+    public async Task ExecuteAsync_LargerOwnedFixtureProcessesPackagesSequentiallyAndKeepsStableEvidence()
+    {
+        using var workspace = new CorpusExecutionWorkspace();
+        var publication = workspace.AddLargeFixture("larger-owned", paragraphCount: 400);
+        var events = new List<string>();
+        var executor = CreateExecutor(
+            layoutEngine: new RecordingLayoutEngine(events),
+            htmlRenderer: new RecordingHtmlRenderer(events),
+            temporaryDirectoryRoot: workspace.TemporaryRoot);
+
+        var first = Assert.Single((await executor.ExecuteAsync(workspace.Manifest(publication), workspace.Options())).Publications);
+        var second = Assert.Single((await executor.ExecuteAsync(workspace.Manifest(publication), workspace.Options())).Publications);
+
+        Assert.Equal(EpubCorpusExecutionStatus.Passed, first.Status);
+        Assert.Equal(["layout-small", "render-small", "layout-large", "render-large", "layout-small", "render-small", "layout-large", "render-large"], events);
+        Assert.Equal(first.Evidence.CanonicalHash, second.Evidence.CanonicalHash);
+        Assert.Equal(first.Evidence.FlowJsonBytes, second.Evidence.FlowJsonBytes);
+        Assert.Equal(first.Evidence.HtmlBytes, second.Evidence.HtmlBytes);
+        Assert.Equal(2, first.Evidence.HtmlPackageCount);
+        Assert.True(first.Evidence.ImportedNodeCount >= 400);
+        Assert.True(first.EnvironmentMetrics?.ApproximatePeakManagedBytes > 0);
+        Assert.True(first.EnvironmentMetrics?.ApproximatePeakWorkingSetBytes > 0);
+        Assert.Empty(Directory.EnumerateFileSystemEntries(workspace.TemporaryRoot));
+
+        Assert.Equal(
+            EpubCorpusExecutionReportJsonSerializer.Serialize(new EpubCorpusExecutionReport([first])),
+            EpubCorpusExecutionReportJsonSerializer.Serialize(new EpubCorpusExecutionReport([second])));
+    }
+
+    [Fact]
     public async Task ExecuteAsync_MissingExternalCorpusIsSkipped()
     {
         using var workspace = new CorpusExecutionWorkspace();
@@ -135,11 +213,17 @@ public sealed class EpubCorpusExecutorTests
         var text = Encoding.UTF8.GetString(firstBytes);
         Assert.Equal(firstBytes, secondBytes);
         Assert.DoesNotContain("totalDurationTicks", text, StringComparison.Ordinal);
+        Assert.DoesNotContain("approximatePeakWorkingSetBytes", text, StringComparison.Ordinal);
         Assert.Contains("\"included\": false", text, StringComparison.Ordinal);
         Assert.DoesNotContain(workspace.Root, text, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain('\r', text);
         Assert.Equal((byte)'\n', firstBytes[^1]);
         Assert.False(firstBytes.AsSpan().StartsWith(new byte[] { 0xEF, 0xBB, 0xBF }));
+
+        var environmentText = Encoding.UTF8.GetString(
+            EpubCorpusExecutionReportJsonSerializer.Serialize(first, includeNonDeterministicEnvironment: true));
+        Assert.Contains("approximatePeakManagedBytes", environmentText, StringComparison.Ordinal);
+        Assert.Contains("approximatePeakWorkingSetBytes", environmentText, StringComparison.Ordinal);
 
         var output = Path.Combine(workspace.OutputRoot, "corpus-report.json");
         await EpubCorpusExecutionReportJsonSerializer.WriteAtomicallyAsync(first, output);
@@ -260,7 +344,10 @@ public sealed class EpubCorpusExecutorTests
         IEpubCorpusDiscoveryService? discoveryService = null,
         IEpubImporter? importer = null,
         IFlowDocumentSerializer? serializer = null,
-        IEpubCheckAdapter? epubCheckAdapter = null) => new(
+        IEpubCheckAdapter? epubCheckAdapter = null,
+        ILayoutEngine? layoutEngine = null,
+        IHtmlBookPackageRenderer? htmlRenderer = null,
+        string? temporaryDirectoryRoot = null) => new(
         discoveryService ?? new EpubCorpusDiscoveryService(),
         new EpubPublicationInspector(),
         importer ?? new EpubImporter(),
@@ -268,9 +355,10 @@ public sealed class EpubCorpusExecutorTests
         new EpubFidelityAnalyzer(),
         serializer ?? new FlowJsonDocumentSerializer(),
         new Sha256DocumentIntegrityService(new FlowDocumentCanonicalizer()),
-        new AdaptiveLayoutEngine(),
-        new HtmlBookPackageRenderer(),
-        epubCheckAdapter);
+        layoutEngine ?? new AdaptiveLayoutEngine(),
+        htmlRenderer ?? new HtmlBookPackageRenderer(),
+        epubCheckAdapter,
+        temporaryDirectoryRoot);
 
     private static FlowDocument CreateInvalidDocument()
     {
@@ -330,6 +418,66 @@ public sealed class EpubCorpusExecutorTests
         }
     }
 
+    private sealed class FailingSerializer : IFlowDocumentSerializer
+    {
+        public async Task SerializeAsync(FlowDocument document, Stream destination, CancellationToken cancellationToken = default)
+        {
+            await destination.WriteAsync("partial"u8.ToArray(), cancellationToken);
+            throw new InvalidDataException("Expected test failure.");
+        }
+
+        public Task<FlowDocument> DeserializeAsync(Stream source, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class CancellingSerializer(CancellationTokenSource cancellation) : IFlowDocumentSerializer
+    {
+        public async Task SerializeAsync(FlowDocument document, Stream destination, CancellationToken cancellationToken = default)
+        {
+            await destination.WriteAsync("partial"u8.ToArray(), cancellationToken);
+            cancellation.Cancel();
+            cancellationToken.ThrowIfCancellationRequested();
+        }
+
+        public Task<FlowDocument> DeserializeAsync(Stream source, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class MemoryFailingSerializer : IFlowDocumentSerializer
+    {
+        public Task SerializeAsync(FlowDocument document, Stream destination, CancellationToken cancellationToken = default) =>
+            throw new OutOfMemoryException("Expected test failure.");
+
+        public Task<FlowDocument> DeserializeAsync(Stream source, CancellationToken cancellationToken = default) =>
+            throw new NotSupportedException();
+    }
+
+    private sealed class RecordingLayoutEngine(List<string> events) : ILayoutEngine
+    {
+        private readonly AdaptiveLayoutEngine inner = new();
+
+        public LayoutDocument Layout(FlowDocument document, LayoutContext context)
+        {
+            events.Add(context.DeviceClass == DeviceClass.Phone ? "layout-small" : "layout-large");
+            return inner.Layout(document, context);
+        }
+    }
+
+    private sealed class RecordingHtmlRenderer(List<string> events) : IHtmlBookPackageRenderer
+    {
+        private readonly HtmlBookPackageRenderer inner = new();
+
+        public HtmlBookPackage Render(
+            FlowDocument document,
+            LayoutDocument layout,
+            UserReadingPreferences userPreferences,
+            HtmlBookIntegrity integrity)
+        {
+            events.Add(layout.Profile.ViewportCategory == ViewportCategory.Small ? "render-small" : "render-large");
+            return inner.Render(document, layout, userPreferences, integrity);
+        }
+    }
+
     private sealed class FixedEpubCheckAdapter(EpubCheckEvidence evidence) : IEpubCheckAdapter
     {
         public Task<EpubCheckEvidence> EvaluateAsync(
@@ -381,6 +529,48 @@ public sealed class EpubCorpusExecutorTests
                     "roundtrip-stable",
                     "valid-flow-document",
                 ]);
+        }
+
+        public EpubCorpusPublication AddLargeFixture(string id, int paragraphCount)
+        {
+            var chapter = new StringBuilder();
+            chapter.Append("<?xml version=\"1.0\" encoding=\"utf-8\"?><html xmlns=\"http://www.w3.org/1999/xhtml\" lang=\"pt-BR\"><head><title>Fixture grande</title></head><body><h1 id=\"start\">Fixture grande</h1>");
+            for (var index = 0; index < paragraphCount; index++)
+            {
+                chapter.Append($"<p id=\"p-{index}\">Parágrafo sintético {index} mantido pelo projeto para regressão operacional.</p>");
+            }
+
+            chapter.Append("<figure id=\"diagram\"><img src=\"../images/flow.png\" alt=\"Imagem de teste\"/><figcaption>Figura sintética</figcaption></figure></body></html>");
+            const string package = """
+                <?xml version="1.0" encoding="utf-8"?>
+                <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id">
+                  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                    <dc:identifier id="book-id">urn:flow:test:larger-owned</dc:identifier>
+                    <dc:title>Fixture sintética grande</dc:title>
+                    <dc:language>pt-BR</dc:language>
+                  </metadata>
+                  <manifest>
+                    <item id="chapter" href="text/chapter-1.xhtml" media-type="application/xhtml+xml" />
+                    <item id="image" href="images/flow.png" media-type="image/png" />
+                  </manifest>
+                  <spine><itemref idref="chapter" /></spine>
+                </package>
+                """;
+            using var stream = MinimalEpubFactory.Create(
+                package: package,
+                chapterOne: chapter.ToString(),
+                includeSecondChapter: false);
+            return AddBytes(id, stream.ToArray(), ["figure", "spine"],
+            [
+                "canonical-hash-stable",
+                "desktop-layout",
+                "html-book-package",
+                "import-success",
+                "inspection-success",
+                "mobile-layout",
+                "roundtrip-stable",
+                "valid-flow-document",
+            ]);
         }
 
         public EpubCorpusPublication AddBytes(
