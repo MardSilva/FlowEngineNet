@@ -116,6 +116,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
                     page.Kind == HtmlBookPageKind.Notes));
             }
 
+            PrepareResponsiveContent(roots, ui);
             foreach (var root in roots)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -333,6 +334,39 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
 
         return collection;
     }
+
+    private static void PrepareResponsiveContent(List<XElement> roots, BookUiText ui)
+    {
+        for (var index = 0; index < roots.Count; index++)
+        {
+            var root = roots[index];
+            foreach (var table in root.Descendants("table").ToArray())
+            {
+                WrapTable(table, ui);
+            }
+
+            if (root.Name.LocalName == "table")
+            {
+                var wrapper = CreateTableWrapper(ui);
+                wrapper.Add(root);
+                roots[index] = wrapper;
+            }
+        }
+    }
+
+    private static void WrapTable(XElement table, BookUiText ui)
+    {
+        var wrapper = CreateTableWrapper(ui);
+        table.ReplaceWith(wrapper);
+        wrapper.Add(table);
+    }
+
+    private static XElement CreateTableWrapper(BookUiText ui) => new(
+        "div",
+        new XAttribute("class", "table-scroll"),
+        new XAttribute("role", "region"),
+        new XAttribute("aria-label", ui.ScrollableTable),
+        new XAttribute("tabindex", "0"));
 
     private static List<XElement> GetPageRoots(
         HtmlBookPage page,
@@ -802,13 +836,13 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
         body:has(input[name="flow-reader-font"][value="sans"]:checked) { --book-reader-font: system-ui, -apple-system, "Segoe UI", sans-serif; }
         body:has(input[name="flow-reader-scale"][value="large"]:checked) { --book-reader-scale: 1.15; }
         body:has(input[name="flow-reader-scale"][value="larger"]:checked) { --book-reader-scale: 1.3; }
-        html, body { background: var(--book-background); color: var(--book-foreground); }
+        html, body { background: var(--book-background); color: var(--book-foreground); max-inline-size: 100%; overflow-x: hidden; overflow-x: clip; }
         body { overflow-wrap: anywhere; }
         a { color: var(--book-accent); text-underline-offset: 0.16em; }
         a:focus-visible, summary:focus-visible, input:focus-visible + label { outline: 0.2rem solid var(--book-accent); outline-offset: 0.2rem; }
         .skip-link { background: var(--book-foreground); color: var(--book-background); inset-block-start: 0.5rem; inset-inline-start: 0.5rem; padding: 0.75rem 1rem; position: fixed; transform: translateY(-200%); z-index: 10; }
         .skip-link:focus { transform: translateY(0); }
-        .book-shell { background: var(--book-background); color: var(--book-foreground); min-height: 100vh; transition: background-color 150ms ease, color 150ms ease; }
+        .book-shell { background: var(--book-background); color: var(--book-foreground); inline-size: 100%; max-inline-size: 100%; min-height: 100vh; min-inline-size: 0; transition: background-color 150ms ease, color 150ms ease; }
         .book-masthead, .book-footer { align-items: baseline; border-color: var(--book-border); display: flex; gap: 1rem; justify-content: space-between; margin: 0 auto; max-width: 72rem; padding: 0.8rem 1rem; }
         .book-masthead { border-block-end: 1px solid var(--book-border); }
         .book-footer { border-block-start: 1px solid var(--book-border); color: var(--book-muted); }
@@ -823,15 +857,18 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
         .reading-preferences label { border: 1px solid var(--book-border); border-radius: 999px; cursor: pointer; padding: 0.3rem 0.65rem; }
         .reading-preferences input:checked + label { background: var(--book-foreground); color: var(--book-background); }
         .book-navigation { display: flex; gap: 1rem; justify-content: space-between; margin: 0 auto; max-width: 72rem; min-height: 3rem; padding: 0.75rem 1rem; }
-        .reading-surface { font-family: var(--book-reader-font); margin: 0 auto; max-width: 72rem; zoom: var(--book-reader-scale); }
-        .reading-surface article { max-width: 46rem; overflow-x: auto; }
+        .reading-surface { font-family: var(--book-reader-font); inline-size: 100%; margin: 0 auto; max-inline-size: 72rem; min-inline-size: 0; zoom: var(--book-reader-scale); }
+        .reading-surface article { inline-size: min(100%, 46rem); margin-inline: auto; max-inline-size: 100%; min-inline-size: 0; overflow-x: visible; }
+        .reading-surface article :is(section, nav, figure, blockquote, pre, h1, h2, h3, h4, h5, h6, p, ol, ul, li) { max-inline-size: 100%; min-inline-size: 0; }
+        .reading-surface article :is(h1, h2, h3, h4, h5, h6, p, a, figcaption) { overflow-wrap: anywhere; word-break: break-word; }
         .reading-surface article:is([data-publication-role="chapter"], [data-publication-role="section"]) > section:first-child { border-block-start: 0.35rem solid var(--book-border); margin-block-start: clamp(1rem, 8vh, 5rem); padding-block-start: clamp(1.5rem, 5vh, 3.5rem); }
         .reading-surface article:is([data-publication-role="chapter"], [data-publication-role="section"]) > section:first-child > [data-typography="chapter-title"]:first-child { text-wrap: balance; }
         .reading-surface nav li[data-level] { padding-inline-start: 0; }
         .reading-surface nav ol ol { padding-inline-start: 1.5rem; }
         .page-notes { border-block-start: 1px solid var(--book-border); margin: 4rem auto 1rem; padding-block-start: 1.5rem; }
-        .page-notes > [role="doc-footnote"] { margin-block: 1rem; }
-        .page-notes > [role="doc-footnote"]:target { outline: 0.2rem solid var(--book-accent); outline-offset: 0.35rem; }
+        .page-notes:has(> [role="doc-footnote"]:target) { padding-block-end: min(45vh, 24rem); }
+        .page-notes > [role="doc-footnote"] { margin-block: 1rem; scroll-margin-block-start: clamp(4rem, 18vh, 10rem); }
+        .page-notes > [role="doc-footnote"]:target { background: color-mix(in srgb, var(--book-accent) 12%, transparent); outline: 0.2rem solid var(--book-accent); outline-offset: 0.35rem; }
         .book-title-page { margin: clamp(2rem, 10vh, 7rem) auto 2rem; max-width: 42rem; padding: 1rem; text-align: center; }
         .book-title-page h1 { text-wrap: balance; }
         .start-reading a { border: 1px solid var(--book-border); border-radius: 999px; display: inline-block; padding: 0.6rem 1rem; }
@@ -839,9 +876,14 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
         .book-credits dl { display: grid; gap: 0.4rem 1rem; grid-template-columns: max-content 1fr; }
         .book-credits dt { font-weight: 700; }
         .book-credits dd { margin: 0; }
-        figure[data-publication-role="cover-preview"] { margin: 1rem auto; max-width: 28rem; }
-        figure[data-publication-role="cover-preview"] img { display: block; height: auto; max-width: 100%; width: 100%; }
-        table { max-width: 100%; }
+        figure { max-inline-size: 100% !important; min-inline-size: 0; }
+        figure img { block-size: auto; display: block; inline-size: auto; max-inline-size: 100% !important; object-fit: contain; }
+        figure[data-publication-role="cover-preview"] { margin: 1rem auto; max-inline-size: min(28rem, 100%); }
+        figure[data-publication-role="cover-preview"] img { inline-size: 100%; }
+        .table-scroll { inline-size: 100%; max-inline-size: 100%; overflow-x: auto; overscroll-behavior-inline: contain; }
+        .table-scroll:focus-visible { outline: 0.2rem solid var(--book-accent); outline-offset: 0.2rem; }
+        .table-scroll > table { inline-size: 100%; max-inline-size: none; min-inline-size: 100%; width: 100%; }
+        .table-scroll :is(th, td) { overflow-wrap: normal; word-break: normal; }
         ruby { ruby-position: over; }
         @media (max-width: 42rem) {
           .book-masthead { align-items: flex-start; flex-direction: column; gap: 0.25rem; }
@@ -858,6 +900,8 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
           .skip-link, .book-masthead, .reading-preferences, .book-navigation, .book-footer { display: none !important; }
           .reading-surface, .reading-surface article { max-width: none; zoom: 1; }
           .reading-surface article { padding: 0; }
+          .table-scroll { overflow: visible; }
+          .table-scroll > table { inline-size: 100%; width: 100%; }
           a { color: inherit; text-decoration: underline; }
         }
         """ + "\n";
@@ -1177,6 +1221,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
             Cover = "Capa",
             FrontMatter = "Elementos pré-textuais",
             Notes = "Notas",
+            ScrollableTable = "Tabela com deslocamento horizontal",
             LogicalReadingPosition = "Posição lógica de leitura",
             PrimaryBookNavigation = "Navegação principal do livro",
             SecondaryBookNavigation = "Navegação secundária do livro",
@@ -1214,6 +1259,7 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
             BookFont = "Do livro",
             Serif = "Serifada",
             SansSerif = "Sem serifa",
+            ScrollableTable = "Tabela com rolagem horizontal",
         };
 
         internal string LanguageTag { get; init; } = "en";
@@ -1241,6 +1287,8 @@ public sealed class HtmlBookPackageRenderer : IHtmlBookPackageRenderer
         internal string FrontMatter { get; init; } = "Front matter";
 
         internal string Notes { get; init; } = "Notes";
+
+        internal string ScrollableTable { get; init; } = "Scrollable table";
 
         internal string LogicalReadingPosition { get; init; } = "Logical reading position";
 
