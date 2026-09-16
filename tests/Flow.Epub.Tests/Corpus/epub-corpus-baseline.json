@@ -23,6 +23,10 @@
           "chapter-two-segundo",
           "epub-paragraph-2"
         ],
+        "orderedChapterIds": [
+          "chapter-one",
+          "chapter-two"
+        ],
         "sourceLocationCount": 4,
         "chapterCount": 2,
         "headingCount": 2,
@@ -80,6 +84,11 @@
           "chapter-notes-nota-1",
           "epub-paragraph-20"
         ],
+        "orderedChapterIds": [
+          "chapter-cover-page",
+          "chapter-chapter",
+          "chapter-notes"
+        ],
         "sourceLocationCount": 7,
         "chapterCount": 3,
         "headingCount": 1,
@@ -135,6 +144,10 @@
           "epub-list-text-7",
           "epub-list-item-10",
           "epub-list-text-9"
+        ],
+        "orderedChapterIds": [
+          "chapter-chapter-one",
+          "chapter-chapter-two"
         ],
         "sourceLocationCount": 7,
         "chapterCount": 2,

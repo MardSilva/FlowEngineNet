@@ -671,7 +671,7 @@ public sealed class EpubImporter : IEpubImporter
 
         foreach (var navigation in navigationDocuments)
         {
-            context.ConsumedResourcePaths.Add(navigation.Source.Item.Path);
+            context.ConsumedResourcePaths.Add(navigation.Item.Path);
         }
 
         if (package.MetadataReport.Cover is { } cover && !entries.ContainsKey(cover.Path))

@@ -69,6 +69,9 @@ public sealed class EpubPublicCorpusQualificationTests
         var localReportPath = Path.Combine(workspace.Root, "reports", "detailed.json");
         await EpubCorpusQualificationService.WriteLocalDetailedReportAsync(qualification, localReportPath);
         var localReport = await File.ReadAllTextAsync(localReportPath);
+        Assert.Contains("flow-epub-corpus-qualification-0.1", localReport, StringComparison.Ordinal);
+        Assert.Contains("deterministicAcrossRepeatedRuns", localReport, StringComparison.Ordinal);
+        Assert.Contains("readingOrderSample", localReport, StringComparison.Ordinal);
         Assert.Contains("\"included\": true", localReport, StringComparison.Ordinal);
         Assert.Contains("fidelityLostUnitCount", localReport, StringComparison.Ordinal);
         Assert.DoesNotContain(workspace.Root, localReport, StringComparison.OrdinalIgnoreCase);
