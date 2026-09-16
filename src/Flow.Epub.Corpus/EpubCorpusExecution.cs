@@ -129,7 +129,8 @@ public sealed record EpubCorpusSemanticEvidence
         int footnoteCount,
         int footnoteReferenceCount,
         int tableCount,
-        int tableCellCount)
+        int tableCellCount,
+        IEnumerable<string>? orderedChapterIds = null)
     {
         ArgumentNullException.ThrowIfNull(orderedNodeIds);
         OrderedNodeIds = orderedNodeIds.ToImmutableArray();
@@ -144,9 +145,12 @@ public sealed record EpubCorpusSemanticEvidence
         FootnoteReferenceCount = footnoteReferenceCount;
         TableCount = tableCount;
         TableCellCount = tableCellCount;
+        OrderedChapterIds = (orderedChapterIds ?? []).ToImmutableArray();
     }
 
     public ImmutableArray<string> OrderedNodeIds { get; }
+
+    public ImmutableArray<string> OrderedChapterIds { get; }
 
     public int SourceLocationCount { get; }
 

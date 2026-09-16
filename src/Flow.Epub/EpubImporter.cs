@@ -320,7 +320,7 @@ public sealed class EpubImporter : IEpubImporter
                              property is not "nav" and not "cover-image"))
                 {
                     diagnostics.Add(Warning(
-                        EpubDiagnosticCodes.UnsupportedResource,
+                        EpubDiagnosticCodes.UnsupportedManifestProperty,
                         $"Manifest property '{property}' on item '{id}' is retained in the processing report but is not interpreted.",
                         resourcePath));
                 }
@@ -668,6 +668,11 @@ public sealed class EpubImporter : IEpubImporter
             : package.MetadataReport.WithCover(package.MetadataReport.Cover with { AssetId = coverAssetId });
 
         context.FlushUnsupportedDiagnostics();
+
+        foreach (var navigation in navigationDocuments)
+        {
+            context.ConsumedResourcePaths.Add(navigation.Source.Item.Path);
+        }
 
         if (package.MetadataReport.Cover is { } cover && !entries.ContainsKey(cover.Path))
         {
@@ -1188,6 +1193,7 @@ public sealed class EpubImporter : IEpubImporter
         private readonly List<EpubSourceLocation> sourceLocations = [];
         private readonly Dictionary<SourceLocationKey, int> sourceOccurrences = [];
         private readonly Dictionary<UnsupportedElementKey, int> unsupportedElements = [];
+        private readonly Dictionary<string, int> approximatedAnchors = new(StringComparer.Ordinal);
         private readonly Dictionary<UnsupportedElementKey, int> mathLosses = [];
         private readonly Dictionary<SvgImageIssueKey, int> svgImageIssues = [];
         private readonly HashSet<XElement> footnoteElements = [];
@@ -1292,6 +1298,14 @@ public sealed class EpubImporter : IEpubImporter
                     key.ResourcePath));
             }
 
+            foreach (var (resourcePath, count) in approximatedAnchors)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.UnsupportedElement,
+                    $"{count} anchor(s) attached to inline or unsupported elements were mapped to their containing Flow blocks; source fragments remain available through the source map.",
+                    resourcePath));
+            }
+
             foreach (var (key, count) in mathLosses)
             {
                 var occurrenceText = count == 1 ? "once" : $"{count} times";
@@ -1383,10 +1397,11 @@ public sealed class EpubImporter : IEpubImporter
                              && targetElement.Name is { } targetName
                              && (targetName == XhtmlNamespace + "figure" || targetName == SvgNamespace + "svg")))
                     {
-                        diagnostics.Add(Warning(
-                            EpubDiagnosticCodes.UnsupportedElement,
-                            $"Anchor '#{htmlId}' is attached to an inline or unsupported element and was mapped to its containing Flow block.",
-                            xhtml.Item.Path));
+                        approximatedAnchors[xhtml.Item.Path] = approximatedAnchors.TryGetValue(
+                            xhtml.Item.Path,
+                            out var anchorCount)
+                            ? anchorCount + 1
+                            : 1;
                     }
                 }
             }

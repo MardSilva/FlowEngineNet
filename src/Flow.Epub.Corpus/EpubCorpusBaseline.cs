@@ -193,6 +193,7 @@ public static class EpubCorpusBaselineComparer
         }
 
         AddIfDifferent(id, "semantic.orderedNodeIds", string.Join('|', expected.OrderedNodeIds), string.Join('|', actual.OrderedNodeIds), differences);
+        AddIfDifferent(id, "semantic.orderedChapterIds", string.Join('|', expected.OrderedChapterIds), string.Join('|', actual.OrderedChapterIds), differences);
         AddIfDifferent(id, "semantic.sourceLocationCount", expected.SourceLocationCount, actual.SourceLocationCount, differences);
         AddIfDifferent(id, "semantic.chapterCount", expected.ChapterCount, actual.ChapterCount, differences);
         AddIfDifferent(id, "semantic.headingCount", expected.HeadingCount, actual.HeadingCount, differences);

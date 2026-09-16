@@ -127,6 +127,13 @@ public static class EpubCorpusBaselineJsonSerializer
         }
 
         writer.WriteEndArray();
+        writer.WriteStartArray("orderedChapterIds");
+        foreach (var id in semantic.OrderedChapterIds)
+        {
+            writer.WriteStringValue(id);
+        }
+
+        writer.WriteEndArray();
         writer.WriteNumber("sourceLocationCount", semantic.SourceLocationCount);
         writer.WriteNumber("chapterCount", semantic.ChapterCount);
         writer.WriteNumber("headingCount", semantic.HeadingCount);
@@ -174,7 +181,10 @@ public static class EpubCorpusBaselineJsonSerializer
             element.GetProperty("footnoteCount").GetInt32(),
             element.GetProperty("footnoteReferenceCount").GetInt32(),
             element.GetProperty("tableCount").GetInt32(),
-            element.GetProperty("tableCellCount").GetInt32());
+            element.GetProperty("tableCellCount").GetInt32(),
+            element.TryGetProperty("orderedChapterIds", out var chapterIds)
+                ? chapterIds.EnumerateArray().Select(static item => item.GetString()!).ToArray()
+                : []);
 
     private static string RequiredString(JsonElement element, string propertyName) =>
         element.GetProperty(propertyName).GetString()

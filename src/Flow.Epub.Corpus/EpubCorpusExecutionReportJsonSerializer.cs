@@ -183,6 +183,13 @@ public static class EpubCorpusExecutionReportJsonSerializer
         }
 
         writer.WriteEndArray();
+        writer.WriteStartArray("orderedChapterIds");
+        foreach (var id in evidence.OrderedChapterIds)
+        {
+            writer.WriteStringValue(id);
+        }
+
+        writer.WriteEndArray();
         writer.WriteNumber("sourceLocationCount", evidence.SourceLocationCount);
         writer.WriteNumber("chapterCount", evidence.ChapterCount);
         writer.WriteNumber("headingCount", evidence.HeadingCount);

@@ -27,6 +27,7 @@ internal sealed class EpubCssProcessor
     private readonly List<EpubDiagnostic> diagnostics;
     private readonly HashSet<string> consumedResources;
     private readonly Dictionary<CssDiagnosticKey, int> aggregatedDiagnostics = [];
+    private readonly Dictionary<string, IReadOnlyList<CssRule>> externalRuleCache = new(StringComparer.Ordinal);
     private int order;
 
     internal EpubCssProcessor(
@@ -185,6 +186,13 @@ internal sealed class EpubCssProcessor
                 continue;
             }
 
+            if (externalRuleCache.TryGetValue(stylesheetPath, out var cachedRules))
+            {
+                consumedResources.Add(stylesheetPath);
+                rules.AddRange(cachedRules.Select(rule => rule with { Order = ++order }));
+                continue;
+            }
+
             try
             {
                 await using var stream = entry.Open();
@@ -198,7 +206,9 @@ internal sealed class EpubCssProcessor
                     css = css[1..];
                 }
                 consumedResources.Add(stylesheetPath);
-                rules.AddRange(ParseStylesheet(css, stylesheetPath));
+                var parsedRules = ParseStylesheet(css, stylesheetPath).ToArray();
+                externalRuleCache[stylesheetPath] = parsedRules;
+                rules.AddRange(parsedRules);
             }
             catch (Exception exception) when (exception is DecoderFallbackException or EpubLimitExceededException)
             {
@@ -219,6 +229,28 @@ internal sealed class EpubCssProcessor
             if (position >= css.Length)
             {
                 yield break;
+            }
+
+            if (css[position] == '@')
+            {
+                var semicolon = FindOutsideQuotes(css, ';', position);
+                var blockOpening = FindOutsideQuotes(css, '{', position);
+                if (semicolon >= 0 && (blockOpening < 0 || semicolon < blockOpening))
+                {
+                    var directive = css[position..semicolon].Trim();
+                    position = semicolon + 1;
+                    if (directive.StartsWith("@charset", StringComparison.OrdinalIgnoreCase))
+                    {
+                        continue;
+                    }
+
+                    Report(
+                        EpubDiagnosticCodes.UnsupportedCssProperty,
+                        resourcePath,
+                        directive.Split((char[]?)null, 2)[0],
+                        $"CSS at-rule '{directive}' is outside the safe subset");
+                    continue;
+                }
             }
 
             var opening = FindOutsideQuotes(css, '{', position);

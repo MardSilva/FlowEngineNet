@@ -138,7 +138,12 @@ public sealed class CliOperations
         await using var source = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         var inspection = await _epubInspector.InspectAsync(source, cancellationToken).ConfigureAwait(false);
         await WriteEpubInspectionAsync(inspection, sourcePath, output).ConfigureAwait(false);
-        await WriteEpubDiagnosticsAsync(inspection.Diagnostics, output, error).ConfigureAwait(false);
+        await WriteEpubDiagnosticsAsync(
+                inspection.Diagnostics,
+                output,
+                error,
+                detailsPersisted: command.JsonOutputPath is not null)
+            .ConfigureAwait(false);
 
         if (jsonOutputPath is not null)
         {
@@ -310,7 +315,12 @@ public sealed class CliOperations
             await output.WriteLineAsync($"Fidelity report: {fidelityPath}").ConfigureAwait(false);
         }
 
-        await WriteEpubDiagnosticsAsync(import.Diagnostics, output, error).ConfigureAwait(false);
+        await WriteEpubDiagnosticsAsync(
+                import.Diagnostics,
+                output,
+                error,
+                detailsPersisted: diagnosticsPath is not null)
+            .ConfigureAwait(false);
 
         if (!import.IsSuccess || import.Document is null)
         {
@@ -895,14 +905,57 @@ public sealed class CliOperations
     private static async Task WriteEpubDiagnosticsAsync(
         IEnumerable<EpubDiagnostic> diagnostics,
         TextWriter output,
-        TextWriter error)
+        TextWriter error,
+        bool detailsPersisted = false)
     {
-        foreach (var diagnostic in diagnostics)
+        const int maximumPersistedDetailsOnConsole = 40;
+        var items = diagnostics.ToArray();
+        if (items.Length == 0)
         {
+            return;
+        }
+
+        var information = items.Count(static item => item.Severity == EpubDiagnosticSeverity.Information);
+        var warnings = items.Count(static item => item.Severity == EpubDiagnosticSeverity.Warning);
+        var errors = items.Count(static item => item.Severity == EpubDiagnosticSeverity.Error);
+        await output.WriteLineAsync(
+                $"Diagnostics: {information.ToString(CultureInfo.InvariantCulture)} information, "
+                + $"{warnings.ToString(CultureInfo.InvariantCulture)} warnings, "
+                + $"{errors.ToString(CultureInfo.InvariantCulture)} errors.")
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(
+                "Diagnostic codes: " + string.Join(
+                    ", ",
+                    items.GroupBy(static item => item.Code, StringComparer.Ordinal)
+                        .OrderBy(static group => group.Key, StringComparer.Ordinal)
+                        .Select(static group => $"{group.Key}={group.Count().ToString(CultureInfo.InvariantCulture)}")))
+            .ConfigureAwait(false);
+
+        var visible = items.AsEnumerable();
+        if (detailsPersisted && items.Length > maximumPersistedDetailsOnConsole)
+        {
+            var errorItems = items.Where(static item => item.Severity == EpubDiagnosticSeverity.Error).ToArray();
+            visible = errorItems.Concat(items
+                .Where(static item => item.Severity != EpubDiagnosticSeverity.Error)
+                .Take(Math.Max(0, maximumPersistedDetailsOnConsole - errorItems.Length)));
+        }
+
+        var visibleCount = 0;
+        foreach (var diagnostic in visible)
+        {
+            visibleCount++;
             var resource = diagnostic.Resource is null ? string.Empty : $" [{diagnostic.Resource}]";
             var line = $"{diagnostic.Severity} {diagnostic.Code}{resource}: {diagnostic.Message}";
             var writer = diagnostic.Severity == EpubDiagnosticSeverity.Information ? output : error;
             await writer.WriteLineAsync(line).ConfigureAwait(false);
+        }
+
+        if (visibleCount < items.Length)
+        {
+            await output.WriteLineAsync(
+                    $"Console detail limited to {visibleCount.ToString(CultureInfo.InvariantCulture)} of "
+                    + $"{items.Length.ToString(CultureInfo.InvariantCulture)} diagnostics; the JSON report contains every item.")
+                .ConfigureAwait(false);
         }
     }
 

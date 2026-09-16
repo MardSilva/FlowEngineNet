@@ -821,7 +821,8 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
                 nodes.OfType<Footnote>().Count(),
                 inline.OfType<FootnoteReference>().Count(),
                 nodes.OfType<Table>().Count(),
-                nodes.Count(static node => node is TableCell or TableHeaderCell));
+                nodes.Count(static node => node is TableCell or TableHeaderCell),
+                nodes.OfType<Chapter>().Select(static chapter => chapter.Id.Value));
         }
     }
 }

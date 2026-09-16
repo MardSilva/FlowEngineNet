@@ -86,10 +86,9 @@ public sealed class EpubCorpusQualificationService
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(result);
-        return EpubCorpusExecutionReportJsonSerializer.WriteAtomicallyAsync(
-            result.Report,
+        return EpubCorpusQualificationReportJsonSerializer.WriteAtomicallyAsync(
+            result,
             outputPath,
-            includeNonDeterministicEnvironment: true,
             cancellationToken);
     }
 }

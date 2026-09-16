@@ -334,7 +334,7 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
                          property is not "nav" and not "cover-image"))
             {
                 diagnostics.Add(Warning(
-                    EpubDiagnosticCodes.UnsupportedResource,
+                    EpubDiagnosticCodes.UnsupportedManifestProperty,
                     $"Manifest property '{property}' on item '{id}' is retained but is not interpreted.",
                     resourcePath));
             }
