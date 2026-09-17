@@ -1,3 +1,4 @@
+using Flow.Epub;
 using Flow.Rendering.Html;
 
 namespace Flow.Cli;
@@ -18,6 +19,36 @@ public sealed record ImportEpubCommand(
     string? SourceMapJsonOutputPath = null) : CliCommand;
 
 public sealed record InspectEpubCommand(string SourcePath, string? JsonOutputPath) : CliCommand;
+
+public sealed record CorpusCommand(
+    string ManifestPath,
+    string RepositoryRoot,
+    string ReportPath,
+    string? ExternalCorpusRoot,
+    string? AcceptedBaselinePath,
+    bool Force = false,
+    bool Resume = false) : CliCommand;
+
+public sealed record QualifyEpubCommand(
+    string SourcePath,
+    EpubCorpusPublicationId CandidateId,
+    EpubCorpusSha256 ExpectedSourceSha256,
+    string ReportPath,
+    string RepositoryRoot,
+    int RepetitionCount,
+    bool IncludeEnvironment,
+    bool Force = false,
+    bool Resume = false) : CliCommand;
+
+public sealed record ReviewEpubCommand(
+    string SourcePath,
+    EpubCorpusPublicationId CandidateId,
+    EpubCorpusSha256 ExpectedSourceSha256,
+    string OutputDirectory,
+    string RepositoryRoot,
+    HtmlBookUiLanguage UiLanguage,
+    bool Force = false,
+    bool Resume = false) : CliCommand;
 
 public sealed record InspectCommand(string DocumentPath) : CliCommand;
 

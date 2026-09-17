@@ -233,12 +233,43 @@ To reproduce the pipeline from the semantic source:
 ```powershell
 dotnet run --project src/Flow.Cli -- epub-inspect path/to/book.epub --json epub-report.json
 dotnet run --project src/Flow.Cli -- import path/to/book.epub --diagnostics-json import-report.json --fidelity-report fidelity.json
+dotnet run --project src/Flow.Cli -- corpus path/to/epub-corpus.json --repository-root path/to/repository --report path/to/corpus-report.json
 dotnet run --project src/Flow.Cli -- inspect samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- validate samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- hash samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- render samples/SampleBook/sample.flow.json --html sample.html --width 390 --height 844
 dotnet run --project src/Flow.Cli -- render samples/SampleBook/sample.flow.json --html-book sample-book
 ```
+
+### Qualify and review a real EPUB
+
+The corpus, automatic gate and assisted review are available through the CLI. They remain evidence workflows, not EPUB conformance certification. A real publication must be DRM-free and legally available to the caller. Flow records those declarations but cannot verify publication rights.
+
+Keep the EPUB, gate report and generated review package outside the repository:
+
+```powershell
+$epub = 'C:\books\book.epub'
+$sha256 = (Get-FileHash $epub -Algorithm SHA256).Hash
+$repository = (Get-Location).Path
+
+dotnet run --project .\src\Flow.Cli -- --language pt-BR epub-qualify $epub `
+  --candidate-id candidate-001 `
+  --sha256 $sha256 `
+  --report 'C:\flow-local\candidate-001-gate.json' `
+  --repository-root $repository `
+  --legal-use --drm-free
+
+dotnet run --project .\src\Flow.Cli -- --language pt-BR epub-review $epub `
+  --candidate-id candidate-001 `
+  --sha256 $sha256 `
+  --output 'C:\flow-local\candidate-001-review' `
+  --repository-root $repository `
+  --legal-use --drm-free --ui-language pt-BR
+```
+
+The gate runs the automatic pipeline at least twice. Its overall JSON status normally remains `inconclusive` until a person completes the separate checklist, but the command returns `0` when every automatic check passes. `epub-review` generates `review.html`, `review-checklist.json`, mobile and desktop packages. It never approves review decisions automatically.
+
+These operational commands refuse to replace existing reports or review directories unless `--force` is present. If a process is interrupted and leaves a recognized hidden transaction artifact beside the destination, rerun it with `--resume`; add `--force` as well when the interrupted operation was replacing a completed result. Recovery restarts processing from the verified EPUB and never treats partial JSON or HTML as complete.
 
 ### Import a real EPUB and generate its HTML book
 

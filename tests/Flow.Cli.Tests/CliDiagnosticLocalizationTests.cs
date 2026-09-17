@@ -44,6 +44,7 @@ public sealed class CliDiagnosticLocalizationTests
 
     private static IEnumerable<string> StableDiagnosticCodes() =>
         ConstantsFrom(typeof(EpubDiagnosticCodes))
+            .Concat(ConstantsFrom(typeof(EpubCorpusDiagnosticCodes)))
             .Concat(ConstantsFrom(typeof(ValidationDiagnosticCodes)))
             .Concat(ConstantsFrom(typeof(FlowSerializationDiagnosticCodes)))
             .OrderBy(static code => code, StringComparer.Ordinal);

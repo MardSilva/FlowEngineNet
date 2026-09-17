@@ -3,6 +3,7 @@ using System.Globalization;
 using System.Text.Json;
 using Flow.Documents;
 using Flow.Epub;
+using Flow.Epub.Corpus;
 using Flow.Layout;
 using Flow.Rendering;
 using Flow.Rendering.Html;
@@ -22,6 +23,9 @@ public sealed class CliOperations
     private readonly IDocumentRenderer _htmlRenderer;
     private readonly IEpubFidelityAnalyzer _epubFidelityAnalyzer;
     private readonly IHtmlBookPackageRenderer _htmlBookRenderer;
+    private readonly EpubCorpusQualificationService _corpusQualificationService;
+    private readonly IEpubLargePublicationGate _largePublicationGate;
+    private readonly IEpubLargePublicationReviewPackageGenerator _reviewPackageGenerator;
 
     public CliOperations(
         IFlowDocumentSerializer serializer,
@@ -32,7 +36,10 @@ public sealed class CliOperations
         ILayoutEngine layoutEngine,
         IDocumentRenderer htmlRenderer,
         IEpubFidelityAnalyzer? epubFidelityAnalyzer = null,
-        IHtmlBookPackageRenderer? htmlBookRenderer = null)
+        IHtmlBookPackageRenderer? htmlBookRenderer = null,
+        EpubCorpusQualificationService? corpusQualificationService = null,
+        IEpubLargePublicationGate? largePublicationGate = null,
+        IEpubLargePublicationReviewPackageGenerator? reviewPackageGenerator = null)
     {
         ArgumentNullException.ThrowIfNull(serializer);
         ArgumentNullException.ThrowIfNull(epubImporter);
@@ -51,6 +58,9 @@ public sealed class CliOperations
         _htmlRenderer = htmlRenderer;
         _epubFidelityAnalyzer = epubFidelityAnalyzer ?? new EpubFidelityAnalyzer();
         _htmlBookRenderer = htmlBookRenderer ?? new HtmlBookPackageRenderer();
+        _corpusQualificationService = corpusQualificationService ?? new EpubCorpusQualificationService();
+        _largePublicationGate = largePublicationGate ?? new EpubLargePublicationGate();
+        _reviewPackageGenerator = reviewPackageGenerator ?? new EpubLargePublicationReviewPackageGenerator();
     }
 
     /// <summary>Executes a parsed command and writes its normal output.</summary>
@@ -82,6 +92,12 @@ public sealed class CliOperations
                 .ConfigureAwait(false),
             InspectEpubCommand inspectEpub => await InspectEpubAsync(inspectEpub, output, error, text, cancellationToken)
                 .ConfigureAwait(false),
+            CorpusCommand corpus => await ExecuteCorpusAsync(corpus, output, error, text, cancellationToken)
+                .ConfigureAwait(false),
+            QualifyEpubCommand qualify => await QualifyEpubAsync(qualify, output, error, text, cancellationToken)
+                .ConfigureAwait(false),
+            ReviewEpubCommand review => await ReviewEpubAsync(review, output, error, text, cancellationToken)
+                .ConfigureAwait(false),
             InspectCommand inspect => await InspectAsync(inspect, output, text, cancellationToken).ConfigureAwait(false),
             ValidateCommand validate => await ValidateAsync(validate, output, text, cancellationToken).ConfigureAwait(false),
             HashCommand hash => await HashAsync(hash, output, text, cancellationToken).ConfigureAwait(false),
@@ -98,6 +114,8 @@ public sealed class CliOperations
                  {
                      "HelpTitle", "HelpWarning", "HelpGlobalOptions", "HelpLanguage", "HelpBanner", "HelpNoColor",
                      "HelpCommands", "HelpSample", "HelpImport1", "HelpImport2", "HelpImport3", "HelpEpubInspect",
+                     "HelpCorpus1", "HelpCorpus2", "HelpEpubQualify1", "HelpEpubQualify2", "HelpEpubQualify3",
+                     "HelpEpubReview1", "HelpEpubReview2", "HelpEpubReview3", "HelpOutputPolicy",
                      "HelpInspect", "HelpValidate", "HelpHash", "HelpRenderHtml", "HelpRenderBook", "HelpExitCodes",
                  })
         {
@@ -106,6 +124,283 @@ public sealed class CliOperations
 
         return 0;
     }
+
+    private async Task<int> ExecuteCorpusAsync(
+        CorpusCommand command,
+        TextWriter output,
+        TextWriter error,
+        CliTextCatalog text,
+        CancellationToken cancellationToken)
+    {
+        var manifestPath = Path.GetFullPath(command.ManifestPath);
+        var repositoryRoot = Path.GetFullPath(command.RepositoryRoot);
+        var reportPath = Path.GetFullPath(command.ReportPath);
+        var externalRoot = command.ExternalCorpusRoot is null
+            ? null
+            : Path.GetFullPath(command.ExternalCorpusRoot);
+        var baselinePath = command.AcceptedBaselinePath is null
+            ? null
+            : Path.GetFullPath(command.AcceptedBaselinePath);
+        if (PathsEqual(reportPath, manifestPath)
+            || baselinePath is not null && PathsEqual(reportPath, baselinePath))
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorCorpusReportConflict"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        await using var manifestStream = new FileStream(
+            manifestPath,
+            FileMode.Open,
+            FileAccess.Read,
+            FileShare.Read,
+            64 * 1024,
+            FileOptions.Asynchronous | FileOptions.SequentialScan);
+        var read = new EpubCorpusManifestJsonSerializer().Read(manifestStream);
+        if (!read.IsSuccess || read.Manifest is null)
+        {
+            foreach (var diagnostic in read.Diagnostics)
+            {
+                var resource = diagnostic.Resource is null ? string.Empty : $" [{diagnostic.Resource}]";
+                await error.WriteLineAsync(
+                        $"{text.Severity(diagnostic.Severity.ToString())} {diagnostic.Code}{resource}: "
+                        + text.DiagnosticMessage(diagnostic.Code, diagnostic.Message))
+                    .ConfigureAwait(false);
+            }
+
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_CORPUS_INVALID", "ErrorCorpusManifestInvalid"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        EpubCorpusBaseline? acceptedBaseline = null;
+        if (baselinePath is not null)
+        {
+            acceptedBaseline = EpubCorpusBaselineJsonSerializer.Deserialize(
+                await File.ReadAllBytesAsync(baselinePath, cancellationToken).ConfigureAwait(false));
+        }
+
+        var outputPreparation = CliOutputPolicy.PrepareFile(reportPath, command.Force, command.Resume);
+        if (!await ReportOutputPreparationAsync(outputPreparation, reportPath, output, error, text).ConfigureAwait(false))
+        {
+            return 1;
+        }
+
+        var options = new EpubCorpusDiscoveryOptions(repositoryRoot, externalRoot);
+        var result = await _corpusQualificationService
+            .QualifyAsync(read.Manifest, options, acceptedBaseline, cancellationToken)
+            .ConfigureAwait(false);
+        await EpubCorpusQualificationService
+            .WriteLocalDetailedReportAsync(result, reportPath, cancellationToken)
+            .ConfigureAwait(false);
+
+        var summary = result.Report.Summary;
+        await output.WriteLineAsync(text.Format("LabelCorpusManifest", manifestPath)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelCorpusReport", reportPath)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelCorpusTotal", summary.Total)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format(
+                "LabelCorpusSummary",
+                summary.Passed,
+                summary.Failed,
+                summary.Skipped,
+                summary.Inconclusive))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format(
+                "LabelRepeatedDeterminism",
+                text.Get(result.IsDeterministic ? "ValueYes" : "ValueNo")))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format(
+                "LabelBaselineStatus",
+                BaselineStatus(result, text)))
+            .ConfigureAwait(false);
+
+        var passed = result.IsDeterministic
+            && summary.Failed == 0
+            && summary.Skipped == 0
+            && summary.Inconclusive == 0
+            && (result.AcceptedBaselineComparison is null || result.AcceptedBaselineComparison.IsMatch);
+        return passed ? 0 : 2;
+    }
+
+    private async Task<int> QualifyEpubAsync(
+        QualifyEpubCommand command,
+        TextWriter output,
+        TextWriter error,
+        CliTextCatalog text,
+        CancellationToken cancellationToken)
+    {
+        var sourcePath = Path.GetFullPath(command.SourcePath);
+        var reportPath = Path.GetFullPath(command.ReportPath);
+        if (!Path.IsPathFullyQualified(command.RepositoryRoot))
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorGateAbsoluteRepositoryRoot"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        var repositoryRoot = Path.GetFullPath(command.RepositoryRoot);
+        if (!string.Equals(Path.GetExtension(sourcePath), ".epub", StringComparison.OrdinalIgnoreCase))
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_UNSUPPORTED_INPUT", "ErrorQualifyOnlyEpub"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        if (PathsEqual(sourcePath, reportPath))
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorGateReportSourceConflict"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        if (IsInside(repositoryRoot, sourcePath) || IsInside(repositoryRoot, reportPath))
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorGateOutsideRepository"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        var outputPreparation = CliOutputPolicy.PrepareFile(reportPath, command.Force, command.Resume);
+        if (!await ReportOutputPreparationAsync(outputPreparation, reportPath, output, error, text).ConfigureAwait(false))
+        {
+            return 1;
+        }
+
+        var candidate = new EpubLargePublicationCandidate(
+            command.CandidateId,
+            sourcePath,
+            legalUseDeclared: true,
+            drmFreeDeclared: true);
+        var options = new EpubLargePublicationGateOptions(
+            command.CandidateId,
+            command.ExpectedSourceSha256,
+            command.RepetitionCount,
+            requireHumanReview: true);
+        var report = await _largePublicationGate.ExecuteAsync(candidate, options, cancellationToken).ConfigureAwait(false);
+        await EpubLargePublicationGateReportJsonSerializer.WriteAtomicallyAsync(
+                report,
+                reportPath,
+                command.IncludeEnvironment,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+        var failedAutomatic = report.Result.AutomaticChecks.Count(static check =>
+            check.Status is not EpubLargePublicationGateStatus.Passed
+                and not EpubLargePublicationGateStatus.PassedWithWarnings);
+        var warningCount = report.Result.Diagnostics.Count(static diagnostic =>
+            diagnostic.Severity == EpubLargePublicationGateDiagnosticSeverity.Warning);
+        await output.WriteLineAsync(text.Format("LabelGateCandidate", command.CandidateId.Value)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelGateReport", reportPath)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelGateStatus", report.Result.Status)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelGateRepetitions", command.RepetitionCount)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format(
+                "LabelGateAutomaticChecks",
+                report.Result.AutomaticChecks.Length - failedAutomatic,
+                failedAutomatic,
+                warningCount))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Get("GateHumanReviewPending")).ConfigureAwait(false);
+        return failedAutomatic == 0 ? 0 : 2;
+    }
+
+    private async Task<int> ReviewEpubAsync(
+        ReviewEpubCommand command,
+        TextWriter output,
+        TextWriter error,
+        CliTextCatalog text,
+        CancellationToken cancellationToken)
+    {
+        var sourcePath = Path.GetFullPath(command.SourcePath);
+        if (!string.Equals(Path.GetExtension(sourcePath), ".epub", StringComparison.OrdinalIgnoreCase))
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_UNSUPPORTED_INPUT", "ErrorReviewOnlyEpub"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        if (!Path.IsPathFullyQualified(command.OutputDirectory)
+            || !Path.IsPathFullyQualified(command.RepositoryRoot))
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorReviewAbsolutePaths"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        var outputDirectory = Path.GetFullPath(command.OutputDirectory);
+        var repositoryRoot = Path.GetFullPath(command.RepositoryRoot);
+        if (IsInside(repositoryRoot, sourcePath))
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorReviewSourceOutsideRepository"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        var outputPreparation = CliOutputPolicy.PrepareReviewDirectory(
+            outputDirectory,
+            command.Force,
+            command.Resume);
+        if (!await ReportOutputPreparationAsync(outputPreparation, outputDirectory, output, error, text)
+                .ConfigureAwait(false))
+        {
+            return 1;
+        }
+
+        var candidate = new EpubLargePublicationCandidate(
+            command.CandidateId,
+            sourcePath,
+            legalUseDeclared: true,
+            drmFreeDeclared: true);
+        var options = new EpubLargePublicationReviewOptions(
+            command.CandidateId,
+            command.ExpectedSourceSha256,
+            outputDirectory,
+            repositoryRoot,
+            command.UiLanguage);
+        var result = await _reviewPackageGenerator.GenerateAsync(candidate, options, cancellationToken)
+            .ConfigureAwait(false);
+
+        await output.WriteLineAsync(text.Format("LabelReviewCandidate", command.CandidateId.Value)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelReviewDirectory", result.OutputDirectory)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelReviewPage", Path.Combine(result.OutputDirectory, "review.html")))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format(
+                "LabelReviewChecklist",
+                Path.Combine(result.OutputDirectory, "review-checklist.json")))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelReviewSamples", result.Samples.Length)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelReviewTargets", result.Targets.Length)).ConfigureAwait(false);
+        return 0;
+    }
+
+    private static async Task<bool> ReportOutputPreparationAsync(
+        CliOutputPreparation preparation,
+        string path,
+        TextWriter output,
+        TextWriter error,
+        CliTextCatalog text)
+    {
+        if (!preparation.IsSuccess)
+        {
+            await error.WriteLineAsync(text.Diagnostic(
+                    "FLOWCLI_OUTPUT_POLICY",
+                    preparation.ErrorResourceKey!,
+                    path))
+                .ConfigureAwait(false);
+            return false;
+        }
+
+        if (preparation.Resumed)
+        {
+            await output.WriteLineAsync(text.Format("LabelInterruptedRunRecovered", path)).ConfigureAwait(false);
+        }
+
+        return true;
+    }
+
+    private static string BaselineStatus(EpubCorpusQualificationResult result, CliTextCatalog text) =>
+        result.AcceptedBaselineComparison is null
+            ? text.Get("ValueNotProvided")
+            : text.Get(result.AcceptedBaselineComparison.IsMatch ? "ValueMatched" : "ValueMismatched");
 
     private async Task<int> InspectEpubAsync(
         InspectEpubCommand command,
@@ -1184,6 +1479,15 @@ public sealed class CliOperations
             left,
             right,
             OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+
+    private static bool IsInside(string root, string path)
+    {
+        var normalizedRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(root));
+        var normalizedPath = Path.GetFullPath(path);
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        return string.Equals(normalizedRoot, Path.TrimEndingDirectorySeparator(normalizedPath), comparison)
+            || normalizedPath.StartsWith(normalizedRoot + Path.DirectorySeparatorChar, comparison);
+    }
 
     private static async Task WriteHashAsync(TextWriter output, DocumentHash hash, CliTextCatalog text)
     {

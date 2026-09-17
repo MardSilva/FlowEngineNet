@@ -14,6 +14,10 @@
   <data name="ErrorInvalidWidth" xml:space="preserve"><value>--width must be a finite number greater than zero.</value></data>
   <data name="ErrorInvalidHeight" xml:space="preserve"><value>--height must be a finite number greater than zero.</value></data>
   <data name="ErrorInvalidUiLanguage" xml:space="preserve"><value>--ui-language must be auto, en, pt-PT, or pt-BR.</value></data>
+  <data name="ErrorInvalidRepetitions" xml:space="preserve"><value>--repetitions must be an integer greater than or equal to 2.</value></data>
+  <data name="ErrorRequiredEpubDeclarations" xml:space="preserve"><value>Both --legal-use and --drm-free are required. These flags are explicit declarations by the caller; Flow does not infer rights or bypass DRM.</value></data>
+  <data name="ErrorInvalidCandidateId" xml:space="preserve"><value>Candidate ID '{0}' is invalid. Use 1 to 64 lowercase ASCII letters, digits, dots, hyphens, or underscores.</value></data>
+  <data name="ErrorInvalidSha256" xml:space="preserve"><value>--sha256 must contain exactly 64 hexadecimal characters.</value></data>
   <data name="ErrorCancelled" xml:space="preserve"><value>The operation was cancelled; no partial final output was kept.</value></data>
   <data name="ErrorOperationFailed" xml:space="preserve"><value>The operation failed: {0}</value></data>
   <data name="HelpTitle" xml:space="preserve"><value>Flow Engine .NET 0.2.0-alpha.1 (experimental)</value></data>
@@ -28,12 +32,21 @@
   <data name="HelpImport2" xml:space="preserve"><value>    [--metadata-json &lt;metadata.json&gt;] [--processing-json &lt;processing.json&gt;] [--source-map-json &lt;source-map.json&gt;]</value></data>
   <data name="HelpImport3" xml:space="preserve"><value>    Without --output, the file name is derived from the imported book title.</value></data>
   <data name="HelpEpubInspect" xml:space="preserve"><value>  flow epub-inspect &lt;book.epub&gt; [--json &lt;report.json&gt;]       Inspect EPUB structure.</value></data>
+  <data name="HelpCorpus1" xml:space="preserve"><value>  flow corpus &lt;manifest.json&gt; --repository-root &lt;directory&gt; --report &lt;report.json&gt;</value></data>
+  <data name="HelpCorpus2" xml:space="preserve"><value>    [--external-root &lt;directory&gt;] [--baseline &lt;baseline.json&gt;] [--force] [--resume]    Run repeated offline corpus qualification.</value></data>
+  <data name="HelpEpubQualify1" xml:space="preserve"><value>  flow epub-qualify &lt;book.epub&gt; --candidate-id &lt;id&gt; --sha256 &lt;hash&gt; --report &lt;report.json&gt;</value></data>
+  <data name="HelpEpubQualify2" xml:space="preserve"><value>    --repository-root &lt;absolute-directory&gt; --legal-use --drm-free [--repetitions &lt;n&gt;] [--include-environment] [--force] [--resume]</value></data>
+  <data name="HelpEpubQualify3" xml:space="preserve"><value>    Run the repeated automatic gate without assigning a human-review outcome.</value></data>
+  <data name="HelpEpubReview1" xml:space="preserve"><value>  flow epub-review &lt;book.epub&gt; --candidate-id &lt;id&gt; --sha256 &lt;hash&gt; --output &lt;absolute-directory&gt;</value></data>
+  <data name="HelpEpubReview2" xml:space="preserve"><value>    --repository-root &lt;absolute-directory&gt; --legal-use --drm-free [--ui-language &lt;auto|en|pt-PT|pt-BR&gt;] [--force] [--resume]</value></data>
+  <data name="HelpEpubReview3" xml:space="preserve"><value>    Generate local mobile/desktop material and a separate human checklist.</value></data>
+  <data name="HelpOutputPolicy" xml:space="preserve"><value>    Existing outputs require --force. Use --resume only to remove recognized artifacts from an interrupted run and restart it.</value></data>
   <data name="HelpInspect" xml:space="preserve"><value>  flow inspect &lt;document&gt;                      Show semantic document counts.</value></data>
   <data name="HelpValidate" xml:space="preserve"><value>  flow validate &lt;document&gt;                     Validate semantic invariants.</value></data>
   <data name="HelpHash" xml:space="preserve"><value>  flow hash &lt;document&gt;                         Compute the canonical SHA-256 hash.</value></data>
   <data name="HelpRenderHtml" xml:space="preserve"><value>  flow render &lt;document&gt; --html &lt;output&gt; --width &lt;n&gt; --height &lt;n&gt;</value></data>
   <data name="HelpRenderBook" xml:space="preserve"><value>  flow render &lt;document&gt; --html-book &lt;output-directory&gt; [--ui-language &lt;auto|en|pt-PT|pt-BR&gt;]</value></data>
-  <data name="HelpExitCodes" xml:space="preserve"><value>Exit codes: 0 success, 1 command/input failure, 2 semantic validation failure, 130 cancellation.</value></data>
+  <data name="HelpExitCodes" xml:space="preserve"><value>Exit codes: 0 completed operation, 1 command/input/I/O failure, 2 semantic validation or automatic qualification failure, 130 cancellation.</value></data>
   <data name="LabelReportJson" xml:space="preserve"><value>JSON report: {0}</value></data>
   <data name="LabelInspection" xml:space="preserve"><value>EPUB inspection: {0}</value></data>
   <data name="LabelStatus" xml:space="preserve"><value>Status: {0}</value></data>
@@ -71,6 +84,21 @@
   <data name="ErrorOutputConflict" xml:space="preserve"><value>{0} and {1} must use different paths.</value></data>
   <data name="ErrorImportFailed" xml:space="preserve"><value>No complete Flow document was written.</value></data>
   <data name="ErrorImportedDocumentInvalid" xml:space="preserve"><value>The imported document was not written.</value></data>
+  <data name="ErrorCorpusReportConflict" xml:space="preserve"><value>The corpus report path must differ from the manifest and accepted baseline paths.</value></data>
+  <data name="ErrorCorpusManifestInvalid" xml:space="preserve"><value>The corpus was not executed because its manifest is invalid.</value></data>
+  <data name="ErrorQualifyOnlyEpub" xml:space="preserve"><value>epub-qualify accepts only .epub files.</value></data>
+  <data name="ErrorGateReportSourceConflict" xml:space="preserve"><value>The gate report path must differ from the source EPUB path.</value></data>
+  <data name="ErrorGateAbsoluteRepositoryRoot" xml:space="preserve"><value>The gate repository root must be an explicit absolute path.</value></data>
+  <data name="ErrorGateOutsideRepository" xml:space="preserve"><value>The gate source EPUB and report must remain outside the repository.</value></data>
+  <data name="ErrorReviewOnlyEpub" xml:space="preserve"><value>epub-review accepts only .epub files.</value></data>
+  <data name="ErrorReviewAbsolutePaths" xml:space="preserve"><value>The review output and repository root must be explicit absolute paths.</value></data>
+  <data name="ErrorReviewSourceOutsideRepository" xml:space="preserve"><value>The review source EPUB must remain outside the repository.</value></data>
+  <data name="ErrorOutputExistsRequiresForce" xml:space="preserve"><value>Output '{0}' already exists. Use --force to replace it after all checks complete.</value></data>
+  <data name="ErrorInterruptedOutputRequiresResume" xml:space="preserve"><value>Recognized interrupted-run artifacts exist for '{0}'. Use --resume to remove them and restart safely.</value></data>
+  <data name="ErrorOutputExpectedFile" xml:space="preserve"><value>File output '{0}' points to an existing directory.</value></data>
+  <data name="ErrorOutputExpectedDirectory" xml:space="preserve"><value>Directory output '{0}' points to an existing file.</value></data>
+  <data name="ErrorAmbiguousReviewRecovery" xml:space="preserve"><value>More than one recognized backup exists for '{0}'. Recovery was refused to avoid choosing one silently.</value></data>
+  <data name="LabelInterruptedRunRecovered" xml:space="preserve"><value>Interrupted-run artifacts removed; restarting: {0}</value></data>
   <data name="ErrorImportOutputMissing" xml:space="preserve"><value>A successful EPUB import did not produce an output path.</value></data>
   <data name="ErrorHtmlBookParentRequired" xml:space="preserve"><value>The HTML book output must have a parent directory.</value></data>
   <data name="ErrorHtmlBookFilesystemRoot" xml:space="preserve"><value>The HTML book output cannot be a filesystem root.</value></data>
@@ -86,6 +114,27 @@
   <data name="LabelMetadataJson" xml:space="preserve"><value>Metadata JSON: {0}</value></data>
   <data name="LabelProcessingJson" xml:space="preserve"><value>Processing JSON: {0}</value></data>
   <data name="LabelSourceMapJson" xml:space="preserve"><value>Source map JSON: {0}</value></data>
+  <data name="LabelCorpusManifest" xml:space="preserve"><value>Corpus manifest: {0}</value></data>
+  <data name="LabelCorpusReport" xml:space="preserve"><value>Corpus qualification report: {0}</value></data>
+  <data name="LabelCorpusTotal" xml:space="preserve"><value>Corpus publications: {0}</value></data>
+  <data name="LabelCorpusSummary" xml:space="preserve"><value>Corpus result: {0} passed, {1} failed, {2} skipped, {3} inconclusive.</value></data>
+  <data name="LabelRepeatedDeterminism" xml:space="preserve"><value>Deterministic across repeated runs: {0}</value></data>
+  <data name="LabelBaselineStatus" xml:space="preserve"><value>Accepted baseline: {0}</value></data>
+  <data name="ValueNotProvided" xml:space="preserve"><value>not provided</value></data>
+  <data name="ValueMatched" xml:space="preserve"><value>matched</value></data>
+  <data name="ValueMismatched" xml:space="preserve"><value>mismatched</value></data>
+  <data name="LabelGateCandidate" xml:space="preserve"><value>Gate candidate: {0}</value></data>
+  <data name="LabelGateReport" xml:space="preserve"><value>Gate report: {0}</value></data>
+  <data name="LabelGateStatus" xml:space="preserve"><value>Gate status: {0}</value></data>
+  <data name="LabelGateRepetitions" xml:space="preserve"><value>Gate repetitions: {0}</value></data>
+  <data name="LabelGateAutomaticChecks" xml:space="preserve"><value>Automatic checks: {0} passed, {1} not passed, {2} warnings.</value></data>
+  <data name="GateHumanReviewPending" xml:space="preserve"><value>Human review remains separate; run epub-review to generate its local material.</value></data>
+  <data name="LabelReviewCandidate" xml:space="preserve"><value>Review candidate: {0}</value></data>
+  <data name="LabelReviewDirectory" xml:space="preserve"><value>Review directory: {0}</value></data>
+  <data name="LabelReviewPage" xml:space="preserve"><value>Review page: {0}</value></data>
+  <data name="LabelReviewChecklist" xml:space="preserve"><value>Review checklist: {0}</value></data>
+  <data name="LabelReviewSamples" xml:space="preserve"><value>Chapter samples: {0}</value></data>
+  <data name="LabelReviewTargets" xml:space="preserve"><value>Representative targets: {0}</value></data>
   <data name="LabelImportedEpub" xml:space="preserve"><value>Imported EPUB: {0}</value></data>
   <data name="LabelFlowDocument" xml:space="preserve"><value>Flow document: {0}</value></data>
   <data name="LabelDocumentId" xml:space="preserve"><value>Document ID: {0}</value></data>
@@ -203,6 +252,18 @@
   <data name="Diagnostic_EPUB068" xml:space="preserve"><value>An SVG image fallback was used.</value></data>
   <data name="Diagnostic_EPUB069" xml:space="preserve"><value>Some SVG image semantics could not be preserved.</value></data>
   <data name="Diagnostic_EPUB070" xml:space="preserve"><value>A manifest property is outside the supported subset.</value></data>
+  <data name="Diagnostic_EPC001" xml:space="preserve"><value>The corpus manifest JSON is invalid.</value></data>
+  <data name="Diagnostic_EPC002" xml:space="preserve"><value>The corpus manifest encoding is invalid.</value></data>
+  <data name="Diagnostic_EPC003" xml:space="preserve"><value>The corpus manifest format is unsupported.</value></data>
+  <data name="Diagnostic_EPC004" xml:space="preserve"><value>A required corpus value is missing.</value></data>
+  <data name="Diagnostic_EPC005" xml:space="preserve"><value>A corpus publication ID occurs more than once.</value></data>
+  <data name="Diagnostic_EPC006" xml:space="preserve"><value>A corpus publication ID is invalid.</value></data>
+  <data name="Diagnostic_EPC007" xml:space="preserve"><value>A corpus SHA-256 value is invalid.</value></data>
+  <data name="Diagnostic_EPC008" xml:space="preserve"><value>A corpus EPUB version is unsupported.</value></data>
+  <data name="Diagnostic_EPC009" xml:space="preserve"><value>A corpus relative path is unsafe.</value></data>
+  <data name="Diagnostic_EPC010" xml:space="preserve"><value>A corpus license declaration is invalid.</value></data>
+  <data name="Diagnostic_EPC011" xml:space="preserve"><value>A corpus value is invalid.</value></data>
+  <data name="Diagnostic_EPC012" xml:space="preserve"><value>The corpus manifest contains an unknown property.</value></data>
   <data name="Diagnostic_FLOW_DUPLICATE_NODE_ID" xml:space="preserve"><value>A node ID occurs more than once.</value></data>
   <data name="Diagnostic_FLOW_INVALID_NODE_ID" xml:space="preserve"><value>A node ID is invalid.</value></data>
   <data name="Diagnostic_FLOW_INVALID_HIERARCHY" xml:space="preserve"><value>A node occurs in an invalid hierarchy.</value></data>

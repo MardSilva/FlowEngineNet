@@ -2,7 +2,7 @@
 
 The `flow` executable is a deliberately small composition layer over the document serializer, validator, canonicalizer, layout engine, and HTML renderer. Command parsing is implemented independently from command operations and uses no external CLI framework.
 
-The help output identifies the CLI and `.flow.json` representation as experimental. Stable `FLOWCLI_*` prefixes distinguish command, option, value, and operation failures. Exit code `0` means success, `1` means command/input/I/O failure, `2` means the document parsed but failed semantic validation, and `130` means cancellation.
+The help output identifies the CLI and `.flow.json` representation as experimental. Stable `FLOWCLI_*` prefixes distinguish command, option, value, and operation failures. Exit code `0` means the requested operation completed, `1` means command/input/I/O failure, `2` means semantic validation or automatic qualification failed, and `130` means cancellation.
 
 ## Global output options
 
@@ -24,6 +24,9 @@ Every stable EPUB, document-validation and Flow JSON diagnostic code currently h
 flow sample [output]
 flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>] [--fidelity-report <fidelity.json>]
 flow epub-inspect <book.epub> [--json <report.json>]
+flow corpus <manifest.json> --repository-root <directory> --report <report.json> [--external-root <directory>] [--baseline <baseline.json>] [--force] [--resume]
+flow epub-qualify <book.epub> --candidate-id <id> --sha256 <hash> --report <report.json> --repository-root <absolute-directory> --legal-use --drm-free [--repetitions <n>] [--include-environment] [--force] [--resume]
+flow epub-review <book.epub> --candidate-id <id> --sha256 <hash> --output <absolute-directory> --repository-root <absolute-directory> --legal-use --drm-free [--ui-language <auto|en|pt-PT|pt-BR>] [--force] [--resume]
 flow inspect <document>
 flow validate <document>
 flow hash <document>
@@ -54,6 +57,18 @@ The imported `.flow.json` contains only canonical Flow metadata. Publisher, cont
 
 `epub-inspect` reads only the EPUB container and OPF structure. It reports the EPUB 2/3 family, principal metadata, manifest properties, fallback and media-overlay IDs, linear/non-linear and repeated spine references, navigation documents, archive sizes, resource types, missing resources, unsupported resources, and diagnostics without producing a `FlowDocument`. `--json` writes the deterministic `flow-epub-inspection-0.1` report even when the publication is invalid enough to return exit code `1`. Spine entries are always emitted by declared position; manifest sorting in JSON is never treated as reading order.
 
+`corpus` reads a `flow-epub-corpus-0.1` manifest, discovers only the permitted local inputs, runs the complete corpus pipeline twice and writes `flow-epub-corpus-qualification-0.1`. `--baseline` compares the observed evidence with an existing reviewed baseline; the command never creates or accepts a replacement baseline. The report excludes physical publication paths. Exit code `2` indicates a failed, skipped or inconclusive publication, non-deterministic repeated evidence, or baseline mismatch.
+
+`epub-qualify` runs the automatic large-publication gate at least twice. The neutral candidate ID, expected SHA-256, absolute repository root and the `--legal-use`/`--drm-free` declarations are mandatory. The source EPUB and report are rejected inside the repository tree. A technically successful run normally reports the overall status `inconclusive`, because human review remains separate; the command still returns `0` when every automatic check passed or passed with warnings. `--include-environment` adds approximate duration, managed-heap and working-set observations to a clearly non-deterministic report section. It is off by default.
+
+`epub-review` creates the transactional review directory with mobile and desktop packages, `review.html`, `review-checklist.json` and `review-manifest.json`. Its output and repository root must be explicit absolute paths, and the output must remain outside the repository. The command verifies the same candidate ID and SHA-256 used by the gate. It does not approve checklist items or infer legal permission.
+
+### Output replacement and interrupted runs
+
+`corpus`, `epub-qualify`, and `epub-review` do not replace an existing final output by default. `--force` permits replacement, but the final file or directory remains untouched until the new result is complete and ready for its atomic commit. Existing review directories must still contain a recognized Flow review manifest; `--force` never authorizes deletion of an arbitrary directory.
+
+An interrupted atomic write may leave a hidden staging, backup, or temporary artifact beside its destination. The next invocation stops and asks for `--resume`. This option removes only artifacts whose exact destination-specific name contains a valid transaction identifier, restores a recognized review backup when necessary, and restarts the operation from the source. Partial JSON and HTML are never reused as completed evidence. Use `--force --resume` together when an interrupted attempt was replacing a completed output. Ambiguous or unrecognized backups are left untouched and reported as errors.
+
 `inspect` reports identity, metadata, total nodes, chapters, sections, paragraphs, figures, footnotes, assets, addressable anchors, and presentation availability.
 
 `validate` returns exit code `0` for a structurally valid document and `2` when validation diagnostics contain errors. Parsing, file, and command errors return `1`.
@@ -74,6 +89,9 @@ During development, invoke the executable through the project:
 dotnet run --project src/Flow.Cli -- sample sample.flow.json
 dotnet run --project src/Flow.Cli -- --language pt-BR --banner help
 dotnet run --project src/Flow.Cli -- epub-inspect book.epub --json inspection.json
+dotnet run --project src/Flow.Cli -- corpus epub-corpus.json --repository-root C:\src\FlowEngineNet --report C:\flow-local\corpus.json --force
+dotnet run --project src/Flow.Cli -- epub-qualify C:\books\book.epub --candidate-id candidate-001 --sha256 $sha256 --report C:\flow-local\gate.json --repository-root C:\src\FlowEngineNet --legal-use --drm-free
+dotnet run --project src/Flow.Cli -- epub-review C:\books\book.epub --candidate-id candidate-001 --sha256 $sha256 --output C:\flow-local\review --repository-root C:\src\FlowEngineNet --legal-use --drm-free --ui-language pt-BR
 dotnet run --project src/Flow.Cli -- --language pt-BR import book.epub --diagnostics-json import-report.json
 dotnet run --project src/Flow.Cli -- validate sample.flow.json
 dotnet run --project src/Flow.Cli -- render sample.flow.json --html sample.html --width 390 --height 844

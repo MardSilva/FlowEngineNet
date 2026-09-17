@@ -1,4 +1,5 @@
 using System.IO.Compression;
+using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Xml.Linq;
@@ -6,6 +7,7 @@ using Flow.Cli;
 using Flow.Core;
 using Flow.Documents;
 using Flow.Epub;
+using Flow.Epub.Corpus;
 using Flow.Layout;
 using Flow.Rendering.Html;
 
@@ -806,8 +808,11 @@ public sealed class FlowCliIntegrationTests
         Assert.Contains("--processing-json <processing.json>", result.Output, StringComparison.Ordinal);
         Assert.Contains("--source-map-json <source-map.json>", result.Output, StringComparison.Ordinal);
         Assert.Contains("flow epub-inspect <book.epub>", result.Output, StringComparison.Ordinal);
+        Assert.Contains("flow corpus <manifest.json>", result.Output, StringComparison.Ordinal);
+        Assert.Contains("flow epub-qualify <book.epub>", result.Output, StringComparison.Ordinal);
+        Assert.Contains("flow epub-review <book.epub>", result.Output, StringComparison.Ordinal);
         Assert.Contains("flow validate <document>", result.Output, StringComparison.Ordinal);
-        Assert.Contains("Exit codes: 0 success, 1 command/input failure, 2 semantic validation failure, 130 cancellation.", result.Output, StringComparison.Ordinal);
+        Assert.Contains("Exit codes: 0 completed operation, 1 command/input/I/O failure, 2 semantic validation or automatic qualification failure, 130 cancellation.", result.Output, StringComparison.Ordinal);
         Assert.Contains("--language <en-US|pt-BR>", result.Output, StringComparison.Ordinal);
         Assert.Contains("--banner", result.Output, StringComparison.Ordinal);
         Assert.DoesNotContain("\u001b[", result.Output, StringComparison.Ordinal);
@@ -869,6 +874,197 @@ public sealed class FlowCliIntegrationTests
         Assert.Equal(1, result.ExitCode);
         Assert.StartsWith("FLOWCLI_INVALID_VALUE:", result.Error, StringComparison.Ordinal);
         Assert.Contains("Unsupported language", result.Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task CorpusCommand_QualifiesAvailableManifestTwiceAndWritesDetailedReport()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var generatedDirectory = workspace.PathOf("generated");
+        Directory.CreateDirectory(generatedDirectory);
+        var epubPath = Path.Combine(generatedDirectory, "corpus-book.epub");
+        CreateMinimalEpub(epubPath, "Corpus local");
+        var manifestPath = workspace.PathOf("epub-corpus.json");
+        var reportPath = workspace.PathOf("reports/corpus-qualification.json");
+        WriteCorpusManifest(manifestPath, epubPath);
+
+        var result = await RunAsync(
+            FlowCliApplication.CreateDefault(),
+            [
+                "--language", "pt-BR", "corpus", manifestPath,
+                "--repository-root", workspace.Root,
+                "--report", reportPath,
+            ]);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.True(File.Exists(reportPath));
+        Assert.Contains("Publicações do corpus: 1", result.Output, StringComparison.Ordinal);
+        Assert.Contains("Determinístico entre execuções repetidas: sim", result.Output, StringComparison.Ordinal);
+        AssertJsonEncoding(reportPath);
+        var report = await File.ReadAllTextAsync(reportPath);
+        Assert.Contains("flow-epub-corpus-qualification-0.1", report, StringComparison.Ordinal);
+        Assert.Contains("\"deterministicAcrossRepeatedRuns\": true", report, StringComparison.Ordinal);
+        Assert.DoesNotContain(workspace.Root, report, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task CorpusCommand_InvalidManifestIsLocalizedAndDoesNotWriteReport()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var manifestPath = workspace.PathOf("invalid-corpus.json");
+        var reportPath = workspace.PathOf("report.json");
+        await File.WriteAllTextAsync(manifestPath, "{}", new UTF8Encoding(false));
+
+        var result = await RunAsync(
+            FlowCliApplication.CreateDefault(),
+            [
+                "--language", "pt-BR", "corpus", manifestPath,
+                "--repository-root", workspace.Root,
+                "--report", reportPath,
+            ]);
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("EPC004", result.Error, StringComparison.Ordinal);
+        Assert.Contains("Um valor obrigatório do corpus está ausente.", result.Error, StringComparison.Ordinal);
+        Assert.False(File.Exists(reportPath));
+    }
+
+    [Fact]
+    public async Task CorpusCommand_RequiresForceAndResumesOnlyRecognizedInterruptedOutput()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var generatedDirectory = workspace.PathOf("generated");
+        Directory.CreateDirectory(generatedDirectory);
+        var epubPath = Path.Combine(generatedDirectory, "corpus-book.epub");
+        CreateMinimalEpub(epubPath);
+        var manifestPath = workspace.PathOf("epub-corpus.json");
+        var reportPath = workspace.PathOf("corpus-report.json");
+        var repositoryRoot = workspace.PathOf("repository");
+        Directory.CreateDirectory(repositoryRoot);
+        WriteCorpusManifest(manifestPath, epubPath);
+        await File.WriteAllTextAsync(reportPath, "keep", new UTF8Encoding(false));
+        var baseArguments = new[]
+        {
+            "--language", "pt-BR", "corpus", manifestPath,
+            "--repository-root", repositoryRoot,
+            "--external-root", workspace.Root,
+            "--report", reportPath,
+        };
+        var application = FlowCliApplication.CreateDefault();
+
+        var refused = await RunAsync(application, baseArguments);
+        var forced = await RunAsync(application, [.. baseArguments, "--force"]);
+
+        Assert.Equal(1, refused.ExitCode);
+        Assert.Contains("FLOWCLI_OUTPUT_POLICY", refused.Error, StringComparison.Ordinal);
+        Assert.Contains("Use --force", refused.Error, StringComparison.Ordinal);
+        Assert.Equal(2, forced.ExitCode);
+        Assert.Contains("flow-epub-corpus-qualification-0.1", await File.ReadAllTextAsync(reportPath));
+
+        File.Delete(reportPath);
+        var interrupted = workspace.PathOf($".corpus-report.json.{Guid.NewGuid():N}.tmp");
+        await File.WriteAllTextAsync(interrupted, "partial", new UTF8Encoding(false));
+        var interruptedRefused = await RunAsync(application, baseArguments);
+        var resumed = await RunAsync(application, [.. baseArguments, "--resume"]);
+
+        Assert.Equal(1, interruptedRefused.ExitCode);
+        Assert.Contains("Use --resume", interruptedRefused.Error, StringComparison.Ordinal);
+        Assert.Equal(2, resumed.ExitCode);
+        Assert.Contains("Resíduos da execução interrompida removidos", resumed.Output, StringComparison.Ordinal);
+        Assert.False(File.Exists(interrupted));
+        Assert.True(File.Exists(reportPath));
+    }
+
+    [Fact]
+    public async Task EpubQualifyAndReview_RunAutomaticGateThenProduceLocalReviewMaterial()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var epubPath = workspace.PathOf("large-candidate.epub");
+        CreateGateReadyEpub(epubPath, chapterCount: 20);
+        var hash = Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(epubPath)));
+        var gateReportPath = workspace.PathOf("large-candidate-gate.json");
+        var repositoryRoot = workspace.PathOf("repository");
+        var reviewDirectory = workspace.PathOf("large-candidate-review");
+        Directory.CreateDirectory(repositoryRoot);
+        var application = FlowCliApplication.CreateDefault();
+
+        var gate = await RunAsync(
+            application,
+            [
+                "--language", "pt-BR", "epub-qualify", epubPath,
+                "--candidate-id", "candidate-001",
+                "--sha256", hash,
+                "--report", gateReportPath,
+                "--repository-root", repositoryRoot,
+                "--legal-use",
+                "--drm-free",
+            ]);
+        var review = await RunAsync(
+            application,
+            [
+                "--language", "pt-BR", "epub-review", epubPath,
+                "--candidate-id", "candidate-001",
+                "--sha256", hash,
+                "--output", reviewDirectory,
+                "--repository-root", repositoryRoot,
+                "--legal-use",
+                "--drm-free",
+                "--ui-language", "pt-BR",
+            ]);
+
+        Assert.Equal(0, gate.ExitCode);
+        Assert.Contains("Candidato do gate: candidate-001", gate.Output, StringComparison.Ordinal);
+        Assert.Contains("0 não aprovadas", gate.Output, StringComparison.Ordinal);
+        Assert.True(File.Exists(gateReportPath));
+        AssertJsonEncoding(gateReportPath);
+        var gateReport = await File.ReadAllTextAsync(gateReportPath);
+        Assert.Contains("flow-epub-large-publication-gate-0.1", gateReport, StringComparison.Ordinal);
+        Assert.Contains("\"status\": \"inconclusive\"", gateReport, StringComparison.Ordinal);
+        Assert.Contains("\"included\": false", gateReport, StringComparison.Ordinal);
+        Assert.DoesNotContain(epubPath, gateReport, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Equal(0, review.ExitCode);
+        Assert.Contains("Diretório da revisão:", review.Output, StringComparison.Ordinal);
+        Assert.True(File.Exists(Path.Combine(reviewDirectory, "review.html")));
+        Assert.True(File.Exists(Path.Combine(reviewDirectory, "review-checklist.json")));
+        Assert.True(File.Exists(Path.Combine(reviewDirectory, "mobile", "index.html")));
+        Assert.True(File.Exists(Path.Combine(reviewDirectory, "desktop", "index.html")));
+        Assert.Contains(
+            "<html lang=\"pt-BR\">",
+            await File.ReadAllTextAsync(Path.Combine(reviewDirectory, "review.html")),
+            StringComparison.Ordinal);
+        Assert.DoesNotContain(
+            epubPath,
+            await File.ReadAllTextAsync(Path.Combine(reviewDirectory, "review-manifest.json")),
+            StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task EpubQualify_RejectsLicensedSourceInsideRepositoryBeforeWritingReport()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var repositoryRoot = workspace.PathOf("repository");
+        Directory.CreateDirectory(repositoryRoot);
+        var epubPath = Path.Combine(repositoryRoot, "licensed.epub");
+        CreateMinimalEpub(epubPath);
+        var hash = Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(epubPath)));
+        var reportPath = workspace.PathOf("gate.json");
+
+        var result = await RunAsync(
+            FlowCliApplication.CreateDefault(),
+            [
+                "epub-qualify", epubPath,
+                "--candidate-id", "candidate-unsafe",
+                "--sha256", hash,
+                "--report", reportPath,
+                "--repository-root", repositoryRoot,
+                "--legal-use",
+                "--drm-free",
+            ]);
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("FLOWCLI_INVALID_OUTPUT", result.Error, StringComparison.Ordinal);
+        Assert.False(File.Exists(reportPath));
     }
 
     private static async Task<CliResult> RunAsync(FlowCliApplication application, string[] arguments)
@@ -1023,6 +1219,111 @@ public sealed class FlowCliIntegrationTests
             """);
     }
 
+    private static void CreateGateReadyEpub(string path, int chapterCount)
+    {
+        using var archive = ZipFile.Open(path, ZipArchiveMode.Create);
+        AddText(archive, "mimetype", "application/epub+zip", CompressionLevel.NoCompression);
+        AddText(
+            archive,
+            "META-INF/container.xml",
+            """
+            <?xml version="1.0" encoding="utf-8"?>
+            <container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+              <rootfiles>
+                <rootfile full-path="EPUB/package.opf" media-type="application/oebps-package+xml" />
+              </rootfiles>
+            </container>
+            """);
+
+        var manifest = new StringBuilder();
+        var spine = new StringBuilder();
+        var navigation = new StringBuilder();
+        for (var index = 1; index <= chapterCount; index++)
+        {
+            manifest.AppendLine($"    <item id=\"chapter-{index}\" href=\"text/chapter-{index}.xhtml\" media-type=\"application/xhtml+xml\" />");
+            spine.AppendLine($"    <itemref idref=\"chapter-{index}\" />");
+            navigation.AppendLine($"      <li><a href=\"text/chapter-{index}.xhtml#chapter-{index}\">Chapter {index}</a></li>");
+            AddText(
+                archive,
+                $"EPUB/text/chapter-{index}.xhtml",
+                $$"""
+                <?xml version="1.0" encoding="utf-8"?>
+                <html xmlns="http://www.w3.org/1999/xhtml" lang="en">
+                  <head><title>Chapter {{index}}</title></head>
+                  <body>
+                    <h1 id="chapter-{{index}}">Chapter {{index}}</h1>
+                    <p id="paragraph-{{index}}">Deterministic gate content for chapter {{index}}.</p>
+                  </body>
+                </html>
+                """);
+        }
+
+        AddText(
+            archive,
+            "EPUB/package.opf",
+            $$"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id">
+              <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                <dc:identifier id="book-id">urn:flow:test:large-gate</dc:identifier>
+                <dc:title>Large gate fixture</dc:title>
+                <dc:language>en</dc:language>
+              </metadata>
+              <manifest>
+                <item id="navigation" href="navigation.xhtml" media-type="application/xhtml+xml" properties="nav" />
+                <item id="image" href="image.png" media-type="image/png" />
+            {{manifest.ToString().TrimEnd()}}
+              </manifest>
+              <spine>
+            {{spine.ToString().TrimEnd()}}
+              </spine>
+            </package>
+            """);
+        AddText(
+            archive,
+            "EPUB/navigation.xhtml",
+            $$"""
+            <?xml version="1.0" encoding="utf-8"?>
+            <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops" lang="en">
+              <head><title>Contents</title></head>
+              <body><nav epub:type="toc"><h1>Contents</h1><ol>
+            {{navigation.ToString().TrimEnd()}}
+              </ol></nav></body>
+            </html>
+            """);
+        AddBytes(
+            archive,
+            "EPUB/image.png",
+            Convert.FromBase64String("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="));
+    }
+
+    private static void WriteCorpusManifest(string path, string epubPath)
+    {
+        var file = new FileInfo(epubPath);
+        var manifest = new EpubCorpusManifest(
+            EpubCorpusManifest.CurrentFormat,
+            [
+                new EpubCorpusPublication(
+                    new EpubCorpusPublicationId("cli-corpus-book"),
+                    "CLI corpus book",
+                    "project:Flow.Cli.Tests",
+                    new EpubCorpusLicense("Flow project fixture", "Generated by the CLI integration test"),
+                    EpubCorpusPublicationKind.ProjectFixture,
+                    EpubCorpusRedistribution.Allowed,
+                    "generated/corpus-book.epub",
+                    EpubVersionFamily.Epub3,
+                    file.Length,
+                    ["pt-PT"],
+                    ["xhtml"],
+                    [],
+                    [],
+                    [],
+                    new EpubCorpusSha256(Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(epubPath)))))
+            ]);
+        using var destination = File.Create(path);
+        new EpubCorpusManifestJsonSerializer().Write(manifest, destination);
+    }
+
     private static void AddText(
         ZipArchive archive,
         string path,
@@ -1032,6 +1333,13 @@ public sealed class FlowCliIntegrationTests
         var entry = archive.CreateEntry(path, compressionLevel);
         using var stream = entry.Open();
         stream.Write(Encoding.UTF8.GetBytes(content));
+    }
+
+    private static void AddBytes(ZipArchive archive, string path, ReadOnlySpan<byte> content)
+    {
+        var entry = archive.CreateEntry(path, CompressionLevel.Optimal);
+        using var stream = entry.Open();
+        stream.Write(content);
     }
 
     private sealed record CliResult(int ExitCode, string Output, string Error);

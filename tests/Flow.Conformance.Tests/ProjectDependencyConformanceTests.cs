@@ -28,7 +28,7 @@ public sealed class ProjectDependencyConformanceTests
             ["Flow.Security"] = ["Flow.Documents"],
             ["Flow.Epub"] = ["Flow.Core", "Flow.Documents"],
             ["Flow.Epub.Corpus"] = ["Flow.Documents", "Flow.Epub", "Flow.Layout", "Flow.Rendering.Html", "Flow.Security"],
-            ["Flow.Cli"] = ["Flow.Documents", "Flow.Epub", "Flow.Layout", "Flow.Rendering.Html", "Flow.Security"],
+            ["Flow.Cli"] = ["Flow.Documents", "Flow.Epub", "Flow.Epub.Corpus", "Flow.Layout", "Flow.Rendering.Html", "Flow.Security"],
         };
 
         foreach (var (projectName, expectedReferences) in expected)

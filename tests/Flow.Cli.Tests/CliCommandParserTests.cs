@@ -80,6 +80,41 @@ public sealed class CliCommandParserTests
                 "livro",
             ]).Command);
         Assert.Equal(HtmlBookUiLanguage.PortuguesePortugal, portugueseHtmlBook.UiLanguage);
+
+        var corpus = Assert.IsType<CorpusCommand>(_parser.Parse(
+        [
+            "corpus", "epub-corpus.json", "--repository-root", "repository", "--report", "corpus-report.json",
+            "--external-root", "external", "--baseline", "baseline.json", "--force", "--resume",
+        ]).Command);
+        Assert.Equal("epub-corpus.json", corpus.ManifestPath);
+        Assert.Equal("external", corpus.ExternalCorpusRoot);
+        Assert.Equal("baseline.json", corpus.AcceptedBaselinePath);
+        Assert.True(corpus.Force);
+        Assert.True(corpus.Resume);
+
+        var hash = new string('A', 64);
+        var qualify = Assert.IsType<QualifyEpubCommand>(_parser.Parse(
+        [
+            "epub-qualify", "book.epub", "--candidate-id", "candidate-001", "--sha256", hash,
+            "--report", "gate.json", "--repository-root", "repository", "--legal-use", "--drm-free", "--repetitions", "3",
+            "--include-environment", "--force", "--resume",
+        ]).Command);
+        Assert.Equal("candidate-001", qualify.CandidateId.Value);
+        Assert.Equal(3, qualify.RepetitionCount);
+        Assert.True(qualify.IncludeEnvironment);
+        Assert.True(qualify.Force);
+        Assert.True(qualify.Resume);
+
+        var review = Assert.IsType<ReviewEpubCommand>(_parser.Parse(
+        [
+            "epub-review", "book.epub", "--candidate-id", "candidate-001", "--sha256", hash,
+            "--output", "review", "--repository-root", "repository", "--legal-use", "--drm-free",
+            "--ui-language", "pt-BR",
+            "--force", "--resume",
+        ]).Command);
+        Assert.Equal(HtmlBookUiLanguage.PortugueseBrazil, review.UiLanguage);
+        Assert.True(review.Force);
+        Assert.True(review.Resume);
     }
 
     [Fact]
@@ -137,9 +172,46 @@ public sealed class CliCommandParserTests
                 .Error,
             StringComparison.Ordinal);
         Assert.StartsWith(
+            "FLOWCLI_DECLARATION_REQUIRED:",
+            _parser.Parse(
+                [
+                    "epub-qualify", "book.epub", "--candidate-id", "candidate", "--sha256", new string('A', 64),
+                    "--report", "gate.json",
+                ])
+                .Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_INVALID_VALUE:",
+            _parser.Parse(
+                [
+                    "epub-qualify", "book.epub", "--candidate-id", "INVALID", "--sha256", new string('A', 64),
+                    "--report", "gate.json", "--repository-root", "repository", "--legal-use", "--drm-free",
+                ])
+                .Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_INVALID_VALUE:",
+            _parser.Parse(
+                [
+                    "epub-qualify", "book.epub", "--candidate-id", "candidate", "--sha256", new string('A', 64),
+                    "--report", "gate.json", "--repository-root", "repository", "--legal-use", "--drm-free", "--repetitions", "1",
+                ])
+                .Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
             "FLOWCLI_DUPLICATE_OPTION:",
             _parser.Parse(
                 ["import", "book.epub", "--source-map-json", "one.json", "--source-map-json", "two.json"])
+                .Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_DUPLICATE_OPTION:",
+            _parser.Parse(
+                [
+                    "epub-review", "book.epub", "--candidate-id", "candidate", "--sha256", new string('A', 64),
+                    "--output", "review", "--repository-root", "repository", "--legal-use", "--drm-free",
+                    "--force", "--force",
+                ])
                 .Error,
             StringComparison.Ordinal);
         Assert.StartsWith(
