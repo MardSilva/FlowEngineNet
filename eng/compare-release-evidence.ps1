@@ -96,6 +96,23 @@ function Read-EvidenceSet {
         $coreFiles[[string]$file.path] = [string]$file.sha256
     }
 
+    $packageEntries = @{}
+    foreach ($entry in $evidence.packageEntries) {
+        if ([string]::IsNullOrWhiteSpace($entry.path) -or
+            $entry.bytes -lt 0 -or
+            $entry.sha256 -notmatch '^[0-9a-f]{64}$' -or
+            $packageEntries.ContainsKey([string]$entry.path)) {
+            throw "The $ExpectedPlatform package-entry evidence is invalid."
+        }
+        $packageEntries[[string]$entry.path] = [pscustomobject]@{
+            Bytes = [long]$entry.bytes
+            Sha256 = [string]$entry.sha256
+        }
+    }
+    if ($packageEntries.Count -eq 0) {
+        throw "The $ExpectedPlatform package-entry evidence is empty."
+    }
+
     $subjectHashes = @{}
     foreach ($subject in $provenance.subject) {
         $subjectHashes[[string]$subject.name] = [string]$subject.digest.sha256
@@ -111,6 +128,7 @@ function Read-EvidenceSet {
         DryRun = $dryRun
         Provenance = $provenance
         CoreFiles = $coreFiles
+        PackageEntries = $packageEntries
     }
 }
 
@@ -128,9 +146,25 @@ if ($windows.DryRun.dotnetSdkVersion -ne $linux.DryRun.dotnetSdkVersion) {
 if ($windows.CoreFiles.Count -ne $linux.CoreFiles.Count) {
     throw 'Windows and Linux produced different portable file sets.'
 }
+if ($windows.PackageEntries.Count -ne $linux.PackageEntries.Count) {
+    throw 'Windows and Linux produced different package entry sets.'
+}
 
 $portableFiles = @()
 $hashMismatches = @()
+$packageEntryNames = [string[]]@($windows.PackageEntries.Keys)
+[Array]::Sort($packageEntryNames, [System.StringComparer]::Ordinal)
+foreach ($entryName in $packageEntryNames) {
+    if (-not $linux.PackageEntries.ContainsKey($entryName)) {
+        throw "Linux evidence is missing package entry '$entryName'."
+    }
+    $windowsEntry = $windows.PackageEntries[$entryName]
+    $linuxEntry = $linux.PackageEntries[$entryName]
+    if ($windowsEntry.Bytes -ne $linuxEntry.Bytes -or $windowsEntry.Sha256 -ne $linuxEntry.Sha256) {
+        $hashMismatches += "package entry ${entryName}: $($windowsEntry.Bytes)/$($windowsEntry.Sha256) != $($linuxEntry.Bytes)/$($linuxEntry.Sha256)"
+    }
+}
+
 $portableFileNames = [string[]]@($windows.CoreFiles.Keys)
 [Array]::Sort($portableFileNames, [System.StringComparer]::Ordinal)
 foreach ($fileName in $portableFileNames) {

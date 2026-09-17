@@ -159,6 +159,18 @@ $sbomEntry = $manifest.files | Where-Object { $_.mediaType -eq 'application/vnd.
 if ($null -eq $packageEntry -or $null -eq $sbomEntry) {
     throw 'The release manifest does not identify both the package and CycloneDX SBOM.'
 }
+if ($null -eq $manifest.packageEntries -or $manifest.packageEntries.Count -eq 0) {
+    throw 'The release manifest does not contain package-entry evidence.'
+}
+$packageEntryPaths = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+foreach ($entry in $manifest.packageEntries) {
+    if ([string]::IsNullOrWhiteSpace($entry.path) -or
+        $entry.bytes -lt 0 -or
+        $entry.sha256 -notmatch '^[0-9a-f]{64}$' -or
+        -not $packageEntryPaths.Add([string]$entry.path)) {
+        throw 'The release manifest contains invalid package-entry evidence.'
+    }
+}
 
 $packageEvidence = $verifiedFiles | Where-Object { $_.path -eq $packageEntry.path } | Select-Object -First 1
 $sbomEvidence = $verifiedFiles | Where-Object { $_.path -eq $sbomEntry.path } | Select-Object -First 1
@@ -333,6 +345,7 @@ $evidence = [ordered]@{
     releaseReady = $releaseReady
     publicationPerformed = $false
     coreFiles = @($coreEvidence)
+    packageEntries = @($manifest.packageEntries)
     provenance = [ordered]@{ path = $provenanceFileName; sha256 = $provenanceHash }
     dryRun = [ordered]@{ path = $dryRunFileName; sha256 = $dryRunHash }
 }

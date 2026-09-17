@@ -39,11 +39,11 @@ No tag or GitHub Release is created. No package is uploaded.
 
 ## Reproducibility check
 
-The script invokes `dotnet pack` twice with deterministic compiler settings, no restore and a normalized source path. NuGet writes current timestamps and host-specific metadata into ZIP entries, so two otherwise identical `.nupkg` files do not initially have the same hash. The script rewrites each unsigned package in ordinal entry order with data compression disabled, applies a fixed ZIP timestamp and clears host-specific creator and file-attribute fields. It then compares the complete package bytes. A mismatch stops the build.
+The script invokes `dotnet pack` twice with deterministic compiler settings, no restore and a normalized source path. NuGet writes current timestamps and host-specific metadata into ZIP entries, while checked-out and generated text can use the host line ending. The script rewrites each unsigned package in ordinal entry order with data compression disabled, normalizes known UTF-8 text entries to LF, applies a fixed ZIP timestamp and clears host-specific creator and file-attribute fields. It then compares the complete package bytes. A mismatch stops the build.
 
 This proves repeatability for the current source, SDK and build environment. CI performs the same two-build comparison independently on Windows and Ubuntu, then transfers only the three small evidence files to a comparison job. That job requires matching hashes for the `.nupkg`, SBOM, release manifest and `SHA256SUMS`. The package itself is never uploaded as workflow evidence.
 
-The comparison report is `flow-cli-cross-platform-release-comparison-0.1`. Windows and Linux must use the same source revision, .NET SDK, package version and expected tag. Both dry-runs must come from clean trees and must state that no publication occurred. Workflow evidence expires after one day.
+The comparison report is `flow-cli-cross-platform-release-comparison-0.1`. Windows and Linux must use the same source revision, .NET SDK, package version and expected tag. Both dry-runs must come from clean trees and must state that no publication occurred. The evidence also carries each package entry's size and SHA-256 value, so a payload difference is reported by its internal path. Workflow evidence expires after one day.
 
 This is a direct cross-platform byte comparison, not a reproducible-build certification. It covers the two GitHub-hosted environments in the workflow, not every supported host or future SDK.
 

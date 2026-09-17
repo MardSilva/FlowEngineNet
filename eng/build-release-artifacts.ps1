@@ -122,6 +122,17 @@ function Normalize-ZipPlatformMetadata {
     }
 }
 
+function Test-NupkgTextEntry {
+    param([Parameter(Mandatory)][string]$EntryName)
+
+    foreach ($suffix in @('.json', '.md', '.nuspec', '.psmdcp', '.rels', '.xml')) {
+        if ($EntryName.EndsWith($suffix, [System.StringComparison]::OrdinalIgnoreCase)) {
+            return $true
+        }
+    }
+    return $false
+}
+
 function Normalize-Nupkg {
     param([Parameter(Mandatory)][string]$Path)
 
@@ -153,7 +164,21 @@ function Normalize-Nupkg {
                     $sourceStream = $sourceEntry.Open()
                     $targetEntryStream = $targetEntry.Open()
                     try {
-                        $sourceStream.CopyTo($targetEntryStream)
+                        if (Test-NupkgTextEntry -EntryName $entryName) {
+                            $utf8 = [System.Text.UTF8Encoding]::new($false, $true)
+                            $reader = [System.IO.StreamReader]::new($sourceStream, $utf8, $true, 4096, $true)
+                            try {
+                                $text = $reader.ReadToEnd().Replace("`r`n", "`n").Replace("`r", "`n")
+                            }
+                            finally {
+                                $reader.Dispose()
+                            }
+                            [byte[]]$normalizedBytes = $utf8.GetBytes($text)
+                            $targetEntryStream.Write($normalizedBytes, 0, $normalizedBytes.Length)
+                        }
+                        else {
+                            $sourceStream.CopyTo($targetEntryStream)
+                        }
                     }
                     finally {
                         $targetEntryStream.Dispose()
@@ -300,6 +325,26 @@ try {
 
             if (-not $entrySet.Add($entryName)) {
                 throw "Duplicate package entry path: $entryName"
+            }
+        }
+
+        [Array]::Sort($entryNames, [System.StringComparer]::Ordinal)
+        $packageEntries = @()
+        foreach ($entryName in $entryNames) {
+            $entry = $archive.GetEntry($entryName)
+            $entryStream = $entry.Open()
+            $sha256 = [System.Security.Cryptography.SHA256]::Create()
+            try {
+                $entryHash = ([System.BitConverter]::ToString($sha256.ComputeHash($entryStream))).Replace('-', '').ToLowerInvariant()
+            }
+            finally {
+                $sha256.Dispose()
+                $entryStream.Dispose()
+            }
+            $packageEntries += [ordered]@{
+                path = $entryName
+                bytes = $entry.Length
+                sha256 = $entryHash
             }
         }
 
@@ -539,6 +584,7 @@ try {
         configuration = $Configuration
         targetFramework = $targetFramework
         toolCommand = $toolCommand
+        packageEntries = @($packageEntries)
         files = @(
             [ordered]@{
                 path = $packageFileName
