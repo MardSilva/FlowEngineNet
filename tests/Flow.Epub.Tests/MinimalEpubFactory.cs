@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.IO.Compression;
 using System.Text;
 
@@ -118,8 +119,50 @@ internal static class MinimalEpubFactory
             }
         }
 
+        NormalizePlatformMetadata(result);
         result.Position = 0;
         return result;
+    }
+
+    private static void NormalizePlatformMetadata(MemoryStream archive)
+    {
+        const uint centralDirectorySignature = 0x02014B50;
+        const uint endOfCentralDirectorySignature = 0x06054B50;
+        const int endOfCentralDirectoryMinimumSize = 22;
+        var bytes = archive.GetBuffer().AsSpan(0, checked((int)archive.Length));
+        var endOffset = -1;
+        for (var offset = bytes.Length - endOfCentralDirectoryMinimumSize; offset >= 0; offset--)
+        {
+            if (BinaryPrimitives.ReadUInt32LittleEndian(bytes[offset..]) == endOfCentralDirectorySignature)
+            {
+                endOffset = offset;
+                break;
+            }
+        }
+
+        if (endOffset < 0)
+        {
+            throw new InvalidOperationException("The generated EPUB has no ZIP end-of-central-directory record.");
+        }
+
+        var entryCount = BinaryPrimitives.ReadUInt16LittleEndian(bytes[(endOffset + 10)..]);
+        var centralOffset = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(bytes[(endOffset + 16)..]));
+        for (var index = 0; index < entryCount; index++)
+        {
+            if (centralOffset > bytes.Length - 46
+                || BinaryPrimitives.ReadUInt32LittleEndian(bytes[centralOffset..]) != centralDirectorySignature)
+            {
+                throw new InvalidOperationException("The generated EPUB has an invalid ZIP central directory.");
+            }
+
+            // Fix the creator platform to MS-DOS and remove host-specific file attributes.
+            bytes[centralOffset + 5] = 0;
+            bytes.Slice(centralOffset + 38, 4).Clear();
+            var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(bytes[(centralOffset + 28)..]);
+            var extraLength = BinaryPrimitives.ReadUInt16LittleEndian(bytes[(centralOffset + 30)..]);
+            var commentLength = BinaryPrimitives.ReadUInt16LittleEndian(bytes[(centralOffset + 32)..]);
+            centralOffset = checked(centralOffset + 46 + nameLength + extraLength + commentLength);
+        }
     }
 
     private static void AddText(

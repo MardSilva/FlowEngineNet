@@ -1,3 +1,4 @@
+using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
 using Flow.Epub;
@@ -233,6 +234,22 @@ public sealed class EpubCorpusManifestTests
     }
 
     [Fact]
+    public void ProjectFixturesUsePlatformNeutralZipMetadata()
+    {
+        foreach (var (id, bytes) in EpubCorpusFixtureFactory.CreateAll())
+        {
+            var entries = ReadCentralDirectoryMetadata(bytes);
+
+            Assert.NotEmpty(entries);
+            Assert.All(entries, entry =>
+            {
+                Assert.True(entry.VersionMadeByPlatform == 0, $"{id}: ZIP creator platform={entry.VersionMadeByPlatform}");
+                Assert.True(entry.ExternalAttributes == 0, $"{id}: ZIP external attributes={entry.ExternalAttributes}");
+            });
+        }
+    }
+
+    [Fact]
     public void PublicManifestAlreadyUsesTheDeterministicRepresentation()
     {
         using var source = OpenPublicManifest();
@@ -266,6 +283,38 @@ public sealed class EpubCorpusManifestTests
 
     private static FileStream OpenPublicManifest() => File.OpenRead(
         Path.Combine(AppContext.BaseDirectory, "Corpus", "epub-corpus.json"));
+
+    private static IReadOnlyList<(byte VersionMadeByPlatform, uint ExternalAttributes)> ReadCentralDirectoryMetadata(
+        byte[] bytes)
+    {
+        const uint centralDirectorySignature = 0x02014B50;
+        const uint endOfCentralDirectorySignature = 0x06054B50;
+        var endOffset = -1;
+        for (var offset = bytes.Length - 22; offset >= 0; offset--)
+        {
+            if (BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(offset)) == endOfCentralDirectorySignature)
+            {
+                endOffset = offset;
+                break;
+            }
+        }
+
+        Assert.True(endOffset >= 0);
+        var entryCount = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(endOffset + 10));
+        var centralOffset = checked((int)BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(endOffset + 16)));
+        var result = new List<(byte VersionMadeByPlatform, uint ExternalAttributes)>(entryCount);
+        for (var index = 0; index < entryCount; index++)
+        {
+            Assert.Equal(centralDirectorySignature, BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(centralOffset)));
+            result.Add((bytes[centralOffset + 5], BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(centralOffset + 38))));
+            var nameLength = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(centralOffset + 28));
+            var extraLength = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(centralOffset + 30));
+            var commentLength = BinaryPrimitives.ReadUInt16LittleEndian(bytes.AsSpan(centralOffset + 32));
+            centralOffset = checked(centralOffset + 46 + nameLength + extraLength + commentLength);
+        }
+
+        return result;
+    }
 
     private static string JoinDiagnostics(EpubCorpusManifestReadResult result) => string.Join(
         Environment.NewLine,
