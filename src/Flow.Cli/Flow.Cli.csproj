@@ -13,6 +13,10 @@
     <ToolCommandName>flow</ToolCommandName>
     <PackageId>FlowEngineNet.Tool</PackageId>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/MardSilva/FlowEngineNet</RepositoryUrl>
     <Authors>Flow Engine contributors</Authors>
     <Description>Experimental Flow Engine command-line tool for semantic documents and EPUB workflows.</Description>
     <PackageTags>flow;epub;documents;cli</PackageTags>

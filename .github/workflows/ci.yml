@@ -21,10 +21,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Install .NET SDK
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -43,3 +46,47 @@ jobs:
       - name: Smoke test packaged CLI
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/smoke-test-cli.ps1 -Configuration Release
+
+      - name: Build and validate local release artifacts
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/build-release-artifacts.ps1 -Configuration Release
+
+      - name: Dry-run versioned release
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/invoke-release-dry-run.ps1
+
+      - name: Store release comparison evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-evidence-${{ runner.os }}
+          path: |
+            artifacts/release/release-evidence.json
+            artifacts/release/release-dry-run.json
+            artifacts/release/*.intoto.jsonl
+          if-no-files-found: error
+          retention-days: 1
+
+  compare-release:
+    name: Compare Windows/Linux release evidence
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Download release evidence
+        uses: actions/download-artifact@v8
+        with:
+          pattern: release-evidence-*
+          path: artifacts/cross-platform
+
+      - name: Compare portable artifact hashes
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/compare-release-evidence.ps1
+          -WindowsEvidenceDirectory ./artifacts/cross-platform/release-evidence-Windows
+          -LinuxEvidenceDirectory ./artifacts/cross-platform/release-evidence-Linux
+          -OutputPath ./artifacts/cross-platform/release-comparison.json

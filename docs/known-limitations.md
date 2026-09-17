@@ -6,8 +6,11 @@ Flow 0.1 is a research-grade reference implementation. This list is part of the 
 
 - All public APIs, `.flow.json` fields, canonicalization rules, renderer output, and diagnostics are experimental and can change during `0.x`.
 - `.flow.json` is a development interchange representation, not a registered media type, standard, archival format, or final Flow container.
-- No NuGet package, release artifact, schema registry, compatibility guarantee, or migration tool is published. `Flow.Cli` can produce the local tool package `FlowEngineNet.Tool` for development and CI smoke testing only.
+- No NuGet package, release artifact, schema registry, compatibility guarantee, or migration tool is published. `Flow.Cli` can produce a validated local `FlowEngineNet.Tool` candidate with SHA-256 checksums, a CycloneDX 1.5 SBOM and a release manifest for development and CI only.
 - The repository currently pins .NET SDK 10.0.401. The CLI package is framework-dependent and still requires a compatible .NET 10 installation; there is no signed installer or self-contained build.
+- Reproducibility validation compares two normalized packages in each build environment. CI then compares the Windows and Ubuntu hashes for the package, SBOM, release manifest and checksum file. This covers the pinned GitHub-hosted matrix only; macOS, self-hosted runners, other SDKs and independent builders remain untested. NuGet ZIP timestamps are normalized only while the package remains unsigned; a future signing workflow must run after normalization and define its own reproducibility boundary.
+- The SBOM covers components shipped inside the CLI package and their runtime dependency graph. It does not inventory the external .NET runtime/SDK, build host, GitHub Actions, test-only packages or operating-system libraries. Local provenance uses an unsigned in-toto statement with a SLSA v1 predicate, but there is no trusted builder identity, signature, transparency log, attestation service or claimed SLSA level.
+- The versioned release plan and dry-run never create a tag, GitHub Release or NuGet publication. Workflow evidence contains hashes and provenance metadata, not the package, and expires after one day. Upgrade, rollback and revocation procedures remain undefined.
 
 ## Semantic model
 

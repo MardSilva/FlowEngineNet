@@ -184,6 +184,7 @@ The final clean-directory review passes 134 tests with zero build warnings; see 
 - [Standalone HTML renderer](docs/html-renderer.md)
 - [HTML book package](docs/html-book-package.md)
 - [Command-line interface](docs/cli.md)
+- [Local release artifacts](docs/release-artifacts.md)
 - [Canonicalization and hashing](docs/canonicalization.md)
 - [Experimental document signatures](docs/signatures.md)
 - [Experimental EPUB import](docs/epub-import.md)
@@ -230,6 +231,22 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\eng\smoke-test-cli.ps1
 On PowerShell 7, including Linux, use `pwsh` instead of `powershell.exe`. A successful run leaves its report and package under `artifacts/cli-smoke/`, which is ignored by Git. GitHub Actions runs the same smoke test on Windows and Ubuntu after restore, formatting, build and tests.
 
 This check requires the .NET 10 SDK selected by `global.json`. It proves that the locally built framework-dependent package can be installed, started and used for the basic document workflow; it is not a signed release or an operating-system installer.
+
+To assemble the complete local release candidate, including checksums, a CycloneDX SBOM and a validation manifest:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\eng\build-release-artifacts.ps1 -Configuration Release
+```
+
+The command performs two independent packs and accepts the package only when the normalized bytes match. It writes the result under `artifacts/release/` and does not publish anything. See [local release artifacts](docs/release-artifacts.md) for the exact contents, validation rules and reproducibility boundary.
+
+The checked-in `eng/release-plan.json` also supports a versioned dry-run:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\eng\invoke-release-dry-run.ps1
+```
+
+The plan explicitly disables publication. CI executes this dry-run from clean Windows and Ubuntu checkouts, retains only provenance metadata for one day and compares the portable artifact hashes in a separate job. It never uploads the NuGet package or creates a tag or GitHub Release.
 
 Global options must appear before the command. They affect terminal text only: generated `.flow.json`, evidence JSON, canonical bytes, hashes and stable diagnostic codes do not change. In `pt-BR`, every current EPUB, document-validation and Flow JSON code receives a short Portuguese summary followed by its original technical detail. This keeps paths, IDs and rejected values available for troubleshooting without changing deterministic reports.
 
