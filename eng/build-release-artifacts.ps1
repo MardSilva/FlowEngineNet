@@ -64,7 +64,7 @@ function Write-Utf8Lf {
     [System.IO.File]::WriteAllText($Path, $normalized, [System.Text.UTF8Encoding]::new($false))
 }
 
-function Normalize-ZipPlatformMetadata {
+function Update-ZipPlatformMetadata {
     param([Parameter(Mandatory)][string]$Path)
 
     [byte[]]$bytes = [System.IO.File]::ReadAllBytes($Path)
@@ -133,7 +133,7 @@ function Test-NupkgTextEntry {
     return $false
 }
 
-function Normalize-Nupkg {
+function Update-NupkgForDeterminism {
     param([Parameter(Mandatory)][string]$Path)
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -200,7 +200,7 @@ function Normalize-Nupkg {
 
     Remove-Item -LiteralPath $Path -Force
     Move-Item -LiteralPath $temporaryPath -Destination $Path
-    Normalize-ZipPlatformMetadata -Path $Path
+    Update-ZipPlatformMetadata -Path $Path
 }
 
 function Read-ZipEntryText {
@@ -297,8 +297,8 @@ try {
         throw "One of the expected packages was not produced: $packageFileName"
     }
 
-    Normalize-Nupkg -Path $firstPackage
-    Normalize-Nupkg -Path $secondPackage
+    Update-NupkgForDeterminism -Path $firstPackage
+    Update-NupkgForDeterminism -Path $secondPackage
     $firstHash = (Get-FileHash -LiteralPath $firstPackage -Algorithm SHA256).Hash.ToLowerInvariant()
     $secondHash = (Get-FileHash -LiteralPath $secondPackage -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($firstHash -ne $secondHash) {
