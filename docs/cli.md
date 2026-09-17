@@ -18,7 +18,7 @@ The deterministic summary is written to `artifacts/cli-smoke/smoke-result.json`;
 
 For a complete local release candidate, run `eng/build-release-artifacts.ps1`. It performs two independent package builds, normalizes unsigned NuGet ZIP metadata, requires byte-for-byte agreement, generates CycloneDX 1.5 and SHA-256 evidence, validates the package structure and installs the final package from a local-only source. The resulting files stay under `artifacts/release/` and are not uploaded or published. See [local release artifacts](release-artifacts.md).
 
-`eng/invoke-release-dry-run.ps1` validates the checked-in version/tag plan and adds unsigned in-toto/SLSA provenance without creating a tag or release. CI exchanges only those small evidence files between jobs and rejects any Windows/Linux hash mismatch; the `.nupkg` itself stays on its originating runner.
+`eng/invoke-release-dry-run.ps1` validates the checked-in version/tag plan and adds unsigned in-toto/SLSA provenance without creating a tag or release. CI builds one canonical candidate on Ubuntu, retains it for one day, and passes that exact `.nupkg` to isolated Ubuntu and Windows validators. `eng/verify-release-artifacts.ps1` checks its hashes and runs the installed CLI; the final comparison rejects a different revision, SDK, identity or package hash. Nothing is sent to a package feed.
 
 ## Global output options
 

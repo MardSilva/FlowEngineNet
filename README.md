@@ -246,7 +246,7 @@ The checked-in `eng/release-plan.json` also supports a versioned dry-run:
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\eng\invoke-release-dry-run.ps1
 ```
 
-The plan explicitly disables publication. CI executes this dry-run from clean Windows and Ubuntu checkouts, retains only provenance metadata for one day and compares the portable artifact hashes in a separate job. It never uploads the NuGet package or creates a tag or GitHub Release.
+The plan explicitly disables publication. After the ordinary Windows/Linux validation matrix passes, CI builds one canonical candidate on Ubuntu and retains it for one day. Ubuntu and Windows then install and exercise that exact `.nupkg`; a final job requires both validation reports to name the same revision, SDK, package identity and SHA-256. The candidate is transferred only between workflow jobs and is never published to NuGet, attached to a GitHub Release or associated with a created tag.
 
 Global options must appear before the command. They affect terminal text only: generated `.flow.json`, evidence JSON, canonical bytes, hashes and stable diagnostic codes do not change. In `pt-BR`, every current EPUB, document-validation and Flow JSON code receives a short Portuguese summary followed by its original technical detail. This keeps paths, IDs and rejected values available for troubleshooting without changing deterministic reports.
 

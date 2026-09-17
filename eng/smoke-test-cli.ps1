@@ -3,7 +3,9 @@ param(
     [ValidateSet('Debug', 'Release')]
     [string]$Configuration = 'Release',
 
-    [string]$ArtifactsDirectory
+    [string]$ArtifactsDirectory,
+
+    [string]$PackagePath
 )
 
 $ErrorActionPreference = 'Stop'
@@ -19,6 +21,19 @@ $runningOnWindows = $env:OS -eq 'Windows_NT'
 $comparison = if ($runningOnWindows) { [System.StringComparison]::OrdinalIgnoreCase } else { [System.StringComparison]::Ordinal }
 if (-not $artifactsRoot.StartsWith($allowedArtifactsRoot + [System.IO.Path]::DirectorySeparatorChar, $comparison)) {
     throw "The smoke-test artifacts directory must be a child of '$allowedArtifactsRoot'."
+}
+
+$externalPackagePath = $null
+if (-not [string]::IsNullOrWhiteSpace($PackagePath)) {
+    $externalPackagePath = [System.IO.Path]::GetFullPath($PackagePath)
+    if (-not $externalPackagePath.StartsWith($allowedArtifactsRoot + [System.IO.Path]::DirectorySeparatorChar, $comparison) -or
+        -not (Test-Path -LiteralPath $externalPackagePath -PathType Leaf) -or
+        [System.IO.Path]::GetExtension($externalPackagePath) -ne '.nupkg') {
+        throw "The supplied package must be an existing .nupkg under '$allowedArtifactsRoot'."
+    }
+    if ($externalPackagePath.StartsWith($artifactsRoot + [System.IO.Path]::DirectorySeparatorChar, $comparison)) {
+        throw 'The supplied package must be outside the smoke-test output directory.'
+    }
 }
 
 $packagesDirectory = Join-Path $artifactsRoot 'packages'
@@ -38,12 +53,20 @@ if ($LASTEXITCODE -ne 0 -or [string]::IsNullOrWhiteSpace($packageId) -or [string
     throw 'Could not resolve the CLI package identity from MSBuild.'
 }
 
-& dotnet pack $projectPath --configuration $Configuration --no-restore --output $packagesDirectory
-if ($LASTEXITCODE -ne 0) {
-    throw 'dotnet pack failed.'
+$packagePath = Join-Path $packagesDirectory "$packageId.$packageVersion.nupkg"
+if ($null -eq $externalPackagePath) {
+    & dotnet pack $projectPath --configuration $Configuration --no-restore --output $packagesDirectory
+    if ($LASTEXITCODE -ne 0) {
+        throw 'dotnet pack failed.'
+    }
+}
+else {
+    if ([System.IO.Path]::GetFileName($externalPackagePath) -ne [System.IO.Path]::GetFileName($packagePath)) {
+        throw "The supplied package name does not match the project identity: $externalPackagePath"
+    }
+    Copy-Item -LiteralPath $externalPackagePath -Destination $packagePath
 }
 
-$packagePath = Join-Path $packagesDirectory "$packageId.$packageVersion.nupkg"
 if (-not (Test-Path -LiteralPath $packagePath -PathType Leaf)) {
     throw "Expected package was not produced: $packagePath"
 }
@@ -127,6 +150,8 @@ try {
         packageId = $packageId
         packageVersion = $packageVersion
         configuration = $Configuration
+        packageSha256 = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash.ToLowerInvariant()
+        packageOrigin = if ($null -eq $externalPackagePath) { 'built' } else { 'supplied' }
         commands = @('help', 'help-pt-BR', 'sample', 'inspect', 'validate', 'hash', 'render-html')
         status = 'passed'
     }
@@ -136,7 +161,7 @@ try {
         ($resultJson.Replace("`r`n", "`n") + "`n"),
         [System.Text.UTF8Encoding]::new($false))
 
-    Write-Host "Flow CLI distribution smoke test passed: $packageId $packageVersion"
+    Write-Output "Flow CLI distribution smoke test passed: $packageId $packageVersion"
 }
 finally {
     if ($installed) {

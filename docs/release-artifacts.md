@@ -35,17 +35,17 @@ The dry-run adds:
 - `release-dry-run.json`, the version, expected tag, source state and validation outcome;
 - `release-evidence.json`, hashes binding the core artifacts to the provenance and dry-run report.
 
-No tag or GitHub Release is created. No package is uploaded.
+No tag or GitHub Release is created. A local run does not upload anything. CI temporarily transfers the canonical candidate between its own jobs so Windows and Linux validate the exact same package; the artifact expires after one day and is never published to a package feed.
 
 ## Reproducibility check
 
 The script invokes `dotnet pack` twice with deterministic compiler settings, no restore, and `ContinuousIntegrationBuild=true`, allowing the .NET SDK to normalize source paths consistently. It does not supply a manual `PathMap`, because a map built from an operating-system path can retain different directory separators in compiler inputs on Windows and Linux. NuGet writes current timestamps and host-specific metadata into ZIP entries, while checked-out and generated text can use the host line ending. The script rewrites each unsigned package in ordinal entry order with data compression disabled, normalizes known UTF-8 text entries to LF, applies a fixed ZIP timestamp and clears host-specific creator and file-attribute fields. It then compares the complete package bytes. A mismatch stops the build.
 
-This proves repeatability for the current source, SDK and build environment. CI performs the same two-build comparison independently on Windows and Ubuntu, then transfers only the three small evidence files to a comparison job. That job requires matching hashes for the `.nupkg`, SBOM, release manifest and `SHA256SUMS`. The package itself is never uploaded as workflow evidence.
+This proves repeatability for the current source, SDK and canonical build environment. It does not claim that independent compiler executions on different operating systems produce identical managed assemblies.
 
-The comparison report is `flow-cli-cross-platform-release-comparison-0.1`. Windows and Linux must use the same source revision, .NET SDK, package version and expected tag. Both dry-runs must come from clean trees and must state that no publication occurred. The evidence also carries each package entry's size and SHA-256 value, so a payload difference is reported by its internal path. Workflow evidence expires after one day.
+CI builds the canonical candidate once on Ubuntu after the Windows/Linux source validation matrix passes. `eng/verify-release-artifacts.ps1` then checks the canonical manifest and every `SHA256SUMS` entry, installs that supplied `.nupkg` from an isolated local-only source, and exercises the installed CLI independently on Ubuntu and Windows. Each validator writes `flow-cli-release-platform-validation-0.1` evidence containing the source revision, SDK, package identity, exact canonical hash and commands exercised.
 
-This is a direct cross-platform byte comparison, not a reproducible-build certification. It covers the two GitHub-hosted environments in the workflow, not every supported host or future SDK.
+`eng/compare-release-evidence.ps1` produces `flow-cli-multiplatform-release-validation-0.1`. It requires clean checkouts, the same revision, SDK, package identity and core-file hashes, and proof that both platforms installed the one canonical package. This is a portability and artifact-promotion gate, not a reproducible-build certification across operating systems. It covers only the GitHub-hosted Ubuntu and Windows environments in the workflow.
 
 ## SBOM scope
 

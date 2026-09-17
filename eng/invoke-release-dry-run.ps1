@@ -352,7 +352,7 @@ $evidence = [ordered]@{
 
 Write-Utf8LfAtomic -Path $evidencePath -Content ($evidence | ConvertTo-Json -Depth 12 -Compress) -Replace ([bool]$Force)
 
-Write-Host "Versioned release dry-run passed without publication: $($plan.tag) [$platform, source=$sourceState]"
+Write-Output "Versioned release dry-run passed without publication: $($plan.tag) [$platform, source=$sourceState]"
 if (-not $releaseReady) {
     Write-Warning 'The dry-run used -AllowDirty and is not releasable evidence. Run again from a clean source tree.'
 }
