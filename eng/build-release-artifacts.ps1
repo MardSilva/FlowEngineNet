@@ -270,7 +270,6 @@ try {
         throw 'Could not resolve the CLI release identity from MSBuild.'
     }
 
-    $pathMap = $repositoryRoot + '=/_/'
     $commonPackArguments = @(
         'pack',
         $projectPath,
@@ -278,8 +277,7 @@ try {
         '--no-restore',
         '-p:ContinuousIntegrationBuild=true',
         '-p:DebugType=None',
-        '-p:DebugSymbols=false',
-        "-p:PathMap=$pathMap")
+        '-p:DebugSymbols=false')
 
     & dotnet @commonPackArguments '--output' $firstPackDirectory
     if ($LASTEXITCODE -ne 0) {
