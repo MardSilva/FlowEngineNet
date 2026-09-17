@@ -218,14 +218,18 @@ public sealed class EpubCorpusManifestTests
         var fixtures = EpubCorpusFixtureFactory.CreateAll();
 
         Assert.Equal(fixtures.Keys.Order(StringComparer.Ordinal), publications.Select(static item => item.Id.Value));
+        var differences = new List<string>();
         foreach (var publication in publications)
         {
             var bytes = fixtures[publication.Id.Value];
             var actualHash = Convert.ToHexString(SHA256.HashData(bytes));
-            Assert.True(
-                bytes.LongLength == publication.ExpectedSizeBytes && actualHash == publication.Sha256.Value,
-                $"{publication.Id.Value}: size={bytes.LongLength}; sha256={actualHash}");
+            if (bytes.LongLength != publication.ExpectedSizeBytes || actualHash != publication.Sha256.Value)
+            {
+                differences.Add($"{publication.Id.Value}: size={bytes.LongLength}; sha256={actualHash}");
+            }
         }
+
+        Assert.True(differences.Count == 0, string.Join(Environment.NewLine, differences));
     }
 
     [Fact]

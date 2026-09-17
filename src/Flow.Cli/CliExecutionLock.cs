@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
@@ -39,8 +40,11 @@ internal sealed class CliExecutionLock : IDisposable
     private const string CurrentFormat = "flow-cli-execution-lock-0.1";
     private const int MaximumLockBytes = 4096;
     private static readonly UTF8Encoding Utf8WithoutBom = new(encoderShouldEmitUTF8Identifier: false);
+    private static readonly ConcurrentDictionary<string, byte> ActiveProcessLocks = new(
+        OperatingSystem.IsWindows() ? StringComparer.OrdinalIgnoreCase : StringComparer.Ordinal);
     private readonly FileStream stream;
     private readonly string destinationHash;
+    private readonly string processLockKey;
     private readonly bool markInterruptedOnDispose;
     private bool completed;
     private bool disposed;
@@ -48,11 +52,13 @@ internal sealed class CliExecutionLock : IDisposable
     private CliExecutionLock(
         FileStream stream,
         string destinationHash,
+        string processLockKey,
         Guid executionId,
         bool markInterruptedOnDispose = true)
     {
         this.stream = stream;
         this.destinationHash = destinationHash;
+        this.processLockKey = processLockKey;
         this.markInterruptedOnDispose = markInterruptedOnDispose;
         ExecutionId = executionId;
     }
@@ -71,33 +77,46 @@ internal sealed class CliExecutionLock : IDisposable
         EnsureSafeDirectory(parent);
         var lockPath = Path.Combine(parent, $".{Path.GetFileName(destination)}.flow-execution.lock");
         var destinationHash = HashDestination(NormalizeDestinationForHash(destination));
-
-        FileStream stream;
-        var created = false;
-        try
+        var processLockKey = NormalizeLockKey(lockPath);
+        if (!ActiveProcessLocks.TryAdd(processLockKey, 0))
         {
-            stream = new FileStream(lockPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.Read);
-            created = true;
+            return CliExecutionLockAcquisition.Failure("ErrorOutputExecutionActive");
         }
-        catch (IOException)
+
+        FileStream? stream = null;
+        var created = false;
+        var fileLockAcquired = false;
+        var ownershipTransferred = false;
+        try
         {
             try
             {
-                stream = new FileStream(lockPath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+                stream = new FileStream(lockPath, FileMode.CreateNew, FileAccess.ReadWrite, FileShare.Read);
+                created = true;
             }
             catch (IOException)
             {
+                try
+                {
+                    stream = new FileStream(lockPath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+                }
+                catch (IOException)
+                {
+                    return CliExecutionLockAcquisition.Failure("ErrorOutputExecutionActive");
+                }
+            }
+
+            if (!TryAcquireFileLock(stream))
+            {
                 return CliExecutionLockAcquisition.Failure("ErrorOutputExecutionActive");
             }
-        }
 
-        try
-        {
+            fileLockAcquired = true;
             if (!created)
             {
                 if (File.GetAttributes(lockPath).HasFlag(FileAttributes.ReparsePoint))
                 {
-                    return FailureAndDispose(stream, "ErrorOutputLockInvalid");
+                    return CliExecutionLockAcquisition.Failure("ErrorOutputLockInvalid");
                 }
 
                 LockRecord? record;
@@ -107,27 +126,37 @@ internal sealed class CliExecutionLock : IDisposable
                 }
                 catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException)
                 {
-                    return FailureAndDispose(stream, "ErrorOutputLockInvalid");
+                    return CliExecutionLockAcquisition.Failure("ErrorOutputLockInvalid");
                 }
                 if (record is null)
                 {
-                    return FailureAndDispose(stream, "ErrorOutputLockInvalid");
+                    return CliExecutionLockAcquisition.Failure("ErrorOutputLockInvalid");
                 }
 
                 if (record.State != CliExecutionRecordedState.Completed && !resume)
                 {
-                    return FailureAndDispose(stream, "ErrorInterruptedExecutionRequiresResume");
+                    return CliExecutionLockAcquisition.Failure("ErrorInterruptedExecutionRequiresResume");
                 }
             }
 
             var executionId = Guid.NewGuid();
             WriteState(stream, destinationHash, executionId, "active");
-            return CliExecutionLockAcquisition.Acquired(new CliExecutionLock(stream, destinationHash, executionId));
+            ownershipTransferred = true;
+            return CliExecutionLockAcquisition.Acquired(
+                new CliExecutionLock(stream, destinationHash, processLockKey, executionId));
         }
-        catch
+        finally
         {
-            stream.Dispose();
-            throw;
+            if (!ownershipTransferred)
+            {
+                if (fileLockAcquired && stream is not null)
+                {
+                    TryReleaseFileLock(stream);
+                }
+
+                stream?.Dispose();
+                ActiveProcessLocks.TryRemove(processLockKey, out _);
+            }
         }
     }
 
@@ -163,14 +192,23 @@ internal sealed class CliExecutionLock : IDisposable
             return new CliExecutionInspection(true, false, false, null, null, lockPath, "ErrorOutputLockInvalid");
         }
 
-        var writerActive = false;
-        try
+        var processLockKey = NormalizeLockKey(lockPath);
+        var writerActive = ActiveProcessLocks.ContainsKey(processLockKey);
+        if (!writerActive)
         {
-            using var probe = new FileStream(lockPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
-        }
-        catch (IOException)
-        {
-            writerActive = true;
+            try
+            {
+                using var probe = new FileStream(lockPath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+                writerActive = !TryAcquireFileLock(probe);
+                if (!writerActive)
+                {
+                    TryReleaseFileLock(probe);
+                }
+            }
+            catch (IOException)
+            {
+                writerActive = true;
+            }
         }
 
         var state = record.State == CliExecutionRecordedState.Active && !writerActive
@@ -194,21 +232,35 @@ internal sealed class CliExecutionLock : IDisposable
             return CliExecutionLockAcquisition.Failure("ErrorExecutionLockMissing");
         }
 
-        FileStream stream;
-        try
-        {
-            stream = new FileStream(lockPath, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
-        }
-        catch (IOException)
+        var processLockKey = NormalizeLockKey(lockPath);
+        if (!ActiveProcessLocks.TryAdd(processLockKey, 0))
         {
             return CliExecutionLockAcquisition.Failure("ErrorOutputExecutionActive");
         }
 
+        FileStream? stream = null;
+        var fileLockAcquired = false;
+        var ownershipTransferred = false;
         try
         {
+            try
+            {
+                stream = new FileStream(lockPath, FileMode.Open, FileAccess.ReadWrite, FileShare.Read);
+            }
+            catch (IOException)
+            {
+                return CliExecutionLockAcquisition.Failure("ErrorOutputExecutionActive");
+            }
+
+            if (!TryAcquireFileLock(stream))
+            {
+                return CliExecutionLockAcquisition.Failure("ErrorOutputExecutionActive");
+            }
+
+            fileLockAcquired = true;
             if (File.GetAttributes(lockPath).HasFlag(FileAttributes.ReparsePoint))
             {
-                return FailureAndDispose(stream, "ErrorOutputLockInvalid");
+                return CliExecutionLockAcquisition.Failure("ErrorOutputLockInvalid");
             }
 
             var destinationHash = HashDestination(NormalizeDestinationForHash(destination));
@@ -219,26 +271,40 @@ internal sealed class CliExecutionLock : IDisposable
             }
             catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException)
             {
-                return FailureAndDispose(stream, "ErrorOutputLockInvalid");
+                return CliExecutionLockAcquisition.Failure("ErrorOutputLockInvalid");
             }
 
             if (record is null)
             {
-                return FailureAndDispose(stream, "ErrorOutputLockInvalid");
+                return CliExecutionLockAcquisition.Failure("ErrorOutputLockInvalid");
             }
 
             if (record.ExecutionId != expectedExecutionId)
             {
-                return FailureAndDispose(stream, "ErrorExecutionIdMismatch");
+                return CliExecutionLockAcquisition.Failure("ErrorExecutionIdMismatch");
             }
 
+            ownershipTransferred = true;
             return CliExecutionLockAcquisition.Acquired(
-                new CliExecutionLock(stream, destinationHash, expectedExecutionId, markInterruptedOnDispose: false));
+                new CliExecutionLock(
+                    stream,
+                    destinationHash,
+                    processLockKey,
+                    expectedExecutionId,
+                    markInterruptedOnDispose: false));
         }
-        catch
+        finally
         {
-            stream.Dispose();
-            throw;
+            if (!ownershipTransferred)
+            {
+                if (fileLockAcquired && stream is not null)
+                {
+                    TryReleaseFileLock(stream);
+                }
+
+                stream?.Dispose();
+                ActiveProcessLocks.TryRemove(processLockKey, out _);
+            }
         }
     }
 
@@ -278,14 +344,52 @@ internal sealed class CliExecutionLock : IDisposable
         finally
         {
             disposed = true;
-            stream.Dispose();
+            try
+            {
+                TryReleaseFileLock(stream);
+                stream.Dispose();
+            }
+            finally
+            {
+                ActiveProcessLocks.TryRemove(processLockKey, out _);
+            }
         }
     }
 
-    private static CliExecutionLockAcquisition FailureAndDispose(FileStream stream, string resourceKey)
+    private static bool TryAcquireFileLock(FileStream stream)
     {
-        stream.Dispose();
-        return CliExecutionLockAcquisition.Failure(resourceKey);
+        // Windows enforces FileShare on the open handle. Linux needs an explicit advisory lock.
+        if (!OperatingSystem.IsLinux())
+        {
+            return true;
+        }
+
+        try
+        {
+            stream.Lock(0, 1);
+            return true;
+        }
+        catch (IOException)
+        {
+            return false;
+        }
+    }
+
+    private static void TryReleaseFileLock(FileStream stream)
+    {
+        if (!OperatingSystem.IsLinux())
+        {
+            return;
+        }
+
+        try
+        {
+            stream.Unlock(0, 1);
+        }
+        catch (IOException)
+        {
+            // Closing the handle releases any remaining operating-system lock.
+        }
     }
 
     private static LockRecord? ReadRecord(Stream stream, string expectedDestinationHash)
@@ -359,6 +463,10 @@ internal sealed class CliExecutionLock : IDisposable
 
     private static string GetLockPath(string destination) =>
         Path.Combine(Path.GetDirectoryName(destination)!, $".{Path.GetFileName(destination)}.flow-execution.lock");
+
+    private static string NormalizeLockKey(string lockPath) => OperatingSystem.IsWindows()
+        ? Path.GetFullPath(lockPath).ToUpperInvariant()
+        : Path.GetFullPath(lockPath);
 
     private static void EnsureSafeDirectory(string path)
     {

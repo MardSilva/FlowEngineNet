@@ -5,6 +5,7 @@ namespace Flow.Epub.Tests;
 
 internal static class MinimalEpubFactory
 {
+    // Stored entries avoid platform-specific Deflate output in fixtures whose ZIP bytes are hashed.
     private static readonly DateTimeOffset StableEntryTimestamp = new(2020, 1, 1, 0, 0, 0, TimeSpan.Zero);
 
     private const string DefaultContainer = """
@@ -93,14 +94,14 @@ internal static class MinimalEpubFactory
 
             if (includeImage)
             {
-                var image = CreateEntry(archive, "EPUB/images/flow.png", CompressionLevel.Optimal);
+                var image = CreateEntry(archive, "EPUB/images/flow.png", CompressionLevel.NoCompression);
                 using var stream = image.Open();
                 stream.Write(OnePixelPng);
             }
 
             if (additionalTextEntries is not null)
             {
-                foreach (var (path, content) in additionalTextEntries)
+                foreach (var (path, content) in additionalTextEntries.OrderBy(static item => item.Key, StringComparer.Ordinal))
                 {
                     AddText(archive, path, content);
                 }
@@ -108,9 +109,9 @@ internal static class MinimalEpubFactory
 
             if (additionalBinaryEntries is not null)
             {
-                foreach (var (path, content) in additionalBinaryEntries)
+                foreach (var (path, content) in additionalBinaryEntries.OrderBy(static item => item.Key, StringComparer.Ordinal))
                 {
-                    var entry = CreateEntry(archive, path, CompressionLevel.Optimal);
+                    var entry = CreateEntry(archive, path, CompressionLevel.NoCompression);
                     using var stream = entry.Open();
                     stream.Write(content);
                 }
@@ -125,7 +126,7 @@ internal static class MinimalEpubFactory
         ZipArchive archive,
         string path,
         string content,
-        CompressionLevel compressionLevel = CompressionLevel.Optimal)
+        CompressionLevel compressionLevel = CompressionLevel.NoCompression)
     {
         var entry = CreateEntry(archive, path, compressionLevel);
         using var stream = entry.Open();
