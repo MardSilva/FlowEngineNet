@@ -64,7 +64,7 @@ function Write-Utf8Lf {
     [System.IO.File]::WriteAllText($Path, $normalized, [System.Text.UTF8Encoding]::new($false))
 }
 
-function Update-ZipPlatformMetadata {
+function ConvertTo-PlatformNeutralZip {
     param([Parameter(Mandatory)][string]$Path)
 
     [byte[]]$bytes = [System.IO.File]::ReadAllBytes($Path)
@@ -133,7 +133,7 @@ function Test-NupkgTextEntry {
     return $false
 }
 
-function Update-NupkgForDeterminism {
+function ConvertTo-DeterministicNupkg {
     param([Parameter(Mandatory)][string]$Path)
 
     Add-Type -AssemblyName System.IO.Compression.FileSystem
@@ -200,7 +200,7 @@ function Update-NupkgForDeterminism {
 
     Remove-Item -LiteralPath $Path -Force
     Move-Item -LiteralPath $temporaryPath -Destination $Path
-    Update-ZipPlatformMetadata -Path $Path
+    ConvertTo-PlatformNeutralZip -Path $Path
 }
 
 function Read-ZipEntryText {
@@ -297,8 +297,8 @@ try {
         throw "One of the expected packages was not produced: $packageFileName"
     }
 
-    Update-NupkgForDeterminism -Path $firstPackage
-    Update-NupkgForDeterminism -Path $secondPackage
+    ConvertTo-DeterministicNupkg -Path $firstPackage
+    ConvertTo-DeterministicNupkg -Path $secondPackage
     $firstHash = (Get-FileHash -LiteralPath $firstPackage -Algorithm SHA256).Hash.ToLowerInvariant()
     $secondHash = (Get-FileHash -LiteralPath $secondPackage -Algorithm SHA256).Hash.ToLowerInvariant()
     if ($firstHash -ne $secondHash) {
@@ -657,7 +657,7 @@ try {
     else {
         Move-Item -LiteralPath $releaseDirectory -Destination $outputRoot
     }
-    Write-Host "Flow CLI release artifacts passed reproducibility and validation checks: $outputRoot"
+    Write-Output "Flow CLI release artifacts passed reproducibility and validation checks: $outputRoot"
 }
 finally {
     if (Test-Path -LiteralPath $stagingRoot) {
