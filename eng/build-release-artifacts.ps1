@@ -64,6 +64,64 @@ function Write-Utf8Lf {
     [System.IO.File]::WriteAllText($Path, $normalized, [System.Text.UTF8Encoding]::new($false))
 }
 
+function Normalize-ZipPlatformMetadata {
+    param([Parameter(Mandatory)][string]$Path)
+
+    [byte[]]$bytes = [System.IO.File]::ReadAllBytes($Path)
+    if ($bytes.Length -lt 22) {
+        throw "The normalized package is too small to contain a ZIP directory: $Path"
+    }
+
+    $endOffset = -1
+    for ($offset = $bytes.Length - 22; $offset -ge 0; $offset--) {
+        if ($bytes[$offset] -eq 0x50 -and
+            $bytes[$offset + 1] -eq 0x4B -and
+            $bytes[$offset + 2] -eq 0x05 -and
+            $bytes[$offset + 3] -eq 0x06) {
+            $endOffset = $offset
+            break
+        }
+    }
+    if ($endOffset -lt 0) {
+        throw "The normalized package has no ZIP end-of-central-directory record: $Path"
+    }
+
+    $entryCount = [System.BitConverter]::ToUInt16($bytes, $endOffset + 10)
+    $centralOffset = [long][System.BitConverter]::ToUInt32($bytes, $endOffset + 16)
+    for ($index = 0; $index -lt $entryCount; $index++) {
+        if ($centralOffset -gt $bytes.Length - 46 -or
+            $bytes[$centralOffset] -ne 0x50 -or
+            $bytes[$centralOffset + 1] -ne 0x4B -or
+            $bytes[$centralOffset + 2] -ne 0x01 -or
+            $bytes[$centralOffset + 3] -ne 0x02) {
+            throw "The normalized package has an invalid ZIP central directory: $Path"
+        }
+
+        # Use the MS-DOS creator platform and clear host-specific file attributes.
+        $bytes[$centralOffset + 5] = 0
+        $bytes[$centralOffset + 38] = 0
+        $bytes[$centralOffset + 39] = 0
+        $bytes[$centralOffset + 40] = 0
+        $bytes[$centralOffset + 41] = 0
+        $nameLength = [System.BitConverter]::ToUInt16($bytes, $centralOffset + 28)
+        $extraLength = [System.BitConverter]::ToUInt16($bytes, $centralOffset + 30)
+        $commentLength = [System.BitConverter]::ToUInt16($bytes, $centralOffset + 32)
+        $centralOffset = $centralOffset + 46 + $nameLength + $extraLength + $commentLength
+    }
+
+    $metadataPath = $Path + '.metadata-normalized'
+    try {
+        [System.IO.File]::WriteAllBytes($metadataPath, $bytes)
+        Remove-Item -LiteralPath $Path -Force
+        Move-Item -LiteralPath $metadataPath -Destination $Path
+    }
+    finally {
+        if (Test-Path -LiteralPath $metadataPath) {
+            Remove-Item -LiteralPath $metadataPath -Force
+        }
+    }
+}
+
 function Normalize-Nupkg {
     param([Parameter(Mandatory)][string]$Path)
 
@@ -89,7 +147,7 @@ function Normalize-Nupkg {
                     $sourceEntry = $source.GetEntry($entryName)
                     $targetEntry = $target.CreateEntry(
                         $entryName,
-                        [System.IO.Compression.CompressionLevel]::Optimal)
+                        [System.IO.Compression.CompressionLevel]::NoCompression)
                     $targetEntry.LastWriteTime = $fixedTimestamp
                     $targetEntry.ExternalAttributes = 0
                     $sourceStream = $sourceEntry.Open()
@@ -117,6 +175,7 @@ function Normalize-Nupkg {
 
     Remove-Item -LiteralPath $Path -Force
     Move-Item -LiteralPath $temporaryPath -Destination $Path
+    Normalize-ZipPlatformMetadata -Path $Path
 }
 
 function Read-ZipEntryText {

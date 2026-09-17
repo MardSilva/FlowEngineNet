@@ -130,6 +130,7 @@ if ($windows.CoreFiles.Count -ne $linux.CoreFiles.Count) {
 }
 
 $portableFiles = @()
+$hashMismatches = @()
 $portableFileNames = [string[]]@($windows.CoreFiles.Keys)
 [Array]::Sort($portableFileNames, [System.StringComparer]::Ordinal)
 foreach ($fileName in $portableFileNames) {
@@ -137,12 +138,16 @@ foreach ($fileName in $portableFileNames) {
         throw "Linux evidence is missing portable file '$fileName'."
     }
     if ($windows.CoreFiles[$fileName] -ne $linux.CoreFiles[$fileName]) {
-        throw "Cross-platform hash mismatch for '$fileName': $($windows.CoreFiles[$fileName]) != $($linux.CoreFiles[$fileName])"
+        $hashMismatches += "${fileName}: $($windows.CoreFiles[$fileName]) != $($linux.CoreFiles[$fileName])"
+        continue
     }
     $portableFiles += [ordered]@{
         path = $fileName
         sha256 = $windows.CoreFiles[$fileName]
     }
+}
+if ($hashMismatches.Count -gt 0) {
+    throw "Cross-platform hash mismatches:`n$($hashMismatches -join "`n")"
 }
 
 $comparison = [ordered]@{

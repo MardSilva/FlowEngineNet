@@ -39,7 +39,7 @@ No tag or GitHub Release is created. No package is uploaded.
 
 ## Reproducibility check
 
-The script invokes `dotnet pack` twice with deterministic compiler settings, no restore and a normalized source path. NuGet writes current timestamps into ZIP entries, so two otherwise identical `.nupkg` files do not initially have the same hash. The script rewrites each unsigned package in ordinal entry order with a fixed ZIP timestamp and neutral external attributes, then compares the complete package bytes. A mismatch stops the build.
+The script invokes `dotnet pack` twice with deterministic compiler settings, no restore and a normalized source path. NuGet writes current timestamps and host-specific metadata into ZIP entries, so two otherwise identical `.nupkg` files do not initially have the same hash. The script rewrites each unsigned package in ordinal entry order with data compression disabled, applies a fixed ZIP timestamp and clears host-specific creator and file-attribute fields. It then compares the complete package bytes. A mismatch stops the build.
 
 This proves repeatability for the current source, SDK and build environment. CI performs the same two-build comparison independently on Windows and Ubuntu, then transfers only the three small evidence files to a comparison job. That job requires matching hashes for the `.nupkg`, SBOM, release manifest and `SHA256SUMS`. The package itself is never uploaded as workflow evidence.
 
