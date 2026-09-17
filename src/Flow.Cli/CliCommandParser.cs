@@ -26,7 +26,9 @@ public sealed class CliCommandParser
             "hash" => ParseDocumentCommand(arguments, static path => new HashCommand(path)),
             "render" => ParseRender(arguments),
             _ => CommandParseResult.Failure(
-                $"FLOWCLI_UNKNOWN_COMMAND: Unknown command '{arguments[0]}'. Run 'flow help' for usage."),
+                "FLOWCLI_UNKNOWN_COMMAND",
+                "ErrorUnknownCommand",
+                arguments[0]),
         };
     }
 
@@ -34,7 +36,7 @@ public sealed class CliCommandParser
     {
         if (arguments.Count < 2)
         {
-            return CommandParseResult.Failure($"FLOWCLI_USAGE: {ImportUsage}");
+            return CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", ImportUsage);
         }
 
         string? outputPath = null;
@@ -48,7 +50,10 @@ public sealed class CliCommandParser
             if (index + 1 >= arguments.Count || string.IsNullOrWhiteSpace(arguments[index + 1]))
             {
                 return CommandParseResult.Failure(
-                    $"FLOWCLI_USAGE: Option '{arguments[index]}' requires a value. {ImportUsage}");
+                    "FLOWCLI_USAGE",
+                    "ErrorOptionRequiresValue",
+                    arguments[index],
+                    ImportUsage);
             }
 
             var option = arguments[index];
@@ -76,10 +81,16 @@ public sealed class CliCommandParser
                 case "--output" or "--diagnostics-json" or "--fidelity-report" or "--metadata-json"
                     or "--processing-json" or "--source-map-json":
                     return CommandParseResult.Failure(
-                        $"FLOWCLI_DUPLICATE_OPTION: Option '{option}' was specified more than once.");
+                        "FLOWCLI_DUPLICATE_OPTION",
+                        "ErrorDuplicateOption",
+                        option);
                 default:
                     return CommandParseResult.Failure(
-                        $"FLOWCLI_UNKNOWN_OPTION: Unknown import option '{option}'. {ImportUsage}");
+                        "FLOWCLI_UNKNOWN_OPTION",
+                        "ErrorUnknownOption",
+                        "import",
+                        option,
+                        ImportUsage);
             }
         }
 
@@ -100,7 +111,7 @@ public sealed class CliCommandParser
             2 => CommandParseResult.Success(new InspectEpubCommand(arguments[1], null)),
             4 when arguments[2] == "--json" && !string.IsNullOrWhiteSpace(arguments[3]) =>
                 CommandParseResult.Success(new InspectEpubCommand(arguments[1], arguments[3])),
-            _ => CommandParseResult.Failure($"FLOWCLI_USAGE: {EpubInspectUsage}"),
+            _ => CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", EpubInspectUsage),
         };
 
     private static CommandParseResult ParseSample(IReadOnlyList<string> arguments) =>
@@ -108,7 +119,7 @@ public sealed class CliCommandParser
         {
             1 => CommandParseResult.Success(new SampleCommand("sample.flow.json")),
             2 => CommandParseResult.Success(new SampleCommand(arguments[1])),
-            _ => CommandParseResult.Failure("FLOWCLI_USAGE: Usage: flow sample [output]"),
+            _ => CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", "flow sample [output]"),
         };
 
     private static CommandParseResult ParseDocumentCommand(
@@ -116,13 +127,13 @@ public sealed class CliCommandParser
         Func<string, CliCommand> create) =>
         arguments.Count == 2
             ? CommandParseResult.Success(create(arguments[1]))
-            : CommandParseResult.Failure($"FLOWCLI_USAGE: Usage: flow {arguments[0]} <document>");
+            : CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", $"flow {arguments[0]} <document>");
 
     private static CommandParseResult ParseRender(IReadOnlyList<string> arguments)
     {
         if (arguments.Count < 2)
         {
-            return CommandParseResult.Failure($"FLOWCLI_USAGE: {RenderUsage}");
+            return CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", RenderUsage);
         }
 
         if (arguments.Skip(2).Contains("--html-book", StringComparer.Ordinal))
@@ -139,7 +150,10 @@ public sealed class CliCommandParser
             if (index + 1 >= arguments.Count)
             {
                 return CommandParseResult.Failure(
-                    $"FLOWCLI_USAGE: Option '{arguments[index]}' requires a value. {RenderUsage}");
+                    "FLOWCLI_USAGE",
+                    "ErrorOptionRequiresValue",
+                    arguments[index],
+                    RenderUsage);
             }
 
             var option = arguments[index];
@@ -153,7 +167,8 @@ public sealed class CliCommandParser
                     if (!TryParseDimension(value, out var parsedWidth))
                     {
                         return CommandParseResult.Failure(
-                            "FLOWCLI_INVALID_VALUE: --width must be a finite number greater than zero.");
+                            "FLOWCLI_INVALID_VALUE",
+                            "ErrorInvalidWidth");
                     }
 
                     width = parsedWidth;
@@ -162,23 +177,30 @@ public sealed class CliCommandParser
                     if (!TryParseDimension(value, out var parsedHeight))
                     {
                         return CommandParseResult.Failure(
-                            "FLOWCLI_INVALID_VALUE: --height must be a finite number greater than zero.");
+                            "FLOWCLI_INVALID_VALUE",
+                            "ErrorInvalidHeight");
                     }
 
                     height = parsedHeight;
                     break;
                 case "--html" or "--width" or "--height":
                     return CommandParseResult.Failure(
-                        $"FLOWCLI_DUPLICATE_OPTION: Option '{option}' was specified more than once.");
+                        "FLOWCLI_DUPLICATE_OPTION",
+                        "ErrorDuplicateOption",
+                        option);
                 default:
                     return CommandParseResult.Failure(
-                        $"FLOWCLI_UNKNOWN_OPTION: Unknown render option '{option}'. {RenderUsage}");
+                        "FLOWCLI_UNKNOWN_OPTION",
+                        "ErrorUnknownOption",
+                        "render",
+                        option,
+                        RenderUsage);
             }
         }
 
         if (string.IsNullOrWhiteSpace(outputPath) || width is null || height is null)
         {
-            return CommandParseResult.Failure($"FLOWCLI_USAGE: {RenderUsage}");
+            return CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", RenderUsage);
         }
 
         return CommandParseResult.Success(
@@ -195,7 +217,10 @@ public sealed class CliCommandParser
             if (index + 1 >= arguments.Count || string.IsNullOrWhiteSpace(arguments[index + 1]))
             {
                 return CommandParseResult.Failure(
-                    $"FLOWCLI_USAGE: Option '{arguments[index]}' requires a value. {RenderUsage}");
+                    "FLOWCLI_USAGE",
+                    "ErrorOptionRequiresValue",
+                    arguments[index],
+                    RenderUsage);
             }
 
             var option = arguments[index];
@@ -209,22 +234,29 @@ public sealed class CliCommandParser
                     if (!TryParseUiLanguage(value, out uiLanguage))
                     {
                         return CommandParseResult.Failure(
-                            "FLOWCLI_INVALID_VALUE: --ui-language must be auto, en, pt-PT, or pt-BR.");
+                            "FLOWCLI_INVALID_VALUE",
+                            "ErrorInvalidUiLanguage");
                     }
 
                     hasUiLanguage = true;
                     break;
                 case "--html-book" or "--ui-language":
                     return CommandParseResult.Failure(
-                        $"FLOWCLI_DUPLICATE_OPTION: Option '{option}' was specified more than once.");
+                        "FLOWCLI_DUPLICATE_OPTION",
+                        "ErrorDuplicateOption",
+                        option);
                 default:
                     return CommandParseResult.Failure(
-                        $"FLOWCLI_UNKNOWN_OPTION: Unknown HTML book option '{option}'. {RenderUsage}");
+                        "FLOWCLI_UNKNOWN_OPTION",
+                        "ErrorUnknownOption",
+                        "HTML book",
+                        option,
+                        RenderUsage);
             }
         }
 
         return outputDirectory is null
-            ? CommandParseResult.Failure($"FLOWCLI_USAGE: {RenderUsage}")
+            ? CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", RenderUsage)
             : CommandParseResult.Success(new RenderHtmlBookCommand(arguments[1], outputDirectory, uiLanguage));
     }
 
@@ -247,10 +279,10 @@ public sealed class CliCommandParser
         && dimension > 0;
 
     private const string RenderUsage =
-        "Usage: flow render <document> (--html <output> --width <n> --height <n> | --html-book <output-directory> [--ui-language <auto|en|pt-PT|pt-BR>])";
+        "flow render <document> (--html <output> --width <n> --height <n> | --html-book <output-directory> [--ui-language <auto|en|pt-PT|pt-BR>])";
 
     private const string ImportUsage =
-        "Usage: flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>] [--fidelity-report <fidelity.json>] [--metadata-json <metadata.json>] [--processing-json <processing.json>] [--source-map-json <source-map.json>]";
+        "flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>] [--fidelity-report <fidelity.json>] [--metadata-json <metadata.json>] [--processing-json <processing.json>] [--source-map-json <source-map.json>]";
 
-    private const string EpubInspectUsage = "Usage: flow epub-inspect <book.epub> [--json <report.json>]";
+    private const string EpubInspectUsage = "flow epub-inspect <book.epub> [--json <report.json>]";
 }

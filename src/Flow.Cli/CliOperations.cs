@@ -59,60 +59,51 @@ public sealed class CliOperations
         TextWriter output,
         TextWriter error,
         CancellationToken cancellationToken = default)
+        => await ExecuteAsync(command, output, error, new CliTextCatalog(), cancellationToken).ConfigureAwait(false);
+
+    /// <summary>Executes a parsed command with the selected human-readable output catalog.</summary>
+    public async Task<int> ExecuteAsync(
+        CliCommand command,
+        TextWriter output,
+        TextWriter error,
+        CliTextCatalog text,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
+        ArgumentNullException.ThrowIfNull(text);
 
         return command switch
         {
-            HelpCommand => await ShowHelpAsync(output).ConfigureAwait(false),
-            SampleCommand sample => await CreateSampleAsync(sample, output, cancellationToken).ConfigureAwait(false),
-            ImportEpubCommand import => await ImportEpubAsync(import, output, error, cancellationToken)
+            HelpCommand => await ShowHelpAsync(output, text).ConfigureAwait(false),
+            SampleCommand sample => await CreateSampleAsync(sample, output, text, cancellationToken).ConfigureAwait(false),
+            ImportEpubCommand import => await ImportEpubAsync(import, output, error, text, cancellationToken)
                 .ConfigureAwait(false),
-            InspectEpubCommand inspectEpub => await InspectEpubAsync(inspectEpub, output, error, cancellationToken)
+            InspectEpubCommand inspectEpub => await InspectEpubAsync(inspectEpub, output, error, text, cancellationToken)
                 .ConfigureAwait(false),
-            InspectCommand inspect => await InspectAsync(inspect, output, cancellationToken).ConfigureAwait(false),
-            ValidateCommand validate => await ValidateAsync(validate, output, cancellationToken).ConfigureAwait(false),
-            HashCommand hash => await HashAsync(hash, output, cancellationToken).ConfigureAwait(false),
-            RenderHtmlCommand render => await RenderHtmlAsync(render, output, cancellationToken).ConfigureAwait(false),
-            RenderHtmlBookCommand renderBook => await RenderHtmlBookAsync(renderBook, output, cancellationToken)
+            InspectCommand inspect => await InspectAsync(inspect, output, text, cancellationToken).ConfigureAwait(false),
+            ValidateCommand validate => await ValidateAsync(validate, output, text, cancellationToken).ConfigureAwait(false),
+            HashCommand hash => await HashAsync(hash, output, text, cancellationToken).ConfigureAwait(false),
+            RenderHtmlCommand render => await RenderHtmlAsync(render, output, text, cancellationToken).ConfigureAwait(false),
+            RenderHtmlBookCommand renderBook => await RenderHtmlBookAsync(renderBook, output, text, cancellationToken)
                 .ConfigureAwait(false),
             _ => throw new ArgumentOutOfRangeException(nameof(command), command, "Unknown CLI command."),
         };
     }
 
-    private static async Task<int> ShowHelpAsync(TextWriter output)
+    private static async Task<int> ShowHelpAsync(TextWriter output, CliTextCatalog text)
     {
-        await output.WriteLineAsync("Flow Engine .NET 0.2.0-alpha.1 (experimental)").ConfigureAwait(false);
-        await output.WriteLineAsync("The .flow.json format and all 0.x APIs may change.").ConfigureAwait(false);
-        await output.WriteLineAsync("Commands:").ConfigureAwait(false);
-        await output.WriteLineAsync("  flow sample [output]                         Create the reference .flow.json book.")
-            .ConfigureAwait(false);
-        await output.WriteLineAsync(
-                "  flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>] [--fidelity-report <fidelity.json>]")
-            .ConfigureAwait(false);
-        await output.WriteLineAsync(
-                "    [--metadata-json <metadata.json>] [--processing-json <processing.json>] [--source-map-json <source-map.json>]")
-            .ConfigureAwait(false);
-        await output.WriteLineAsync(
-                "    Without --output, the file name is derived from the imported book title.")
-            .ConfigureAwait(false);
-        await output.WriteLineAsync("  flow epub-inspect <book.epub> [--json <report.json>]")
-            .ConfigureAwait(false);
-        await output.WriteLineAsync("  flow inspect <document>                      Show semantic document counts.")
-            .ConfigureAwait(false);
-        await output.WriteLineAsync("  flow validate <document>                     Validate semantic invariants.")
-            .ConfigureAwait(false);
-        await output.WriteLineAsync("  flow hash <document>                         Compute the canonical SHA-256 hash.")
-            .ConfigureAwait(false);
-        await output.WriteLineAsync("  flow render <document> --html <output> --width <n> --height <n>")
-            .ConfigureAwait(false);
-        await output.WriteLineAsync(
-                "  flow render <document> --html-book <output-directory> [--ui-language <auto|en|pt-PT|pt-BR>]")
-            .ConfigureAwait(false);
-        await output.WriteLineAsync("Exit codes: 0 success, 1 command/input failure, 2 semantic validation failure.")
-            .ConfigureAwait(false);
+        foreach (var key in new[]
+                 {
+                     "HelpTitle", "HelpWarning", "HelpGlobalOptions", "HelpLanguage", "HelpBanner", "HelpNoColor",
+                     "HelpCommands", "HelpSample", "HelpImport1", "HelpImport2", "HelpImport3", "HelpEpubInspect",
+                     "HelpInspect", "HelpValidate", "HelpHash", "HelpRenderHtml", "HelpRenderBook", "HelpExitCodes",
+                 })
+        {
+            await output.WriteLineAsync(text.Get(key)).ConfigureAwait(false);
+        }
+
         return 0;
     }
 
@@ -120,12 +111,13 @@ public sealed class CliOperations
         InspectEpubCommand command,
         TextWriter output,
         TextWriter error,
+        CliTextCatalog text,
         CancellationToken cancellationToken)
     {
         var sourcePath = Path.GetFullPath(command.SourcePath);
         if (!string.Equals(Path.GetExtension(sourcePath), ".epub", StringComparison.OrdinalIgnoreCase))
         {
-            await error.WriteLineAsync("FLOWCLI_UNSUPPORTED_INPUT: epub-inspect accepts only .epub files.")
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_UNSUPPORTED_INPUT", "ErrorInspectOnlyEpub"))
                 .ConfigureAwait(false);
             return 1;
         }
@@ -133,18 +125,19 @@ public sealed class CliOperations
         var jsonOutputPath = command.JsonOutputPath is null ? null : Path.GetFullPath(command.JsonOutputPath);
         if (jsonOutputPath is not null && PathsEqual(sourcePath, jsonOutputPath))
         {
-            await error.WriteLineAsync("FLOWCLI_INVALID_OUTPUT: The JSON report path must differ from the EPUB source path.")
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorJsonSourceConflict"))
                 .ConfigureAwait(false);
             return 1;
         }
 
         await using var source = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
         var inspection = await _epubInspector.InspectAsync(source, cancellationToken).ConfigureAwait(false);
-        await WriteEpubInspectionAsync(inspection, sourcePath, output).ConfigureAwait(false);
+        await WriteEpubInspectionAsync(inspection, sourcePath, output, text).ConfigureAwait(false);
         await WriteEpubDiagnosticsAsync(
                 inspection.Diagnostics,
                 output,
                 error,
+                text,
                 detailsPersisted: command.JsonOutputPath is not null)
             .ConfigureAwait(false);
 
@@ -153,7 +146,7 @@ public sealed class CliOperations
             EnsureParentDirectory(jsonOutputPath);
             await WriteInspectionAtomicallyAsync(inspection, jsonOutputPath, cancellationToken)
                 .ConfigureAwait(false);
-            await output.WriteLineAsync($"JSON report: {jsonOutputPath}").ConfigureAwait(false);
+            await output.WriteLineAsync(text.Format("LabelReportJson", jsonOutputPath)).ConfigureAwait(false);
         }
 
         return inspection.IsSuccess ? 0 : 1;
@@ -162,43 +155,54 @@ public sealed class CliOperations
     private static async Task WriteEpubInspectionAsync(
         EpubPublicationInspection inspection,
         string sourcePath,
-        TextWriter output)
+        TextWriter output,
+        CliTextCatalog text)
     {
         var package = inspection.Package;
-        await output.WriteLineAsync($"EPUB inspection: {sourcePath}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Status: {(inspection.IsSuccess ? "valid" : "invalid")}")
+        var none = text.Get("ValueNone");
+        await output.WriteLineAsync(text.Format("LabelInspection", sourcePath)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelStatus", text.Get(inspection.IsSuccess ? "ValueValid" : "ValueInvalid")))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"Container: {inspection.ContainerPath}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Package: {package?.Path ?? "(unavailable)"}").ConfigureAwait(false);
-        await output.WriteLineAsync(
-                $"EPUB version: {package?.VersionFamily.ToString() ?? "Unknown"} ({package?.DeclaredVersion ?? "unknown"})")
+        await output.WriteLineAsync(text.Format("LabelContainer", inspection.ContainerPath)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelPackage", package?.Path ?? text.Get("ValueUnavailable")))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"Title: {package?.Title ?? "(none)"}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Identifier: {package?.Identifier ?? "(none)"}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Language: {package?.Language ?? "(none)"}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Creators: {string.Join(", ", package?.Creators ?? [])}")
+        await output.WriteLineAsync(text.Format(
+                "LabelEpubVersion",
+                package?.VersionFamily.ToString() ?? text.Get("ValueUnknown"),
+                package?.DeclaredVersion ?? text.Get("ValueUnknown")))
             .ConfigureAwait(false);
-        await output.WriteLineAsync(
-                $"Manifest items: {inspection.Resources.ManifestItemCount.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("LabelTitle", package?.Title ?? none)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelIdentifier", package?.Identifier ?? none)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelLanguage", package?.Language ?? none)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelCreators", string.Join(", ", package?.Creators ?? [])))
             .ConfigureAwait(false);
-        await output.WriteLineAsync(
-                $"Spine items: {inspection.Spine.Length.ToString(CultureInfo.InvariantCulture)} "
-                + $"(linear {inspection.Spine.Count(static item => item.IsLinear).ToString(CultureInfo.InvariantCulture)}, "
-                + $"non-linear {inspection.Spine.Count(static item => !item.IsLinear).ToString(CultureInfo.InvariantCulture)})")
+        await output.WriteLineAsync(text.Format(
+                "LabelManifestItems",
+                inspection.Resources.ManifestItemCount.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync(
-                $"Navigation documents: {inspection.NavigationDocumentPaths.Length.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format(
+                "LabelSpineItems",
+                inspection.Spine.Length.ToString(CultureInfo.InvariantCulture),
+                inspection.Spine.Count(static item => item.IsLinear).ToString(CultureInfo.InvariantCulture),
+                inspection.Spine.Count(static item => !item.IsLinear).ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync(
-                $"Archive entries: {inspection.Resources.ArchiveEntryCount.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format(
+                "LabelNavigationDocuments",
+                inspection.NavigationDocumentPaths.Length.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync(
-                $"Compressed bytes: {inspection.Resources.TotalCompressedBytes.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format(
+                "LabelArchiveEntries",
+                inspection.Resources.ArchiveEntryCount.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync(
-                $"Uncompressed bytes: {inspection.Resources.TotalUncompressedBytes.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format(
+                "LabelCompressedBytes",
+                inspection.Resources.TotalCompressedBytes.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync("Resource types:").ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format(
+                "LabelUncompressedBytes",
+                inspection.Resources.TotalUncompressedBytes.ToString(CultureInfo.InvariantCulture)))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Get("LabelResourceTypes")).ConfigureAwait(false);
         foreach (var (mediaType, count) in inspection.Resources.MediaTypeCounts)
         {
             await output.WriteLineAsync($"  {mediaType}: {count.ToString(CultureInfo.InvariantCulture)}")
@@ -210,6 +214,7 @@ public sealed class CliOperations
         ImportEpubCommand command,
         TextWriter output,
         TextWriter error,
+        CliTextCatalog text,
         CancellationToken cancellationToken)
     {
         var sourcePath = Path.GetFullPath(command.SourcePath);
@@ -231,38 +236,35 @@ public sealed class CliOperations
             : Path.GetFullPath(command.SourceMapJsonOutputPath);
         if (!string.Equals(Path.GetExtension(sourcePath), ".epub", StringComparison.OrdinalIgnoreCase))
         {
-            await error.WriteLineAsync("FLOWCLI_UNSUPPORTED_INPUT: The import command currently accepts only .epub files.")
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_UNSUPPORTED_INPUT", "ErrorImportOnlyEpub"))
                 .ConfigureAwait(false);
             return 1;
         }
 
         if (outputPath is not null && PathsEqual(sourcePath, outputPath))
         {
-            await error.WriteLineAsync("FLOWCLI_INVALID_OUTPUT: The output path must differ from the EPUB source path.")
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorOutputSourceConflict"))
                 .ConfigureAwait(false);
             return 1;
         }
 
         if (diagnosticsPath is not null && PathsEqual(sourcePath, diagnosticsPath))
         {
-            await error.WriteLineAsync(
-                    "FLOWCLI_INVALID_OUTPUT: The diagnostics report path must differ from the EPUB source path.")
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorDiagnosticSourceConflict"))
                 .ConfigureAwait(false);
             return 1;
         }
 
         if (fidelityPath is not null && PathsEqual(sourcePath, fidelityPath))
         {
-            await error.WriteLineAsync(
-                    "FLOWCLI_INVALID_OUTPUT: The fidelity report path must differ from the EPUB source path.")
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorFidelitySourceConflict"))
                 .ConfigureAwait(false);
             return 1;
         }
 
         if (outputPath is not null && diagnosticsPath is not null && PathsEqual(outputPath, diagnosticsPath))
         {
-            await error.WriteLineAsync(
-                    "FLOWCLI_INVALID_OUTPUT: The Flow document and diagnostics report must use different paths.")
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorDocumentDiagnosticsConflict"))
                 .ConfigureAwait(false);
             return 1;
         }
@@ -271,8 +273,7 @@ public sealed class CliOperations
             && ((outputPath is not null && PathsEqual(outputPath, fidelityPath))
                 || (diagnosticsPath is not null && PathsEqual(diagnosticsPath, fidelityPath))))
         {
-            await error.WriteLineAsync(
-                    "FLOWCLI_INVALID_OUTPUT: The fidelity report must use a path different from every other output.")
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorFidelityOutputConflict"))
                 .ConfigureAwait(false);
             return 1;
         }
@@ -285,7 +286,8 @@ public sealed class CliOperations
                 metadataPath,
                 processingPath,
                 sourceMapPath,
-                error).ConfigureAwait(false))
+                error,
+                text).ConfigureAwait(false))
         {
             return 1;
         }
@@ -303,8 +305,7 @@ public sealed class CliOperations
 
         if (outputPath is not null && diagnosticsPath is not null && PathsEqual(outputPath, diagnosticsPath))
         {
-            await error.WriteLineAsync(
-                    "FLOWCLI_INVALID_OUTPUT: The Flow document and diagnostics report must use different paths.")
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorDocumentDiagnosticsConflict"))
                 .ConfigureAwait(false);
             return 1;
         }
@@ -313,8 +314,7 @@ public sealed class CliOperations
             && ((outputPath is not null && PathsEqual(outputPath, fidelityPath))
                 || (diagnosticsPath is not null && PathsEqual(diagnosticsPath, fidelityPath))))
         {
-            await error.WriteLineAsync(
-                    "FLOWCLI_INVALID_OUTPUT: The fidelity report must use a path different from every other output.")
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorFidelityOutputConflict"))
                 .ConfigureAwait(false);
             return 1;
         }
@@ -328,7 +328,8 @@ public sealed class CliOperations
                 metadataPath,
                 processingPath,
                 sourceMapPath,
-                error).ConfigureAwait(false))
+                error,
+                text).ConfigureAwait(false))
         {
             return 1;
         }
@@ -338,7 +339,7 @@ public sealed class CliOperations
             EnsureParentDirectory(diagnosticsPath);
             await WriteImportDiagnosticsAtomicallyAsync(import, diagnosticsPath, cancellationToken)
                 .ConfigureAwait(false);
-            await output.WriteLineAsync($"Diagnostics JSON: {diagnosticsPath}").ConfigureAwait(false);
+            await output.WriteLineAsync(text.Format("LabelDiagnosticsJson", diagnosticsPath)).ConfigureAwait(false);
         }
 
         if (fidelityPath is not null)
@@ -351,7 +352,7 @@ public sealed class CliOperations
             EnsureParentDirectory(fidelityPath);
             await WriteFidelityReportAtomicallyAsync(fidelity, fidelityPath, cancellationToken)
                 .ConfigureAwait(false);
-            await output.WriteLineAsync($"Fidelity report: {fidelityPath}").ConfigureAwait(false);
+            await output.WriteLineAsync(text.Format("LabelFidelityReport", fidelityPath)).ConfigureAwait(false);
         }
 
         await WriteImportEvidenceSidecarsAsync(
@@ -360,6 +361,7 @@ public sealed class CliOperations
                 processingPath,
                 sourceMapPath,
                 output,
+                text,
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -367,20 +369,21 @@ public sealed class CliOperations
                 import.Diagnostics,
                 output,
                 error,
+                text,
                 detailsPersisted: diagnosticsPath is not null)
             .ConfigureAwait(false);
 
         if (!import.IsSuccess || import.Document is null)
         {
-            await WriteImportMetricsAsync(pipelineMetrics, output).ConfigureAwait(false);
-            await error.WriteLineAsync("FLOWCLI_EPUB_IMPORT_FAILED: No complete Flow document was written.")
+            await WriteImportMetricsAsync(pipelineMetrics, output, text).ConfigureAwait(false);
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_EPUB_IMPORT_FAILED", "ErrorImportFailed"))
                 .ConfigureAwait(false);
             return 1;
         }
 
         if (outputPath is null)
         {
-            throw new InvalidOperationException("A successful EPUB import did not produce an output path.");
+            throw new CliOperationException("ErrorImportOutputMissing");
         }
 
         var validation = _validator.Validate(import.Document);
@@ -390,11 +393,12 @@ public sealed class CliOperations
             {
                 var location = diagnostic.NodeId is null ? string.Empty : $" [{diagnostic.NodeId}]";
                 await error.WriteLineAsync(
-                        $"{diagnostic.Severity} {diagnostic.Code}{location}: {diagnostic.Message}")
+                        $"{text.Severity(diagnostic.Severity.ToString())} {diagnostic.Code}{location}: "
+                        + text.DiagnosticMessage(diagnostic.Code, diagnostic.Message))
                     .ConfigureAwait(false);
             }
 
-            await error.WriteLineAsync("FLOWCLI_EPUB_DOCUMENT_INVALID: The imported document was not written.")
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_EPUB_DOCUMENT_INVALID", "ErrorImportedDocumentInvalid"))
                 .ConfigureAwait(false);
             return 2;
         }
@@ -407,24 +411,27 @@ public sealed class CliOperations
             .WithOutputSizes(new FileInfo(outputPath).Length, null, null);
 
         var hash = _integrityService.ComputeHash(import.Document);
-        await output.WriteLineAsync($"Imported EPUB: {sourcePath}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Flow document: {outputPath}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Title: {import.Document.Metadata.Title}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Document ID: {import.Document.Identity.Id}").ConfigureAwait(false);
-        await output.WriteLineAsync(
-                $"Nodes: {import.Document.Index.NodeCount.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("LabelImportedEpub", sourcePath)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelFlowDocument", outputPath)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelTitle", import.Document.Metadata.Title)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelDocumentId", import.Document.Identity.Id)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format(
+                "LabelNodes",
+                import.Document.Index.NodeCount.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync(
-                $"Assets: {import.Document.Assets.Count.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format(
+                "LabelAssets",
+                import.Document.Assets.Count.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await WriteHashAsync(output, hash).ConfigureAwait(false);
-        await WriteImportMetricsAsync(pipelineMetrics, output).ConfigureAwait(false);
+        await WriteHashAsync(output, hash, text).ConfigureAwait(false);
+        await WriteImportMetricsAsync(pipelineMetrics, output, text).ConfigureAwait(false);
         return 0;
     }
 
     private async Task<int> CreateSampleAsync(
         SampleCommand command,
         TextWriter output,
+        CliTextCatalog text,
         CancellationToken cancellationToken)
     {
         var path = Path.GetFullPath(command.OutputPath);
@@ -434,39 +441,41 @@ public sealed class CliOperations
             await _serializer.SerializeAsync(SampleBookFactory.Create(), stream, cancellationToken).ConfigureAwait(false);
         }
 
-        await output.WriteLineAsync($"Sample written: {path}").ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelSampleWritten", path)).ConfigureAwait(false);
         return 0;
     }
 
     private async Task<int> InspectAsync(
         InspectCommand command,
         TextWriter output,
+        CliTextCatalog text,
         CancellationToken cancellationToken)
     {
         var document = await ReadDocumentAsync(command.DocumentPath, cancellationToken).ConfigureAwait(false);
-        await output.WriteLineAsync($"ID: {document.Identity.Id}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Version: {document.Identity.Version ?? "(none)"}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Title: {document.Metadata.Title}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Subtitle: {document.Metadata.Subtitle ?? "(none)"}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Language: {document.Metadata.Language ?? "(none)"}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Authors: {string.Join(", ", document.Metadata.Authors)}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Nodes: {document.Index.NodeCount.ToString(CultureInfo.InvariantCulture)}")
+        var none = text.Get("ValueNone");
+        await output.WriteLineAsync(text.Format("LabelId", document.Identity.Id)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelVersion", document.Identity.Version ?? none)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelTitle", document.Metadata.Title)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelSubtitle", document.Metadata.Subtitle ?? none)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelLanguage", document.Metadata.Language ?? none)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelAuthors", string.Join(", ", document.Metadata.Authors))).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelNodes", document.Index.NodeCount.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"Chapters: {document.Content.Children.Count(static node => node is Chapter).ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("LabelChapters", document.Content.Children.Count(static node => node is Chapter).ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"Sections: {CountNodes<Section>(document).ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("LabelSections", CountNodes<Section>(document).ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"Paragraphs: {CountNodes<Paragraph>(document).ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("LabelParagraphs", CountNodes<Paragraph>(document).ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"Figures: {CountNodes<Figure>(document).ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("LabelFigures", CountNodes<Figure>(document).ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"Footnotes: {CountNodes<Footnote>(document).ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("LabelFootnotes", CountNodes<Footnote>(document).ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"Assets: {document.Assets.Count.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("LabelAssets", document.Assets.Count.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"Anchors: {document.Index.NodeCount.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("LabelAnchors", document.Index.NodeCount.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"Presentation: {(document.Presentation is null ? "no" : "yes")}")
+        await output.WriteLineAsync(text.Format("LabelPresentation", text.Get(document.Presentation is null ? "ValueNo" : "ValueYes")))
             .ConfigureAwait(false);
         return 0;
     }
@@ -474,20 +483,23 @@ public sealed class CliOperations
     private async Task<int> ValidateAsync(
         ValidateCommand command,
         TextWriter output,
+        CliTextCatalog text,
         CancellationToken cancellationToken)
     {
         var document = await ReadDocumentAsync(command.DocumentPath, cancellationToken).ConfigureAwait(false);
         var validation = _validator.Validate(document);
         if (validation.IsValid)
         {
-            await output.WriteLineAsync("Valid: no semantic validation errors.").ConfigureAwait(false);
+            await output.WriteLineAsync(text.Get("ValidationValid")).ConfigureAwait(false);
             return 0;
         }
 
         foreach (var diagnostic in validation.Diagnostics)
         {
             var location = diagnostic.NodeId is null ? string.Empty : $" [{diagnostic.NodeId}]";
-            await output.WriteLineAsync($"{diagnostic.Severity} {diagnostic.Code}{location}: {diagnostic.Message}")
+            await output.WriteLineAsync(
+                    $"{text.Severity(diagnostic.Severity.ToString())} {diagnostic.Code}{location}: "
+                    + text.DiagnosticMessage(diagnostic.Code, diagnostic.Message))
                 .ConfigureAwait(false);
         }
 
@@ -497,17 +509,19 @@ public sealed class CliOperations
     private async Task<int> HashAsync(
         HashCommand command,
         TextWriter output,
+        CliTextCatalog text,
         CancellationToken cancellationToken)
     {
         var document = await ReadDocumentAsync(command.DocumentPath, cancellationToken).ConfigureAwait(false);
         var hash = _integrityService.ComputeHash(document);
-        await WriteHashAsync(output, hash).ConfigureAwait(false);
+        await WriteHashAsync(output, hash, text).ConfigureAwait(false);
         return 0;
     }
 
     private async Task<int> RenderHtmlAsync(
         RenderHtmlCommand command,
         TextWriter output,
+        CliTextCatalog text,
         CancellationToken cancellationToken)
     {
         var document = await ReadDocumentAsync(command.DocumentPath, cancellationToken).ConfigureAwait(false);
@@ -525,13 +539,16 @@ public sealed class CliOperations
         rendered.WriteTo(outputPath);
 
         var hash = _integrityService.ComputeHash(document);
-        await output.WriteLineAsync($"Rendered: {outputPath}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Document ID: {document.Identity.Id}").ConfigureAwait(false);
-        await WriteHashAsync(output, hash).ConfigureAwait(false);
-        await output.WriteLineAsync($"Anchors: {document.Index.NodeCount.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("LabelRendered", outputPath)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelDocumentId", document.Identity.Id)).ConfigureAwait(false);
+        await WriteHashAsync(output, hash, text).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelAnchors", document.Index.NodeCount.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync(
-                $"Viewport: {CssNumber(command.ViewportWidth)}x{CssNumber(command.ViewportHeight)} ({layout.Profile.ViewportCategory})")
+        await output.WriteLineAsync(text.Format(
+                "LabelViewport",
+                CssNumber(command.ViewportWidth),
+                CssNumber(command.ViewportHeight),
+                layout.Profile.ViewportCategory))
             .ConfigureAwait(false);
         return 0;
     }
@@ -539,6 +556,7 @@ public sealed class CliOperations
     private async Task<int> RenderHtmlBookAsync(
         RenderHtmlBookCommand command,
         TextWriter output,
+        CliTextCatalog text,
         CancellationToken cancellationToken)
     {
         const double width = 1024;
@@ -566,61 +584,71 @@ public sealed class CliOperations
         var writingStarted = Stopwatch.GetTimestamp();
         await WriteHtmlBookPackageAtomicallyAsync(package, outputDirectory, cancellationToken).ConfigureAwait(false);
         var writingDuration = Stopwatch.GetElapsedTime(writingStarted);
-        await output.WriteLineAsync($"HTML book: {outputDirectory}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Entry: {Path.Combine(outputDirectory, "index.html")}").ConfigureAwait(false);
-        await output.WriteLineAsync($"UI language: {UiLanguageName(command.UiLanguage, document.Metadata.Language)}")
+        await output.WriteLineAsync(text.Format("LabelHtmlBook", outputDirectory)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelEntry", Path.Combine(outputDirectory, "index.html")))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"Document ID: {document.Identity.Id}").ConfigureAwait(false);
-        await WriteHashAsync(output, hash).ConfigureAwait(false);
-        await output.WriteLineAsync(
-                $"Files: {package.Files.Length.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("LabelUiLanguage", UiLanguageName(command.UiLanguage, document.Metadata.Language)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync(
-                $"Chapters: {package.Files.Count(static file => file.Path.StartsWith("chapters/", StringComparison.Ordinal)).ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("LabelDocumentId", document.Identity.Id)).ConfigureAwait(false);
+        await WriteHashAsync(output, hash, text).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format(
+                "LabelFiles",
+                package.Files.Length.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync(
-                $"HTML bytes: {package.Files.Sum(static file => (long)file.Content.Length).ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format(
+                "LabelChapters",
+                package.Files.Count(static file => file.Path.StartsWith("chapters/", StringComparison.Ordinal)).ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"Render duration ms: {Milliseconds(renderingDuration)}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Write duration ms: {Milliseconds(writingDuration)}").ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format(
+                "LabelHtmlBytes",
+                package.Files.Sum(static file => (long)file.Content.Length).ToString(CultureInfo.InvariantCulture)))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelRenderDuration", Milliseconds(renderingDuration)))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelWriteDuration", Milliseconds(writingDuration)))
+            .ConfigureAwait(false);
         return 0;
     }
 
-    private static async Task WriteImportMetricsAsync(EpubImportMetrics? metrics, TextWriter output)
+    private static async Task WriteImportMetricsAsync(
+        EpubImportMetrics? metrics,
+        TextWriter output,
+        CliTextCatalog text)
     {
         if (metrics is null)
         {
             return;
         }
 
-        await output.WriteLineAsync("Import metrics (noncanonical):").ConfigureAwait(false);
-        await output.WriteLineAsync($"  Total duration ms: {Milliseconds(metrics.TotalDuration)}").ConfigureAwait(false);
-        await output.WriteLineAsync($"  Archive entries: {metrics.ArchiveEntryCount.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Get("MetricsTitle")).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("MetricsTotalDuration", Milliseconds(metrics.TotalDuration))).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("MetricsArchiveEntries", metrics.ArchiveEntryCount.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"  Compressed bytes: {metrics.CompressedBytes.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("MetricsCompressedBytes", metrics.CompressedBytes.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"  Uncompressed bytes: {metrics.UncompressedBytes.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("MetricsUncompressedBytes", metrics.UncompressedBytes.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"  Asset bytes: {metrics.AssetBytes.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("MetricsAssetBytes", metrics.AssetBytes.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"  Spine documents: {metrics.SpineDocumentsProcessed.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("MetricsSpineDocuments", metrics.SpineDocumentsProcessed.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"  Nodes: {metrics.NodesProduced.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("MetricsNodes", metrics.NodesProduced.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync($"  Characters: {metrics.CharactersProduced.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format("MetricsCharacters", metrics.CharactersProduced.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync(
-                $"  Approximate peak managed bytes: {metrics.ApproximatePeakManagedBytes.ToString(CultureInfo.InvariantCulture)}")
+        await output.WriteLineAsync(text.Format(
+                "MetricsPeakManagedBytes",
+                metrics.ApproximatePeakManagedBytes.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
         if (metrics.FlowJsonBytes is not null)
         {
-            await output.WriteLineAsync($"  Flow JSON bytes: {metrics.FlowJsonBytes.Value.ToString(CultureInfo.InvariantCulture)}")
+            await output.WriteLineAsync(text.Format("MetricsFlowJsonBytes", metrics.FlowJsonBytes.Value.ToString(CultureInfo.InvariantCulture)))
                 .ConfigureAwait(false);
         }
 
         foreach (var timing in metrics.PhaseTimings)
         {
-            await output.WriteLineAsync($"  Phase {timing.Phase}: {Milliseconds(timing.Duration)} ms")
+            await output.WriteLineAsync(text.Format("MetricsPhase", timing.Phase, Milliseconds(timing.Duration)))
                 .ConfigureAwait(false);
         }
     }
@@ -786,6 +814,7 @@ public sealed class CliOperations
         string? processingPath,
         string? sourceMapPath,
         TextWriter output,
+        CliTextCatalog text,
         CancellationToken cancellationToken)
     {
         if (metadataPath is not null)
@@ -797,7 +826,7 @@ public sealed class CliOperations
                     EpubImportEvidenceJsonWriter.WriteMetadataAsync,
                     cancellationToken)
                 .ConfigureAwait(false);
-            await output.WriteLineAsync($"Metadata JSON: {metadataPath}").ConfigureAwait(false);
+            await output.WriteLineAsync(text.Format("LabelMetadataJson", metadataPath)).ConfigureAwait(false);
         }
 
         if (processingPath is not null)
@@ -809,7 +838,7 @@ public sealed class CliOperations
                     EpubImportEvidenceJsonWriter.WriteProcessingAsync,
                     cancellationToken)
                 .ConfigureAwait(false);
-            await output.WriteLineAsync($"Processing JSON: {processingPath}").ConfigureAwait(false);
+            await output.WriteLineAsync(text.Format("LabelProcessingJson", processingPath)).ConfigureAwait(false);
         }
 
         if (sourceMapPath is not null)
@@ -821,7 +850,7 @@ public sealed class CliOperations
                     EpubImportEvidenceJsonWriter.WriteSourceMapAsync,
                     cancellationToken)
                 .ConfigureAwait(false);
-            await output.WriteLineAsync($"Source map JSON: {sourceMapPath}").ConfigureAwait(false);
+            await output.WriteLineAsync(text.Format("LabelSourceMapJson", sourceMapPath)).ConfigureAwait(false);
         }
     }
 
@@ -862,7 +891,8 @@ public sealed class CliOperations
         string? metadataPath,
         string? processingPath,
         string? sourceMapPath,
-        TextWriter error)
+        TextWriter error,
+        CliTextCatalog text)
     {
         var evidenceOutputs = new (string Option, string? Path)[]
         {
@@ -874,8 +904,10 @@ public sealed class CliOperations
         {
             if (item.Path is not null && PathsEqual(sourcePath, item.Path))
             {
-                await error.WriteLineAsync(
-                        $"FLOWCLI_INVALID_OUTPUT: The {item.Option} report path must differ from the EPUB source path.")
+                await error.WriteLineAsync(text.Diagnostic(
+                        "FLOWCLI_INVALID_OUTPUT",
+                        "ErrorEvidenceSourceConflict",
+                        item.Option))
                     .ConfigureAwait(false);
                 return false;
             }
@@ -901,8 +933,11 @@ public sealed class CliOperations
             {
                 if (outputs[right].Path is not null && PathsEqual(outputs[left].Path!, outputs[right].Path!))
                 {
-                    await error.WriteLineAsync(
-                            $"FLOWCLI_INVALID_OUTPUT: {outputs[left].Option} and {outputs[right].Option} must use different paths.")
+                    await error.WriteLineAsync(text.Diagnostic(
+                            "FLOWCLI_INVALID_OUTPUT",
+                            "ErrorOutputConflict",
+                            outputs[left].Option,
+                            outputs[right].Option))
                         .ConfigureAwait(false);
                     return false;
                 }
@@ -918,7 +953,7 @@ public sealed class CliOperations
         CancellationToken cancellationToken)
     {
         var parent = Path.GetDirectoryName(outputDirectory)
-            ?? throw new ArgumentException("The HTML book output must have a parent directory.", nameof(outputDirectory));
+            ?? throw new CliOperationException("ErrorHtmlBookParentRequired");
         Directory.CreateDirectory(parent);
         if (Directory.Exists(outputDirectory))
         {
@@ -994,12 +1029,12 @@ public sealed class CliOperations
                 Path.TrimEndingDirectorySeparator(outputDirectory),
                 Path.TrimEndingDirectorySeparator(root)))
         {
-            throw new ArgumentException("The HTML book output cannot be a filesystem root.", nameof(outputDirectory));
+            throw new CliOperationException("ErrorHtmlBookFilesystemRoot");
         }
 
         if (File.Exists(outputDirectory))
         {
-            throw new ArgumentException("The HTML book output path points to an existing file.", nameof(outputDirectory));
+            throw new CliOperationException("ErrorHtmlBookExistingFile");
         }
 
         var outputPrefix = Path.TrimEndingDirectorySeparator(outputDirectory) + Path.DirectorySeparatorChar;
@@ -1007,13 +1042,13 @@ public sealed class CliOperations
                 outputPrefix,
                 OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
         {
-            throw new ArgumentException("The HTML book output cannot contain its source document.", nameof(outputDirectory));
+            throw new CliOperationException("ErrorHtmlBookContainsSource");
         }
 
         if (Directory.Exists(outputDirectory)
             && (File.GetAttributes(outputDirectory) & FileAttributes.ReparsePoint) != 0)
         {
-            throw new ArgumentException("The HTML book output cannot be a symbolic link or reparse point.", nameof(outputDirectory));
+            throw new CliOperationException("ErrorHtmlBookReparsePoint");
         }
     }
 
@@ -1021,13 +1056,13 @@ public sealed class CliOperations
     {
         if (ContainsReparsePoint(outputDirectory))
         {
-            throw new IOException("An existing HTML book directory contains a symbolic link or reparse point.");
+            throw new CliOperationException("ErrorHtmlBookExistingReparsePoint");
         }
 
         var manifestPath = Path.Combine(outputDirectory, "manifest.json");
         if (!File.Exists(manifestPath))
         {
-            throw new IOException("An existing output directory is not a replaceable Flow HTML book.");
+            throw new CliOperationException("ErrorHtmlBookNotReplaceable");
         }
 
         try
@@ -1035,12 +1070,12 @@ public sealed class CliOperations
             using var manifest = JsonDocument.Parse(File.ReadAllBytes(manifestPath));
             if (manifest.RootElement.GetProperty("format").GetString() != HtmlBookPackage.Format)
             {
-                throw new IOException("An existing output directory is not a replaceable Flow HTML book.");
+                throw new CliOperationException("ErrorHtmlBookNotReplaceable");
             }
         }
         catch (Exception exception) when (exception is JsonException or KeyNotFoundException or InvalidOperationException)
         {
-            throw new IOException("An existing output directory has an invalid Flow HTML book manifest.", exception);
+            throw new CliOperationException("ErrorHtmlBookInvalidManifest", exception);
         }
     }
 
@@ -1076,7 +1111,7 @@ public sealed class CliOperations
                 prefix,
                 OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
         {
-            throw new IOException($"Unsafe HTML book package path '{packagePath}'.");
+            throw new CliOperationException("ErrorHtmlBookUnsafePackagePath", packagePath);
         }
 
         return target;
@@ -1086,6 +1121,7 @@ public sealed class CliOperations
         IEnumerable<EpubDiagnostic> diagnostics,
         TextWriter output,
         TextWriter error,
+        CliTextCatalog text,
         bool detailsPersisted = false)
     {
         const int maximumPersistedDetailsOnConsole = 40;
@@ -1098,17 +1134,19 @@ public sealed class CliOperations
         var information = items.Count(static item => item.Severity == EpubDiagnosticSeverity.Information);
         var warnings = items.Count(static item => item.Severity == EpubDiagnosticSeverity.Warning);
         var errors = items.Count(static item => item.Severity == EpubDiagnosticSeverity.Error);
-        await output.WriteLineAsync(
-                $"Diagnostics: {information.ToString(CultureInfo.InvariantCulture)} information, "
-                + $"{warnings.ToString(CultureInfo.InvariantCulture)} warnings, "
-                + $"{errors.ToString(CultureInfo.InvariantCulture)} errors.")
+        await output.WriteLineAsync(text.Format(
+                "DiagnosticsSummary",
+                information.ToString(CultureInfo.InvariantCulture),
+                warnings.ToString(CultureInfo.InvariantCulture),
+                errors.ToString(CultureInfo.InvariantCulture)))
             .ConfigureAwait(false);
-        await output.WriteLineAsync(
-                "Diagnostic codes: " + string.Join(
+        await output.WriteLineAsync(text.Format(
+                "DiagnosticsCodes",
+                string.Join(
                     ", ",
                     items.GroupBy(static item => item.Code, StringComparer.Ordinal)
                         .OrderBy(static group => group.Key, StringComparer.Ordinal)
-                        .Select(static group => $"{group.Key}={group.Count().ToString(CultureInfo.InvariantCulture)}")))
+                        .Select(static group => $"{group.Key}={group.Count().ToString(CultureInfo.InvariantCulture)}"))))
             .ConfigureAwait(false);
 
         var visible = items.AsEnumerable();
@@ -1125,16 +1163,18 @@ public sealed class CliOperations
         {
             visibleCount++;
             var resource = diagnostic.Resource is null ? string.Empty : $" [{diagnostic.Resource}]";
-            var line = $"{diagnostic.Severity} {diagnostic.Code}{resource}: {diagnostic.Message}";
+            var line = $"{text.Severity(diagnostic.Severity.ToString())} {diagnostic.Code}{resource}: "
+                       + text.DiagnosticMessage(diagnostic.Code, diagnostic.Message);
             var writer = diagnostic.Severity == EpubDiagnosticSeverity.Information ? output : error;
             await writer.WriteLineAsync(line).ConfigureAwait(false);
         }
 
         if (visibleCount < items.Length)
         {
-            await output.WriteLineAsync(
-                    $"Console detail limited to {visibleCount.ToString(CultureInfo.InvariantCulture)} of "
-                    + $"{items.Length.ToString(CultureInfo.InvariantCulture)} diagnostics; the JSON report contains every item.")
+            await output.WriteLineAsync(text.Format(
+                    "DiagnosticsLimited",
+                    visibleCount.ToString(CultureInfo.InvariantCulture),
+                    items.Length.ToString(CultureInfo.InvariantCulture)))
                 .ConfigureAwait(false);
         }
     }
@@ -1145,10 +1185,11 @@ public sealed class CliOperations
             right,
             OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
-    private static async Task WriteHashAsync(TextWriter output, DocumentHash hash)
+    private static async Task WriteHashAsync(TextWriter output, DocumentHash hash, CliTextCatalog text)
     {
-        await output.WriteLineAsync($"Hash: {hash.Algorithm}:{hash.Hash}").ConfigureAwait(false);
-        await output.WriteLineAsync($"Canonicalization: {hash.CanonicalizationVersion}").ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelHash", hash.Algorithm, hash.Hash)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelCanonicalization", hash.CanonicalizationVersion))
+            .ConfigureAwait(false);
     }
 
     private static DeviceClass GetDeviceClass(double width) => width switch

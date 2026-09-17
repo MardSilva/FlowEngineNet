@@ -38,15 +38,20 @@ public sealed record RenderHtmlBookCommand(
 
 public sealed record CommandParseResult
 {
-    private CommandParseResult(CliCommand? command, string? error)
+    private readonly string? legacyError;
+
+    private CommandParseResult(CliCommand? command, CliParseDiagnostic? diagnostic, string? legacyError = null)
     {
         Command = command;
-        Error = error;
+        Diagnostic = diagnostic;
+        this.legacyError = legacyError;
     }
 
     public CliCommand? Command { get; }
 
-    public string? Error { get; }
+    public CliParseDiagnostic? Diagnostic { get; }
+
+    public string? Error => legacyError ?? Diagnostic?.Format(new CliTextCatalog());
 
     public bool IsSuccess => Command is not null;
 
@@ -56,9 +61,22 @@ public sealed record CommandParseResult
         return new CommandParseResult(command, null);
     }
 
+    public static CommandParseResult Failure(string code, string resourceKey, params object?[] arguments)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(code);
+        ArgumentException.ThrowIfNullOrWhiteSpace(resourceKey);
+        return new CommandParseResult(null, new CliParseDiagnostic(code, resourceKey, arguments));
+    }
+
+    /// <summary>Creates a legacy literal parse failure. New parsers should use the structured overload.</summary>
     public static CommandParseResult Failure(string error)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(error);
-        return new CommandParseResult(null, error);
+        return new CommandParseResult(null, null, error);
     }
+}
+
+public sealed record CliParseDiagnostic(string Code, string ResourceKey, IReadOnlyList<object?> Arguments)
+{
+    public string Format(CliTextCatalog text) => text.Diagnostic(Code, ResourceKey, Arguments.ToArray());
 }

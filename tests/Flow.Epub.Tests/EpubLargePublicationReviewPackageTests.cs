@@ -26,6 +26,11 @@ public sealed class EpubLargePublicationReviewPackageTests
         Assert.True(File.Exists(Path.Combine(output, "mobile", "index.html")));
         Assert.True(File.Exists(Path.Combine(output, "desktop", "index.html")));
         Assert.True(File.Exists(Path.Combine(output, "review.html")));
+        var reviewHtml = await File.ReadAllTextAsync(Path.Combine(output, "review.html"));
+        Assert.Contains("<html lang=\"pt-BR\">", reviewHtml, StringComparison.Ordinal);
+        Assert.Contains("Revis&#xE3;o de EPUB do Flow", reviewHtml, StringComparison.Ordinal);
+        Assert.Contains("Amostras de cap&#xED;tulos", reviewHtml, StringComparison.Ordinal);
+        Assert.Contains(">celular</a>", reviewHtml, StringComparison.Ordinal);
         Assert.Equal(
             new[]
             {
@@ -87,6 +92,30 @@ public sealed class EpubLargePublicationReviewPackageTests
             firstFiles.Where(static pair => pair.Key.EndsWith(".json", StringComparison.Ordinal))
                 .Select(static pair => Encoding.UTF8.GetString(pair.Value)),
             text => text.Contains(workspace.Path, StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task EnglishReviewPage_UsesEnglishCatalogWithoutChangingStableTargets()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var bytes = EpubCorpusFixtureFactory.CreateLargeGateFixture(20);
+        var candidate = workspace.AddCandidate("english-review", bytes);
+        var output = Path.Combine(workspace.Path, "english");
+
+        await CreateGenerator().GenerateAsync(
+            candidate,
+            Options(
+                candidate,
+                bytes,
+                output,
+                workspace.RepositoryRoot,
+                HtmlBookUiLanguage.English));
+
+        var reviewHtml = await File.ReadAllTextAsync(Path.Combine(output, "review.html"));
+        Assert.Contains("<html lang=\"en-US\">", reviewHtml, StringComparison.Ordinal);
+        Assert.Contains("Flow EPUB review", reviewHtml, StringComparison.Ordinal);
+        Assert.Contains("Chapter samples", reviewHtml, StringComparison.Ordinal);
+        Assert.Contains("mobile/chapters/", reviewHtml, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -208,12 +237,13 @@ public sealed class EpubLargePublicationReviewPackageTests
         EpubLargePublicationCandidate candidate,
         byte[] bytes,
         string output,
-        string repositoryRoot) => new(
+        string repositoryRoot,
+        HtmlBookUiLanguage uiLanguage = HtmlBookUiLanguage.PortugueseBrazil) => new(
         candidate.Id,
         new EpubCorpusSha256(Convert.ToHexString(SHA256.HashData(bytes))),
         output,
         repositoryRoot,
-        HtmlBookUiLanguage.PortugueseBrazil);
+        uiLanguage);
 
     private static SortedDictionary<string, byte[]> ReadTree(string root) => Directory
         .EnumerateFiles(root, "*", SearchOption.AllDirectories)

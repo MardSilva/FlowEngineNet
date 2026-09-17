@@ -208,9 +208,18 @@ The real EPUB cycle now follows these increments:
 
 The EPUB work now includes measured progress and cancellation, a deterministic legal-corpus catalog, bounded offline discovery, end-to-end execution, optional local EPUBCheck evidence, reviewed baselines for three project-owned fixtures, a typed structural/reference audit, and transactional material for assisted local review. The review package provides mobile and desktop HTML, beginning/middle/end samples, feature shortcuts, hashes and a separate human checklist without copying licensed material into Git. After the first local large-publication run exposed missing inline images and approximate reference evidence, the importer began preserving those images as ordered figures and the auditor began classifying links through their nearest mapped semantic ancestor. Two final automatic runs on the same verified input produced identical stable evidence, reconciled all 56 image occurrences, classified and resolved all 146 internal links, and resolved all 120 footnote backlinks. A focused renderer correction then contained covers, figures, long headings and tables within the reading surface, gave wide tables their own scroll region, and made note targets visible. Human review passed the beginning, middle, end, TOC, images, links, notes and tables at an exact 390 x 844 CSS-pixel viewport and at 1600 x 1000. This is evidence for one verified real publication, not a universal EPUB-support, performance, or accessibility-conformance claim. See [EPUB performance, progress, and cancellation](docs/epub-performance.md), the [experimental EPUB corpus](docs/epub-corpus.md), and its [public coverage matrix](docs/epub-corpus-matrix.md).
 
-The qualified fixtures and the locally supplied real publication now complete that end-to-end path for the documented subset: import without measured silent loss, a valid `FlowDocument`, round-trip, layout, inspection, rendering and assisted human review. Broader EPUB coverage remains open, so this is not yet an “open any EPUB” guarantee.
+The qualified fixtures and the locally supplied real publication now complete that end-to-end path for the documented subset: import without measured silent loss, a valid `FlowDocument`, round-trip, layout, inspection, rendering and assisted human review. Broader EPUB coverage remains open, so this is not yet an “open any EPUB” guarantee. The [Flow 0.2 EPUB cycle review](docs/0.2-epub-cycle-review.md) records the evidence and the wording that is safe to use publicly.
 
 ## CLI quick start
+
+The CLI keeps command names, option names, JSON fields and diagnostic codes invariant. Human-readable help, CLI errors, labels and summaries can be selected with the global `--language` option. The first catalogs are `en-US` and `pt-BR`; omitting the option selects `en-US`, while an unsupported value is rejected with an English fallback error. `--banner` adds an optional FIGlet-style ASCII heading, while normal output remains plain and contains no required ANSI color sequences:
+
+```powershell
+dotnet run --project src/Flow.Cli -- --language pt-BR --banner help
+dotnet run --project src/Flow.Cli -- --language en-US --no-color help
+```
+
+Global options must appear before the command. They affect terminal text only: generated `.flow.json`, evidence JSON, canonical bytes, hashes and stable diagnostic codes do not change. In `pt-BR`, every current EPUB, document-validation and Flow JSON code receives a short Portuguese summary followed by its original technical detail. This keeps paths, IDs and rejected values available for troubleshooting without changing deterministic reports.
 
 To see the current end-to-end result without generating anything, open the committed mobile and desktop files:
 
@@ -239,7 +248,7 @@ Pass the complete EPUB path to `flow import`. Quotes are recommended because boo
 Set-Location 'C:\caminho\para\FlowEngineNet'
 
 $epub = 'C:\caminho\para\Meu livro.epub'
-dotnet run --project .\src\Flow.Cli -- import $epub
+dotnet run --project .\src\Flow.Cli -- --language pt-BR import $epub
 ```
 
 When `--output` is omitted, the CLI creates the `.flow.json` beside the EPUB. Its portable file name is derived from the book title, while the original title—including accents—remains in the document metadata. For the example above, the result can be:
@@ -267,8 +276,8 @@ The CLI prints the exact generated path. Validate it and create the multi-file H
 $flow = 'C:\caminho\para\meu_livro.flow.json'
 $book = 'C:\caminho\para\meu_livro_book'
 
-dotnet run --project .\src\Flow.Cli -- validate $flow
-dotnet run --project .\src\Flow.Cli -- render $flow --html-book $book --ui-language pt-PT
+dotnet run --project .\src\Flow.Cli -- --language pt-BR validate $flow
+dotnet run --project .\src\Flow.Cli -- --language pt-BR render $flow --html-book $book --ui-language pt-BR
 Start-Process "$book\index.html"
 ```
 

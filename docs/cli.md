@@ -2,7 +2,21 @@
 
 The `flow` executable is a deliberately small composition layer over the document serializer, validator, canonicalizer, layout engine, and HTML renderer. Command parsing is implemented independently from command operations and uses no external CLI framework.
 
-The help output identifies the CLI and `.flow.json` representation as experimental. Stable `FLOWCLI_*` prefixes distinguish command, option, value, and operation failures. Exit code `0` means success, `1` means command/input/I/O failure, and `2` means the document parsed but failed semantic validation.
+The help output identifies the CLI and `.flow.json` representation as experimental. Stable `FLOWCLI_*` prefixes distinguish command, option, value, and operation failures. Exit code `0` means success, `1` means command/input/I/O failure, `2` means the document parsed but failed semantic validation, and `130` means cancellation.
+
+## Global output options
+
+Global options appear before the command:
+
+```text
+flow [--language <en-US|pt-BR>] [--banner] [--no-color] <command>
+```
+
+`--language` selects the resource catalog for human-readable terminal output. The initial catalogs are `en-US` and `pt-BR`. Omitting the option selects `en-US`; an unsupported value fails with `FLOWCLI_INVALID_VALUE` and an English fallback message. Commands, option names, paths, serialized fields and diagnostic codes do not change with the language.
+
+Every stable EPUB, document-validation and Flow JSON diagnostic code currently has a `pt-BR` summary. The CLI prints the original technical detail immediately afterward, so paths, IDs, rejected values and parser messages are not lost. A code introduced without a catalog entry falls back to its original message. This localization affects only terminal text: diagnostic and inspection JSON remains deterministic and independent of `--language`.
+
+`--banner` prints an optional FIGlet-style ASCII heading. The CLI emits plain text by default and does not require ANSI colors; `--no-color` makes that contract explicit for scripts, redirected output and limited terminals. These presentation options do not affect generated files, canonical bytes or hashes.
 
 ## Commands
 
@@ -58,8 +72,9 @@ During development, invoke the executable through the project:
 
 ```powershell
 dotnet run --project src/Flow.Cli -- sample sample.flow.json
+dotnet run --project src/Flow.Cli -- --language pt-BR --banner help
 dotnet run --project src/Flow.Cli -- epub-inspect book.epub --json inspection.json
-dotnet run --project src/Flow.Cli -- import book.epub --diagnostics-json import-report.json
+dotnet run --project src/Flow.Cli -- --language pt-BR import book.epub --diagnostics-json import-report.json
 dotnet run --project src/Flow.Cli -- validate sample.flow.json
 dotnet run --project src/Flow.Cli -- render sample.flow.json --html sample.html --width 390 --height 844
 dotnet run --project src/Flow.Cli -- render sample.flow.json --html-book sample-book --ui-language pt-PT

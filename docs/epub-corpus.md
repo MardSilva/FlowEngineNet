@@ -150,7 +150,7 @@ EPUBCheck remains separate evidence. A Flow failure does not become an EPUBCheck
 The destination contains:
 
 - `mobile/` and `desktop/`, each with a complete HTML book package;
-- `review.html`, a script-free page with direct local links to the beginning, middle and end, plus representative TOC, link, image, cover, note and table targets when present;
+- `review.html`, a script-free page with localized `en-US` or `pt-BR` labels and direct local links to the beginning, middle and end, plus representative TOC, link, image, cover, note and table targets when present;
 - `review-checklist.json`, a versioned human checklist whose items accept `approved`, `rejected`, `not-applicable` or `inconclusive`;
 - `review-manifest.json`, which relates the local artifacts to the neutral candidate ID, source EPUB SHA-256, canonical FlowDocument SHA-256, canonicalization version and package hashes.
 

@@ -69,6 +69,7 @@ Flow 0.1 is a research-grade reference implementation. This list is part of the 
 ## CLI and operations
 
 - The CLI inspects/imports the documented EPUB subset and exposes sample, inspect, validate, hash, standalone HTML, and multi-file HTML-book commands.
+- Human-readable CLI framing has resource catalogs for `en-US` and `pt-BR`; omitting `--language` selects `en-US`, and unsupported values are rejected with an English fallback error. Commands, options, JSON fields and diagnostic codes are invariant. All current stable EPUB, document-validation and Flow JSON diagnostic codes have a Portuguese summary. The original technical detail is shown after that summary because it can contain source paths, IDs, rejected values or parser messages that are not yet represented as typed localization arguments. Unknown future codes fall back to their original message instead of hiding information. Deterministic JSON evidence always retains the original language-neutral diagnostic payload.
 - It has no signing, verification, EPUB export, preference/theme flags, streaming pipeline, batch mode, or interactive prompts. Fidelity, metadata, package-processing, and source-map data are optional noncanonical sidecars rather than one durable publication container.
 - Output paths are replaced when commands succeed; callers should use copies for experiments.
 - CI validates Windows and Linux only. macOS and alternative .NET SDK/runtime implementations are not in the matrix.

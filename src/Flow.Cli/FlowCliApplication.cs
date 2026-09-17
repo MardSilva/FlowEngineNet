@@ -44,27 +44,58 @@ public sealed class FlowCliApplication
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
 
-        var parseResult = _parser.Parse(arguments);
+        var invocationResult = CliInvocationOptionsParser.Parse(arguments);
+        var invocationText = new CliTextCatalog(invocationResult.Options?.CultureName);
+        if (!invocationResult.IsSuccess)
+        {
+            await error.WriteLineAsync(invocationText.Diagnostic(
+                    invocationResult.DiagnosticCode!,
+                    invocationResult.ResourceKey!,
+                    invocationResult.Arguments.ToArray()))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        var invocation = invocationResult.Options!;
+        var text = new CliTextCatalog(invocation.CultureName);
+        if (invocation.ShowBanner)
+        {
+            await output.WriteLineAsync(CliBanner.Text).ConfigureAwait(false);
+        }
+
+        var parseResult = _parser.Parse(invocation.CommandArguments);
         if (!parseResult.IsSuccess)
         {
-            await error.WriteLineAsync(parseResult.Error).ConfigureAwait(false);
+            await error.WriteLineAsync(parseResult.Diagnostic!.Format(text)).ConfigureAwait(false);
             return 1;
         }
 
         try
         {
-            return await _operations.ExecuteAsync(parseResult.Command!, output, error, cancellationToken)
+            return await _operations.ExecuteAsync(parseResult.Command!, output, error, text, cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            await error.WriteLineAsync("FLOWCLI_CANCELLED: The operation was cancelled; no partial final output was kept.")
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_CANCELLED", "ErrorCancelled"))
                 .ConfigureAwait(false);
             return 130;
         }
         catch (FlowSerializationException exception)
         {
-            await error.WriteLineAsync($"{exception.Code}: {exception.Message}").ConfigureAwait(false);
+            await error.WriteLineAsync(
+                    $"{exception.Code}: {text.DiagnosticMessage(exception.Code, exception.Message)}")
+                .ConfigureAwait(false);
+            return 1;
+        }
+        catch (CliOperationException exception)
+        {
+            await error.WriteLineAsync(
+                    text.Diagnostic(
+                        "FLOWCLI_OPERATION_FAILED",
+                        exception.ResourceKey,
+                        exception.Arguments.ToArray()))
+                .ConfigureAwait(false);
             return 1;
         }
         catch (Exception exception) when (exception is IOException
@@ -72,7 +103,9 @@ public sealed class FlowCliApplication
                                           or ArgumentException
                                           or NotSupportedException)
         {
-            await error.WriteLineAsync($"FLOWCLI_OPERATION_FAILED: {exception.Message}").ConfigureAwait(false);
+            await error.WriteLineAsync(
+                    text.Diagnostic("FLOWCLI_OPERATION_FAILED", "ErrorOperationFailed", exception.Message))
+                .ConfigureAwait(false);
             return 1;
         }
     }

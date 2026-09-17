@@ -133,7 +133,11 @@ public sealed class EpubLargePublicationReviewPackageGenerator : IEpubLargePubli
                     checklistBytes,
                     cancellationToken)
                 .ConfigureAwait(false);
-            var shortcutsBytes = CreateShortcuts(options.CandidateId, samples, targets);
+            var shortcutsBytes = CreateShortcuts(
+                options.CandidateId,
+                samples,
+                targets,
+                ReviewTextCatalog.For(options.UiLanguage, document.Metadata.Language));
             await File.WriteAllBytesAsync(
                     Path.Combine(staging, "review.html"),
                     shortcutsBytes,
@@ -451,34 +455,49 @@ public sealed class EpubLargePublicationReviewPackageGenerator : IEpubLargePubli
     private static byte[] CreateShortcuts(
         EpubCorpusPublicationId candidateId,
         IEnumerable<EpubLargePublicationReviewSample> samples,
-        IEnumerable<EpubLargePublicationReviewTarget> targets)
+        IEnumerable<EpubLargePublicationReviewTarget> targets,
+        ReviewTextCatalog text)
     {
         var builder = new StringBuilder();
-        builder.Append("<!doctype html>\n<html lang=\"en\"><head><meta charset=\"utf-8\"><title>Flow EPUB review</title></head><body>\n");
-        builder.Append("<h1>Flow EPUB review</h1><p>Candidate: <code>")
+        builder.Append("<!doctype html>\n<html lang=\"").Append(text.LanguageTag)
+            .Append("\"><head><meta charset=\"utf-8\"><title>")
+            .Append(HtmlEncoder.Default.Encode(text.Get("Title")))
+            .Append("</title></head><body>\n<h1>")
+            .Append(HtmlEncoder.Default.Encode(text.Get("Title")))
+            .Append("</h1><p>")
+            .Append(HtmlEncoder.Default.Encode(text.Get("Candidate")))
+            .Append(" <code>")
             .Append(HtmlEncoder.Default.Encode(candidateId.Value))
             .Append("</code></p>\n");
-        builder.Append("<p>This page contains local shortcuts only. Record decisions in <code>review-checklist.json</code>. No result is approved automatically.</p>\n");
-        builder.Append("<h2>Chapter samples</h2><ul>\n");
+        builder.Append("<p>").Append(HtmlEncoder.Default.Encode(text.Get("Instructions")))
+            .Append("</p>\n<h2>").Append(HtmlEncoder.Default.Encode(text.Get("ChapterSamples"))).Append("</h2><ul>\n");
         foreach (var sample in samples.OrderBy(static item => item.Position))
         {
-            AppendLinks(builder, Token(sample.Position), sample.MobileTarget, sample.DesktopTarget);
+            AppendLinks(builder, text.Label(Token(sample.Position)), sample.MobileTarget, sample.DesktopTarget, text);
         }
 
-        builder.Append("</ul><h2>Representative features</h2><ul>\n");
+        builder.Append("</ul><h2>").Append(HtmlEncoder.Default.Encode(text.Get("RepresentativeFeatures")))
+            .Append("</h2><ul>\n");
         foreach (var target in targets.OrderBy(static item => item.Category, StringComparer.Ordinal))
         {
-            AppendLinks(builder, target.Category, target.MobileTarget, target.DesktopTarget);
+            AppendLinks(builder, text.Label(target.Category), target.MobileTarget, target.DesktopTarget, text);
         }
 
         builder.Append("</ul></body></html>\n");
         return Utf8WithoutBom.GetBytes(builder.ToString());
 
-        static void AppendLinks(StringBuilder builder, string label, string mobile, string desktop)
+        static void AppendLinks(
+            StringBuilder builder,
+            string label,
+            string mobile,
+            string desktop,
+            ReviewTextCatalog text)
         {
             builder.Append("<li>").Append(HtmlEncoder.Default.Encode(label)).Append(": <a href=\"")
-                .Append(HtmlEncoder.Default.Encode(mobile)).Append("\">mobile</a> | <a href=\"")
-                .Append(HtmlEncoder.Default.Encode(desktop)).Append("\">desktop</a></li>\n");
+                .Append(HtmlEncoder.Default.Encode(mobile)).Append("\">")
+                .Append(HtmlEncoder.Default.Encode(text.Get("Mobile"))).Append("</a> | <a href=\"")
+                .Append(HtmlEncoder.Default.Encode(desktop)).Append("\">")
+                .Append(HtmlEncoder.Default.Encode(text.Get("Desktop"))).Append("</a></li>\n");
         }
     }
 

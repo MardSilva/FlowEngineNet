@@ -1,0 +1,224 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="ErrorDuplicateOption" xml:space="preserve"><value>A opção '{0}' foi informada mais de uma vez.</value></data>
+  <data name="ErrorOptionRequiresValue" xml:space="preserve"><value>A opção '{0}' exige um valor. Uso: {1}</value></data>
+  <data name="ErrorLanguageValue" xml:space="preserve"><value>O idioma '{0}' não é aceito. Use en-US ou pt-BR.</value></data>
+  <data name="ErrorUnknownGlobalOption" xml:space="preserve"><value>Opção global desconhecida: '{0}'. Execute 'flow help' para consultar o uso.</value></data>
+  <data name="ErrorUnknownCommand" xml:space="preserve"><value>Comando desconhecido: '{0}'. Execute 'flow help' para consultar o uso.</value></data>
+  <data name="ErrorUsage" xml:space="preserve"><value>Uso: {0}</value></data>
+  <data name="ErrorUnknownOption" xml:space="preserve"><value>Opção desconhecida de {0}: '{1}'. {2}</value></data>
+  <data name="ErrorInvalidWidth" xml:space="preserve"><value>--width deve ser um número finito maior que zero.</value></data>
+  <data name="ErrorInvalidHeight" xml:space="preserve"><value>--height deve ser um número finito maior que zero.</value></data>
+  <data name="ErrorInvalidUiLanguage" xml:space="preserve"><value>--ui-language deve ser auto, en, pt-PT ou pt-BR.</value></data>
+  <data name="ErrorCancelled" xml:space="preserve"><value>A operação foi cancelada; nenhuma saída final parcial foi mantida.</value></data>
+  <data name="ErrorOperationFailed" xml:space="preserve"><value>A operação falhou: {0}</value></data>
+  <data name="HelpTitle" xml:space="preserve"><value>Flow Engine .NET 0.2.0-alpha.1 (experimental)</value></data>
+  <data name="HelpWarning" xml:space="preserve"><value>O formato .flow.json e todas as APIs 0.x ainda podem mudar.</value></data>
+  <data name="HelpGlobalOptions" xml:space="preserve"><value>Opções globais:</value></data>
+  <data name="HelpLanguage" xml:space="preserve"><value>  --language &lt;en-US|pt-BR&gt;                  Escolhe o idioma da saída; o fallback é en-US.</value></data>
+  <data name="HelpBanner" xml:space="preserve"><value>  --banner                                      Exibe o cabeçalho ASCII opcional no estilo FIGlet.</value></data>
+  <data name="HelpNoColor" xml:space="preserve"><value>  --no-color                                    Mantém a saída simples; cores ANSI nunca são obrigatórias.</value></data>
+  <data name="HelpCommands" xml:space="preserve"><value>Comandos:</value></data>
+  <data name="HelpSample" xml:space="preserve"><value>  flow sample [saída]                          Cria o livro .flow.json de referência.</value></data>
+  <data name="HelpImport1" xml:space="preserve"><value>  flow import &lt;livro.epub&gt; [--output &lt;livro.flow.json&gt;] [--diagnostics-json &lt;relatório.json&gt;] [--fidelity-report &lt;fidelidade.json&gt;]</value></data>
+  <data name="HelpImport2" xml:space="preserve"><value>    [--metadata-json &lt;metadados.json&gt;] [--processing-json &lt;processamento.json&gt;] [--source-map-json &lt;mapa.json&gt;]</value></data>
+  <data name="HelpImport3" xml:space="preserve"><value>    Sem --output, o nome do arquivo é derivado do título importado.</value></data>
+  <data name="HelpEpubInspect" xml:space="preserve"><value>  flow epub-inspect &lt;livro.epub&gt; [--json &lt;relatório.json&gt;]    Inspeciona a estrutura do EPUB.</value></data>
+  <data name="HelpInspect" xml:space="preserve"><value>  flow inspect &lt;documento&gt;                     Exibe as contagens semânticas do documento.</value></data>
+  <data name="HelpValidate" xml:space="preserve"><value>  flow validate &lt;documento&gt;                    Valida as invariantes semânticas.</value></data>
+  <data name="HelpHash" xml:space="preserve"><value>  flow hash &lt;documento&gt;                        Calcula o hash SHA-256 canônico.</value></data>
+  <data name="HelpRenderHtml" xml:space="preserve"><value>  flow render &lt;documento&gt; --html &lt;saída&gt; --width &lt;n&gt; --height &lt;n&gt;</value></data>
+  <data name="HelpRenderBook" xml:space="preserve"><value>  flow render &lt;documento&gt; --html-book &lt;diretório&gt; [--ui-language &lt;auto|en|pt-PT|pt-BR&gt;]</value></data>
+  <data name="HelpExitCodes" xml:space="preserve"><value>Códigos de saída: 0 sucesso, 1 falha de comando/entrada, 2 falha de validação semântica, 130 cancelamento.</value></data>
+  <data name="LabelReportJson" xml:space="preserve"><value>Relatório JSON: {0}</value></data>
+  <data name="LabelInspection" xml:space="preserve"><value>Inspeção EPUB: {0}</value></data>
+  <data name="LabelStatus" xml:space="preserve"><value>Estado: {0}</value></data>
+  <data name="ValueValid" xml:space="preserve"><value>válido</value></data>
+  <data name="ValueInvalid" xml:space="preserve"><value>inválido</value></data>
+  <data name="ValueNone" xml:space="preserve"><value>(nenhum)</value></data>
+  <data name="ValueUnavailable" xml:space="preserve"><value>(indisponível)</value></data>
+  <data name="ValueUnknown" xml:space="preserve"><value>desconhecida</value></data>
+  <data name="LabelContainer" xml:space="preserve"><value>Contêiner: {0}</value></data>
+  <data name="LabelPackage" xml:space="preserve"><value>Pacote: {0}</value></data>
+  <data name="LabelEpubVersion" xml:space="preserve"><value>Versão EPUB: {0} ({1})</value></data>
+  <data name="LabelTitle" xml:space="preserve"><value>Título: {0}</value></data>
+  <data name="LabelIdentifier" xml:space="preserve"><value>Identificador: {0}</value></data>
+  <data name="LabelLanguage" xml:space="preserve"><value>Idioma: {0}</value></data>
+  <data name="LabelCreators" xml:space="preserve"><value>Autores/criadores: {0}</value></data>
+  <data name="LabelManifestItems" xml:space="preserve"><value>Itens do manifesto: {0}</value></data>
+  <data name="LabelSpineItems" xml:space="preserve"><value>Itens do spine: {0} (lineares {1}, não lineares {2})</value></data>
+  <data name="LabelNavigationDocuments" xml:space="preserve"><value>Documentos de navegação: {0}</value></data>
+  <data name="LabelArchiveEntries" xml:space="preserve"><value>Entradas do arquivo: {0}</value></data>
+  <data name="LabelCompressedBytes" xml:space="preserve"><value>Bytes compactados: {0}</value></data>
+  <data name="LabelUncompressedBytes" xml:space="preserve"><value>Bytes descompactados: {0}</value></data>
+  <data name="LabelResourceTypes" xml:space="preserve"><value>Tipos de recurso:</value></data>
+  <data name="Severity_Information" xml:space="preserve"><value>Informação</value></data>
+  <data name="Severity_Warning" xml:space="preserve"><value>Aviso</value></data>
+  <data name="Severity_Error" xml:space="preserve"><value>Erro</value></data>
+  <data name="ErrorInspectOnlyEpub" xml:space="preserve"><value>epub-inspect aceita apenas arquivos .epub.</value></data>
+  <data name="ErrorImportOnlyEpub" xml:space="preserve"><value>O comando import aceita apenas arquivos .epub nesta versão.</value></data>
+  <data name="ErrorJsonSourceConflict" xml:space="preserve"><value>O relatório JSON deve usar um caminho diferente do EPUB de origem.</value></data>
+  <data name="ErrorOutputSourceConflict" xml:space="preserve"><value>A saída deve usar um caminho diferente do EPUB de origem.</value></data>
+  <data name="ErrorDiagnosticSourceConflict" xml:space="preserve"><value>O relatório de diagnósticos deve usar um caminho diferente do EPUB de origem.</value></data>
+  <data name="ErrorFidelitySourceConflict" xml:space="preserve"><value>O relatório de fidelidade deve usar um caminho diferente do EPUB de origem.</value></data>
+  <data name="ErrorDocumentDiagnosticsConflict" xml:space="preserve"><value>O documento Flow e o relatório de diagnósticos devem usar caminhos diferentes.</value></data>
+  <data name="ErrorFidelityOutputConflict" xml:space="preserve"><value>O relatório de fidelidade deve usar um caminho diferente de todas as outras saídas.</value></data>
+  <data name="ErrorEvidenceSourceConflict" xml:space="preserve"><value>O relatório {0} deve usar um caminho diferente do EPUB de origem.</value></data>
+  <data name="ErrorOutputConflict" xml:space="preserve"><value>{0} e {1} devem usar caminhos diferentes.</value></data>
+  <data name="ErrorImportFailed" xml:space="preserve"><value>Nenhum documento Flow completo foi gravado.</value></data>
+  <data name="ErrorImportedDocumentInvalid" xml:space="preserve"><value>O documento importado não foi gravado.</value></data>
+  <data name="ErrorImportOutputMissing" xml:space="preserve"><value>Uma importação EPUB bem-sucedida não produziu um caminho de saída.</value></data>
+  <data name="ErrorHtmlBookParentRequired" xml:space="preserve"><value>A saída do livro HTML deve estar dentro de um diretório.</value></data>
+  <data name="ErrorHtmlBookFilesystemRoot" xml:space="preserve"><value>A saída do livro HTML não pode ser a raiz do sistema de arquivos.</value></data>
+  <data name="ErrorHtmlBookExistingFile" xml:space="preserve"><value>O caminho de saída do livro HTML aponta para um arquivo existente.</value></data>
+  <data name="ErrorHtmlBookContainsSource" xml:space="preserve"><value>A saída do livro HTML não pode conter o documento de origem.</value></data>
+  <data name="ErrorHtmlBookReparsePoint" xml:space="preserve"><value>A saída do livro HTML não pode ser um link simbólico ou ponto de nova análise.</value></data>
+  <data name="ErrorHtmlBookExistingReparsePoint" xml:space="preserve"><value>O diretório existente do livro HTML contém um link simbólico ou ponto de nova análise.</value></data>
+  <data name="ErrorHtmlBookNotReplaceable" xml:space="preserve"><value>O diretório de saída existente não é um livro HTML Flow que possa ser substituído.</value></data>
+  <data name="ErrorHtmlBookInvalidManifest" xml:space="preserve"><value>O diretório de saída existente contém um manifesto de livro HTML Flow inválido.</value></data>
+  <data name="ErrorHtmlBookUnsafePackagePath" xml:space="preserve"><value>O pacote do livro HTML contém o caminho inseguro '{0}'.</value></data>
+  <data name="LabelDiagnosticsJson" xml:space="preserve"><value>JSON de diagnósticos: {0}</value></data>
+  <data name="LabelFidelityReport" xml:space="preserve"><value>Relatório de fidelidade: {0}</value></data>
+  <data name="LabelMetadataJson" xml:space="preserve"><value>JSON de metadados: {0}</value></data>
+  <data name="LabelProcessingJson" xml:space="preserve"><value>JSON de processamento: {0}</value></data>
+  <data name="LabelSourceMapJson" xml:space="preserve"><value>JSON do mapa de origem: {0}</value></data>
+  <data name="LabelImportedEpub" xml:space="preserve"><value>EPUB importado: {0}</value></data>
+  <data name="LabelFlowDocument" xml:space="preserve"><value>Documento Flow: {0}</value></data>
+  <data name="LabelDocumentId" xml:space="preserve"><value>ID do documento: {0}</value></data>
+  <data name="LabelNodes" xml:space="preserve"><value>Nós: {0}</value></data>
+  <data name="LabelAssets" xml:space="preserve"><value>Assets: {0}</value></data>
+  <data name="LabelSampleWritten" xml:space="preserve"><value>Sample gravado: {0}</value></data>
+  <data name="LabelId" xml:space="preserve"><value>ID: {0}</value></data>
+  <data name="LabelVersion" xml:space="preserve"><value>Versão: {0}</value></data>
+  <data name="LabelSubtitle" xml:space="preserve"><value>Subtítulo: {0}</value></data>
+  <data name="LabelAuthors" xml:space="preserve"><value>Autores: {0}</value></data>
+  <data name="LabelChapters" xml:space="preserve"><value>Capítulos: {0}</value></data>
+  <data name="LabelSections" xml:space="preserve"><value>Seções: {0}</value></data>
+  <data name="LabelParagraphs" xml:space="preserve"><value>Parágrafos: {0}</value></data>
+  <data name="LabelFigures" xml:space="preserve"><value>Figuras: {0}</value></data>
+  <data name="LabelFootnotes" xml:space="preserve"><value>Notas: {0}</value></data>
+  <data name="LabelAnchors" xml:space="preserve"><value>Âncoras: {0}</value></data>
+  <data name="LabelPresentation" xml:space="preserve"><value>Apresentação: {0}</value></data>
+  <data name="ValueYes" xml:space="preserve"><value>sim</value></data>
+  <data name="ValueNo" xml:space="preserve"><value>não</value></data>
+  <data name="ValidationValid" xml:space="preserve"><value>Válido: nenhum erro de validação semântica.</value></data>
+  <data name="LabelRendered" xml:space="preserve"><value>Renderizado: {0}</value></data>
+  <data name="LabelViewport" xml:space="preserve"><value>Viewport: {0}x{1} ({2})</value></data>
+  <data name="LabelHtmlBook" xml:space="preserve"><value>Livro HTML: {0}</value></data>
+  <data name="LabelEntry" xml:space="preserve"><value>Entrada: {0}</value></data>
+  <data name="LabelUiLanguage" xml:space="preserve"><value>Idioma da interface: {0}</value></data>
+  <data name="LabelFiles" xml:space="preserve"><value>Arquivos: {0}</value></data>
+  <data name="LabelHtmlBytes" xml:space="preserve"><value>Bytes de HTML: {0}</value></data>
+  <data name="LabelRenderDuration" xml:space="preserve"><value>Duração da renderização em ms: {0}</value></data>
+  <data name="LabelWriteDuration" xml:space="preserve"><value>Duração da gravação em ms: {0}</value></data>
+  <data name="MetricsTitle" xml:space="preserve"><value>Métricas de importação (não canônicas):</value></data>
+  <data name="MetricsTotalDuration" xml:space="preserve"><value>  Duração total em ms: {0}</value></data>
+  <data name="MetricsArchiveEntries" xml:space="preserve"><value>  Entradas do arquivo: {0}</value></data>
+  <data name="MetricsCompressedBytes" xml:space="preserve"><value>  Bytes compactados: {0}</value></data>
+  <data name="MetricsUncompressedBytes" xml:space="preserve"><value>  Bytes descompactados: {0}</value></data>
+  <data name="MetricsAssetBytes" xml:space="preserve"><value>  Bytes de assets: {0}</value></data>
+  <data name="MetricsSpineDocuments" xml:space="preserve"><value>  Documentos do spine: {0}</value></data>
+  <data name="MetricsNodes" xml:space="preserve"><value>  Nós: {0}</value></data>
+  <data name="MetricsCharacters" xml:space="preserve"><value>  Caracteres: {0}</value></data>
+  <data name="MetricsPeakManagedBytes" xml:space="preserve"><value>  Pico aproximado de memória gerenciada em bytes: {0}</value></data>
+  <data name="MetricsFlowJsonBytes" xml:space="preserve"><value>  Bytes do JSON Flow: {0}</value></data>
+  <data name="MetricsPhase" xml:space="preserve"><value>  Fase {0}: {1} ms</value></data>
+  <data name="DiagnosticsSummary" xml:space="preserve"><value>Diagnósticos: {0} informativos, {1} avisos e {2} erros.</value></data>
+  <data name="DiagnosticsCodes" xml:space="preserve"><value>Códigos de diagnóstico: {0}</value></data>
+  <data name="DiagnosticsLimited" xml:space="preserve"><value>O terminal exibe {0} de {1} diagnósticos; o relatório JSON contém todos os itens.</value></data>
+  <data name="LabelHash" xml:space="preserve"><value>Hash: {0}:{1}</value></data>
+  <data name="LabelCanonicalization" xml:space="preserve"><value>Canonicalização: {0}</value></data>
+  <data name="DiagnosticTechnicalDetail" xml:space="preserve"><value>Detalhe técnico: {0}</value></data>
+  <data name="Diagnostic_EPUB001" xml:space="preserve"><value>O arquivo EPUB é inválido ou não pode ser lido.</value></data>
+  <data name="Diagnostic_EPUB002" xml:space="preserve"><value>Um limite de segurança do EPUB foi excedido.</value></data>
+  <data name="Diagnostic_EPUB003" xml:space="preserve"><value>O EPUB contém um caminho inseguro.</value></data>
+  <data name="Diagnostic_EPUB004" xml:space="preserve"><value>O documento de contêiner obrigatório não foi encontrado.</value></data>
+  <data name="Diagnostic_EPUB005" xml:space="preserve"><value>Um recurso XML é inválido ou inseguro.</value></data>
+  <data name="Diagnostic_EPUB006" xml:space="preserve"><value>O documento de pacote do EPUB não foi encontrado.</value></data>
+  <data name="Diagnostic_EPUB007" xml:space="preserve"><value>O documento de pacote do EPUB é inválido.</value></data>
+  <data name="Diagnostic_EPUB008" xml:space="preserve"><value>Um recurso referenciado pelo EPUB não foi encontrado.</value></data>
+  <data name="Diagnostic_EPUB009" xml:space="preserve"><value>O tipo de um recurso do EPUB não é suportado.</value></data>
+  <data name="Diagnostic_EPUB010" xml:space="preserve"><value>Um elemento XHTML não possui representação direta no Flow.</value></data>
+  <data name="Diagnostic_EPUB011" xml:space="preserve"><value>Uma referência do EPUB é inválida ou não foi resolvida.</value></data>
+  <data name="Diagnostic_EPUB012" xml:space="preserve"><value>Foi necessário aplicar um fallback determinístico aos metadados.</value></data>
+  <data name="Diagnostic_EPUB013" xml:space="preserve"><value>Um item não linear do spine foi tratado explicitamente.</value></data>
+  <data name="Diagnostic_EPUB014" xml:space="preserve"><value>O documento Flow importado falhou na validação semântica.</value></data>
+  <data name="Diagnostic_EPUB015" xml:space="preserve"><value>A versão declarada do EPUB não é suportada ou reconhecida.</value></data>
+  <data name="Diagnostic_EPUB016" xml:space="preserve"><value>Foi encontrado mais de um sumário.</value></data>
+  <data name="Diagnostic_EPUB017" xml:space="preserve"><value>O sumário do EPUB é inválido.</value></data>
+  <data name="Diagnostic_EPUB018" xml:space="preserve"><value>Um destino do sumário não existe.</value></data>
+  <data name="Diagnostic_EPUB019" xml:space="preserve"><value>Uma entrada do sumário não possui rótulo utilizável.</value></data>
+  <data name="Diagnostic_EPUB020" xml:space="preserve"><value>Um nível do sumário é inválido.</value></data>
+  <data name="Diagnostic_EPUB021" xml:space="preserve"><value>Foi encontrada uma referência circular no sumário.</value></data>
+  <data name="Diagnostic_EPUB022" xml:space="preserve"><value>As fontes de navegação divergem sobre o sumário.</value></data>
+  <data name="Diagnostic_EPUB023" xml:space="preserve"><value>Um valor dos metadados do EPUB é inválido.</value></data>
+  <data name="Diagnostic_EPUB024" xml:space="preserve"><value>Um refinamento de metadados do EPUB não possui destino.</value></data>
+  <data name="Diagnostic_EPUB025" xml:space="preserve"><value>Foram encontrados valores conflitantes nos metadados do EPUB.</value></data>
+  <data name="Diagnostic_EPUB026" xml:space="preserve"><value>Uma tag de idioma do EPUB é inválida.</value></data>
+  <data name="Diagnostic_EPUB027" xml:space="preserve"><value>O EPUB não possui um identificador de publicação utilizável.</value></data>
+  <data name="Diagnostic_EPUB028" xml:space="preserve"><value>Foi encontrada uma cadeia circular de fallback no manifesto.</value></data>
+  <data name="Diagnostic_EPUB029" xml:space="preserve"><value>Uma cadeia de fallback do manifesto está quebrada.</value></data>
+  <data name="Diagnostic_EPUB030" xml:space="preserve"><value>Um item aparece mais de uma vez no spine.</value></data>
+  <data name="Diagnostic_EPUB031" xml:space="preserve"><value>Media overlays não são suportados.</value></data>
+  <data name="Diagnostic_EPUB032" xml:space="preserve"><value>Um valor de linearidade do spine é inválido.</value></data>
+  <data name="Diagnostic_EPUB033" xml:space="preserve"><value>O manifesto contém um recurso duplicado.</value></data>
+  <data name="Diagnostic_EPUB034" xml:space="preserve"><value>Um ID de origem do EPUB aparece mais de uma vez.</value></data>
+  <data name="Diagnostic_EPUB035" xml:space="preserve"><value>Um ID de origem do EPUB é inválido.</value></data>
+  <data name="Diagnostic_EPUB036" xml:space="preserve"><value>IDs de origem colidiram durante o mapeamento determinístico.</value></data>
+  <data name="Diagnostic_EPUB037" xml:space="preserve"><value>Não foi possível mapear uma localização de origem do EPUB.</value></data>
+  <data name="Diagnostic_EPUB038" xml:space="preserve"><value>Uma imagem contém dados inválidos.</value></data>
+  <data name="Diagnostic_EPUB039" xml:space="preserve"><value>O tipo de mídia declarado para uma imagem não corresponde aos seus bytes.</value></data>
+  <data name="Diagnostic_EPUB040" xml:space="preserve"><value>Uma imagem excede o limite configurado de dimensões.</value></data>
+  <data name="Diagnostic_EPUB041" xml:space="preserve"><value>Uma imagem não possui texto alternativo utilizável.</value></data>
+  <data name="Diagnostic_EPUB042" xml:space="preserve"><value>O formato de uma imagem não é suportado.</value></data>
+  <data name="Diagnostic_EPUB043" xml:space="preserve"><value>Um recurso SVG não é seguro.</value></data>
+  <data name="Diagnostic_EPUB044" xml:space="preserve"><value>Foi utilizado um fallback de imagem.</value></data>
+  <data name="Diagnostic_EPUB045" xml:space="preserve"><value>Bytes de imagem duplicados foram deduplicados.</value></data>
+  <data name="Diagnostic_EPUB046" xml:space="preserve"><value>Uma imagem excede o limite configurado de bytes.</value></data>
+  <data name="Diagnostic_EPUB047" xml:space="preserve"><value>Uma folha de estilos é inválida ou insegura.</value></data>
+  <data name="Diagnostic_EPUB048" xml:space="preserve"><value>Um seletor CSS está fora do subconjunto seguro suportado.</value></data>
+  <data name="Diagnostic_EPUB049" xml:space="preserve"><value>Uma propriedade CSS está fora do subconjunto tipado suportado.</value></data>
+  <data name="Diagnostic_EPUB050" xml:space="preserve"><value>Um valor CSS é inválido ou não pode ser representado.</value></data>
+  <data name="Diagnostic_EPUB051" xml:space="preserve"><value>Uma referência externa ou insegura de folha de estilos foi bloqueada.</value></data>
+  <data name="Diagnostic_EPUB052" xml:space="preserve"><value>Um destino CSS não pode ser representado pela apresentação do Flow.</value></data>
+  <data name="Diagnostic_EPUB053" xml:space="preserve"><value>Uma referência de nota não possui nota correspondente.</value></data>
+  <data name="Diagnostic_EPUB054" xml:space="preserve"><value>Uma nota não é referenciada pela publicação.</value></data>
+  <data name="Diagnostic_EPUB055" xml:space="preserve"><value>Um link de retorno da nota está ausente ou não foi resolvido.</value></data>
+  <data name="Diagnostic_EPUB056" xml:space="preserve"><value>Foi encontrada uma referência circular de nota.</value></data>
+  <data name="Diagnostic_EPUB057" xml:space="preserve"><value>O destino de uma nota é ambíguo.</value></data>
+  <data name="Diagnostic_EPUB058" xml:space="preserve"><value>Uma tabela possui estrutura semântica inválida.</value></data>
+  <data name="Diagnostic_EPUB059" xml:space="preserve"><value>A extensão de uma célula de tabela é inválida.</value></data>
+  <data name="Diagnostic_EPUB060" xml:space="preserve"><value>O escopo de um cabeçalho de tabela é inválido.</value></data>
+  <data name="Diagnostic_EPUB061" xml:space="preserve"><value>Uma referência de cabeçalho de tabela está ausente ou não foi resolvida.</value></data>
+  <data name="Diagnostic_EPUB062" xml:space="preserve"><value>Conteúdo SVG inseguro foi removido.</value></data>
+  <data name="Diagnostic_EPUB063" xml:space="preserve"><value>Parte da semântica MathML não pôde ser preservada.</value></data>
+  <data name="Diagnostic_EPUB064" xml:space="preserve"><value>Um valor de direção do texto é inválido.</value></data>
+  <data name="Diagnostic_EPUB065" xml:space="preserve"><value>Foram encontrados valores conflitantes de idioma inline.</value></data>
+  <data name="Diagnostic_EPUB066" xml:space="preserve"><value>Uma estrutura de anotação ruby é inválida.</value></data>
+  <data name="Diagnostic_EPUB067" xml:space="preserve"><value>Uma referência de imagem SVG é inválida ou insegura.</value></data>
+  <data name="Diagnostic_EPUB068" xml:space="preserve"><value>Foi utilizado um fallback de imagem SVG.</value></data>
+  <data name="Diagnostic_EPUB069" xml:space="preserve"><value>Parte da semântica da imagem SVG não pôde ser preservada.</value></data>
+  <data name="Diagnostic_EPUB070" xml:space="preserve"><value>Uma propriedade do manifesto está fora do subconjunto suportado.</value></data>
+  <data name="Diagnostic_FLOW_DUPLICATE_NODE_ID" xml:space="preserve"><value>Um ID de nó aparece mais de uma vez.</value></data>
+  <data name="Diagnostic_FLOW_INVALID_NODE_ID" xml:space="preserve"><value>Um ID de nó é inválido.</value></data>
+  <data name="Diagnostic_FLOW_INVALID_HIERARCHY" xml:space="preserve"><value>Um nó aparece em uma hierarquia inválida.</value></data>
+  <data name="Diagnostic_FLOW_INVALID_HEADING_LEVEL" xml:space="preserve"><value>O nível de um título é inválido.</value></data>
+  <data name="Diagnostic_FLOW_MISSING_FIGURE_ASSET" xml:space="preserve"><value>Uma figura referencia um asset ausente.</value></data>
+  <data name="Diagnostic_FLOW_INVALID_COVER_FIGURE" xml:space="preserve"><value>A intenção de capa não referencia uma única figura.</value></data>
+  <data name="Diagnostic_FLOW_INVALID_ANCHOR" xml:space="preserve"><value>Uma âncora Flow é inválida.</value></data>
+  <data name="Diagnostic_FLOW_UNRESOLVED_ANCHOR" xml:space="preserve"><value>Uma âncora Flow não pôde ser resolvida.</value></data>
+  <data name="Diagnostic_FLOW_UNRESOLVED_FOOTNOTE_REFERENCE" xml:space="preserve"><value>Uma referência de nota não pôde ser resolvida.</value></data>
+  <data name="Diagnostic_FLOW_INVALID_TOC_TARGET" xml:space="preserve"><value>Um destino do sumário é inválido.</value></data>
+  <data name="Diagnostic_FLOW_UNRESOLVED_TABLE_HEADER_REFERENCE" xml:space="preserve"><value>Uma referência de cabeçalho de tabela não pôde ser resolvida.</value></data>
+  <data name="Diagnostic_FLOW_INVALID_LANGUAGE_TAG" xml:space="preserve"><value>Uma tag de idioma inline é inválida.</value></data>
+  <data name="Diagnostic_FLOW_INVALID_BIDIRECTIONAL_STRUCTURE" xml:space="preserve"><value>Uma estrutura de texto bidirecional é inválida.</value></data>
+  <data name="Diagnostic_FLOW_INVALID_RUBY_STRUCTURE" xml:space="preserve"><value>Uma estrutura de anotação ruby é inválida.</value></data>
+  <data name="Diagnostic_FLOW_JSON_INVALID" xml:space="preserve"><value>O JSON Flow é inválido.</value></data>
+  <data name="Diagnostic_FLOW_JSON_INVALID_DOCUMENT" xml:space="preserve"><value>O JSON Flow não descreve um documento válido.</value></data>
+  <data name="Diagnostic_FLOW_JSON_UNSUPPORTED_FORMAT" xml:space="preserve"><value>O formato do JSON Flow não é suportado.</value></data>
+  <data name="Diagnostic_FLOW_JSON_UNSUPPORTED_NODE" xml:space="preserve"><value>O JSON Flow contém um nó não suportado.</value></data>
+</root>

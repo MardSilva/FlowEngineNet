@@ -82,6 +82,30 @@ public sealed class CliCommandParserTests
         Assert.Equal(HtmlBookUiLanguage.PortuguesePortugal, portugueseHtmlBook.UiLanguage);
     }
 
+    [Fact]
+    public void InvocationOptions_RecognizeLanguageBannerAndPlainOutput()
+    {
+        var result = CliInvocationOptionsParser.Parse(
+            ["--language", "pt-BR", "--banner", "--no-color", "inspect", "book.flow.json"]);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("pt-BR", result.Options!.CultureName);
+        Assert.True(result.Options.ShowBanner);
+        Assert.False(result.Options.UseColor);
+        Assert.Equal(["inspect", "book.flow.json"], result.Options.CommandArguments);
+    }
+
+    [Theory]
+    [InlineData("fr-FR", "FLOWCLI_INVALID_VALUE")]
+    [InlineData("", "FLOWCLI_USAGE")]
+    public void InvocationOptions_RejectUnknownLanguagesWithStableCode(string language, string code)
+    {
+        var result = CliInvocationOptionsParser.Parse(["--language", language, "help"]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(code, result.DiagnosticCode);
+    }
+
     [Theory]
     [InlineData("0")]
     [InlineData("-1")]

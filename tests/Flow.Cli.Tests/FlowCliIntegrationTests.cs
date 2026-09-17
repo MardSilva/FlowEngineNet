@@ -204,6 +204,32 @@ public sealed class FlowCliIntegrationTests
     }
 
     [Fact]
+    public async Task Import_PortugueseDiagnosticAddsLocalizedSummaryWithoutChangingJsonEvidence()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var epubPath = workspace.PathOf("invalid-localized.epub");
+        var diagnosticsPath = workspace.PathOf("invalid-localized-diagnostics.json");
+        await File.WriteAllTextAsync(epubPath, "not a ZIP archive");
+        var application = FlowCliApplication.CreateDefault();
+
+        var english = await RunAsync(
+            application,
+            ["--language", "en-US", "import", epubPath, "--diagnostics-json", diagnosticsPath]);
+        var englishJson = await File.ReadAllBytesAsync(diagnosticsPath);
+        var portuguese = await RunAsync(
+            application,
+            ["--language", "pt-BR", "import", epubPath, "--diagnostics-json", diagnosticsPath]);
+        var portugueseJson = await File.ReadAllBytesAsync(diagnosticsPath);
+
+        Assert.Equal(1, english.ExitCode);
+        Assert.Equal(1, portuguese.ExitCode);
+        Assert.Contains("EPUB001", portuguese.Error, StringComparison.Ordinal);
+        Assert.Contains("O arquivo EPUB é inválido ou não pode ser lido.", portuguese.Error, StringComparison.Ordinal);
+        Assert.Contains("Detalhe técnico:", portuguese.Error, StringComparison.Ordinal);
+        Assert.Equal(englishJson, portugueseJson);
+    }
+
+    [Fact]
     public async Task Import_WithManyDiagnosticsSummarizesConsoleAndPreservesEveryJsonDetail()
     {
         using var workspace = new TemporaryWorkspace();
@@ -680,12 +706,20 @@ public sealed class FlowCliIntegrationTests
         var containingSource = await RunAsync(
             application,
             ["render", documentPath, "--html-book", workspace.Root]);
+        var localized = await RunAsync(
+            application,
+            ["--language", "pt-BR", "render", documentPath, "--html-book", unrelatedDirectory]);
 
         Assert.Equal(1, unrelated.ExitCode);
         Assert.Contains("not a replaceable Flow HTML book", unrelated.Error, StringComparison.Ordinal);
         Assert.Equal("keep", await File.ReadAllTextAsync(marker));
         Assert.Equal(1, containingSource.ExitCode);
         Assert.Contains("cannot contain its source document", containingSource.Error, StringComparison.Ordinal);
+        Assert.Equal(1, localized.ExitCode);
+        Assert.Contains(
+            "O diretório de saída existente não é um livro HTML Flow que possa ser substituído.",
+            localized.Error,
+            StringComparison.Ordinal);
         Assert.True(File.Exists(documentPath));
         Assert.Empty(Directory.GetDirectories(workspace.Root, ".*.flow-html-book-*.tmp"));
     }
@@ -773,7 +807,68 @@ public sealed class FlowCliIntegrationTests
         Assert.Contains("--source-map-json <source-map.json>", result.Output, StringComparison.Ordinal);
         Assert.Contains("flow epub-inspect <book.epub>", result.Output, StringComparison.Ordinal);
         Assert.Contains("flow validate <document>", result.Output, StringComparison.Ordinal);
-        Assert.Contains("Exit codes: 0 success, 1 command/input failure, 2 semantic validation failure.", result.Output, StringComparison.Ordinal);
+        Assert.Contains("Exit codes: 0 success, 1 command/input failure, 2 semantic validation failure, 130 cancellation.", result.Output, StringComparison.Ordinal);
+        Assert.Contains("--language <en-US|pt-BR>", result.Output, StringComparison.Ordinal);
+        Assert.Contains("--banner", result.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("\u001b[", result.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LocalizedHelpBannerAndErrors_PreserveCommandsAndDiagnosticCodes()
+    {
+        var application = FlowCliApplication.CreateDefault();
+
+        var help = await RunAsync(application, ["--language", "pt-BR", "--banner", "--no-color", "help"]);
+        var portugueseError = await RunAsync(application, ["--language", "pt-BR", "desconhecido"]);
+        var englishError = await RunAsync(application, ["--language", "en-US", "desconhecido"]);
+
+        Assert.Equal(0, help.ExitCode);
+        Assert.Contains("Flow Engine .NET", help.Output, StringComparison.Ordinal);
+        Assert.Contains("Opções globais:", help.Output, StringComparison.Ordinal);
+        Assert.Contains("Comandos:", help.Output, StringComparison.Ordinal);
+        Assert.Contains("flow import", help.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("\u001b[", help.Output, StringComparison.Ordinal);
+
+        Assert.Equal(1, portugueseError.ExitCode);
+        Assert.StartsWith("FLOWCLI_UNKNOWN_COMMAND:", portugueseError.Error, StringComparison.Ordinal);
+        Assert.Contains("Comando desconhecido", portugueseError.Error, StringComparison.Ordinal);
+        Assert.StartsWith("FLOWCLI_UNKNOWN_COMMAND:", englishError.Error, StringComparison.Ordinal);
+        Assert.Contains("Unknown command", englishError.Error, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task PortugueseReports_AreLocalizedWithoutChangingGeneratedDocumentBytes()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var englishPath = workspace.PathOf("english.flow.json");
+        var portuguesePath = workspace.PathOf("portuguese.flow.json");
+        var application = FlowCliApplication.CreateDefault();
+
+        var englishSample = await RunAsync(application, ["--language", "en-US", "sample", englishPath]);
+        var portugueseSample = await RunAsync(application, ["--language", "pt-BR", "sample", portuguesePath]);
+        var inspect = await RunAsync(application, ["--language", "pt-BR", "inspect", portuguesePath]);
+        var validate = await RunAsync(application, ["--language", "pt-BR", "validate", portuguesePath]);
+        var hash = await RunAsync(application, ["--language", "pt-BR", "hash", portuguesePath]);
+
+        Assert.Equal(0, englishSample.ExitCode);
+        Assert.Equal(0, portugueseSample.ExitCode);
+        Assert.Equal(await File.ReadAllBytesAsync(englishPath), await File.ReadAllBytesAsync(portuguesePath));
+        Assert.Contains("Título: The Flow Experiment", inspect.Output, StringComparison.Ordinal);
+        Assert.Contains("Capítulos: 5", inspect.Output, StringComparison.Ordinal);
+        Assert.Contains("Válido: nenhum erro de validação semântica.", validate.Output, StringComparison.Ordinal);
+        Assert.Contains("Canonicalização: flow-c14n-0.1", hash.Output, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task UnsupportedLanguage_UsesDocumentedEnglishFallback()
+    {
+        var result = await RunAsync(
+            FlowCliApplication.CreateDefault(),
+            ["--language", "fr-FR", "help"]);
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.StartsWith("FLOWCLI_INVALID_VALUE:", result.Error, StringComparison.Ordinal);
+        Assert.Contains("Unsupported language", result.Error, StringComparison.Ordinal);
     }
 
     private static async Task<CliResult> RunAsync(FlowCliApplication application, string[] arguments)
