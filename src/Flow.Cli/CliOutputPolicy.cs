@@ -9,9 +9,101 @@ internal sealed record CliOutputPreparation(bool IsSuccess, bool Resumed, string
     public static CliOutputPreparation Failure(string resourceKey) => new(false, false, resourceKey);
 }
 
+internal sealed record CliOutputArtifactInspection(int TemporaryFiles, int StagingDirectories, int BackupDirectories)
+{
+    public int Total => TemporaryFiles + StagingDirectories + BackupDirectories;
+}
+
+internal sealed record CliOutputArtifactCleanup(
+    bool IsSuccess,
+    int RemovedArtifacts,
+    bool RestoredBackup,
+    string? ErrorResourceKey = null);
+
 /// <summary>Applies the CLI's explicit overwrite and interrupted-run recovery policy.</summary>
 internal static class CliOutputPolicy
 {
+    public static CliOutputArtifactInspection InspectArtifacts(string destinationPath)
+    {
+        var destination = Path.TrimEndingDirectorySeparator(Path.GetFullPath(destinationPath));
+        var parent = Path.GetDirectoryName(destination)
+            ?? throw new ArgumentException("The output destination must have a parent directory.", nameof(destinationPath));
+        if (!Directory.Exists(parent))
+        {
+            return new CliOutputArtifactInspection(0, 0, 0);
+        }
+
+        return new CliOutputArtifactInspection(
+            Directory.EnumerateFiles(parent, $".{Path.GetFileName(destination)}.*.tmp", SearchOption.TopDirectoryOnly)
+                .Count(path => IsTransactionArtifact(path, destination, "tmp")),
+            FindDirectories(parent, destination, "staging").Length,
+            FindDirectories(parent, destination, "backup").Length);
+    }
+
+    public static CliOutputArtifactCleanup CleanupArtifacts(string destinationPath)
+    {
+        var destination = Path.TrimEndingDirectorySeparator(Path.GetFullPath(destinationPath));
+        var parent = Path.GetDirectoryName(destination)
+            ?? throw new ArgumentException("The output destination must have a parent directory.", nameof(destinationPath));
+        if (!Directory.Exists(parent))
+        {
+            return new CliOutputArtifactCleanup(true, 0, false);
+        }
+
+        var temporaryFiles = Directory
+            .EnumerateFiles(parent, $".{Path.GetFileName(destination)}.*.tmp", SearchOption.TopDirectoryOnly)
+            .Where(path => IsTransactionArtifact(path, destination, "tmp"))
+            .Order(StringComparer.Ordinal)
+            .ToArray();
+        var staging = FindDirectories(parent, destination, "staging");
+        var backups = FindDirectories(parent, destination, "backup");
+        if (backups.Length > 1)
+        {
+            return new CliOutputArtifactCleanup(false, 0, false, "ErrorAmbiguousReviewRecovery");
+        }
+
+        EnsurePlainFiles(temporaryFiles);
+        EnsurePlainDirectories(staging.Concat(backups));
+        foreach (var backup in backups)
+        {
+            EnsureReviewManifest(backup);
+        }
+
+        if (backups.Length == 1 && File.Exists(destination))
+        {
+            return new CliOutputArtifactCleanup(false, 0, false, "ErrorOutputExpectedDirectory");
+        }
+
+        foreach (var path in temporaryFiles)
+        {
+            File.Delete(path);
+        }
+
+        foreach (var directory in staging)
+        {
+            Directory.Delete(directory, recursive: true);
+        }
+
+        var restored = false;
+        if (backups.Length == 1)
+        {
+            if (Directory.Exists(destination))
+            {
+                Directory.Delete(backups[0], recursive: true);
+            }
+            else
+            {
+                Directory.Move(backups[0], destination);
+                restored = true;
+            }
+        }
+
+        return new CliOutputArtifactCleanup(
+            true,
+            temporaryFiles.Length + staging.Length + backups.Length,
+            restored);
+    }
+
     public static CliOutputPreparation PrepareFile(string outputPath, bool force, bool resume)
     {
         var fullPath = Path.GetFullPath(outputPath);

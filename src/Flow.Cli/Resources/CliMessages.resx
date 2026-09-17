@@ -40,7 +40,9 @@
   <data name="HelpEpubReview1" xml:space="preserve"><value>  flow epub-review &lt;book.epub&gt; --candidate-id &lt;id&gt; --sha256 &lt;hash&gt; --output &lt;absolute-directory&gt;</value></data>
   <data name="HelpEpubReview2" xml:space="preserve"><value>    --repository-root &lt;absolute-directory&gt; --legal-use --drm-free [--ui-language &lt;auto|en|pt-PT|pt-BR&gt;] [--force] [--resume]</value></data>
   <data name="HelpEpubReview3" xml:space="preserve"><value>    Generate local mobile/desktop material and a separate human checklist.</value></data>
-  <data name="HelpOutputPolicy" xml:space="preserve"><value>    Existing outputs require --force. Use --resume only to remove recognized artifacts from an interrupted run and restart it.</value></data>
+  <data name="HelpOutputPolicy" xml:space="preserve"><value>    Existing outputs require --force. Destinations are locked across processes; --resume takes over only a recognized interrupted run.</value></data>
+  <data name="HelpExecutionStatus" xml:space="preserve"><value>  flow execution-status &lt;destination&gt; [--json &lt;report.json&gt;] [--force]    Inspect local execution state without changing it.</value></data>
+  <data name="HelpExecutionClean" xml:space="preserve"><value>  flow execution-clean &lt;destination&gt; --execution-id &lt;32-hex-id&gt;    Remove only recognized artifacts while holding the matching lock.</value></data>
   <data name="HelpInspect" xml:space="preserve"><value>  flow inspect &lt;document&gt;                      Show semantic document counts.</value></data>
   <data name="HelpValidate" xml:space="preserve"><value>  flow validate &lt;document&gt;                     Validate semantic invariants.</value></data>
   <data name="HelpHash" xml:space="preserve"><value>  flow hash &lt;document&gt;                         Compute the canonical SHA-256 hash.</value></data>
@@ -99,6 +101,26 @@
   <data name="ErrorOutputExpectedDirectory" xml:space="preserve"><value>Directory output '{0}' points to an existing file.</value></data>
   <data name="ErrorAmbiguousReviewRecovery" xml:space="preserve"><value>More than one recognized backup exists for '{0}'. Recovery was refused to avoid choosing one silently.</value></data>
   <data name="LabelInterruptedRunRecovered" xml:space="preserve"><value>Interrupted-run artifacts removed; restarting: {0}</value></data>
+  <data name="ErrorOutputExecutionActive" xml:space="preserve"><value>Another Flow process holds the execution lock for '{0}'. Wait for it to finish or use a different destination.</value></data>
+  <data name="ErrorInterruptedExecutionRequiresResume" xml:space="preserve"><value>The execution lock for '{0}' records an interrupted run. Use --resume to take it over and restart safely.</value></data>
+  <data name="ErrorOutputLockInvalid" xml:space="preserve"><value>The execution lock for '{0}' is invalid, belongs to another destination, or uses an unknown format. It was preserved for manual inspection.</value></data>
+  <data name="LabelExecutionStarted" xml:space="preserve"><value>Execution ID: {0}</value></data>
+  <data name="ErrorInvalidExecutionId" xml:space="preserve"><value>--execution-id must contain the exact 32 lowercase or uppercase hexadecimal characters printed by Flow.</value></data>
+  <data name="ErrorExecutionLockMissing" xml:space="preserve"><value>No Flow execution lock exists for '{0}'. Nothing was cleaned.</value></data>
+  <data name="ErrorExecutionIdMismatch" xml:space="preserve"><value>The supplied execution ID does not match the lock for '{0}'. Nothing was cleaned.</value></data>
+  <data name="ErrorExecutionStatusOutputConflict" xml:space="preserve"><value>The execution-status JSON path must differ from the inspected destination and its lock sidecar.</value></data>
+  <data name="LabelExecutionStatusJson" xml:space="preserve"><value>Execution-status JSON: {0}</value></data>
+  <data name="LabelExecutionLockStatus" xml:space="preserve"><value>Execution state: {0}</value></data>
+  <data name="LabelExecutionStatusId" xml:space="preserve"><value>Recorded execution ID: {0}</value></data>
+  <data name="LabelExecutionArtifacts" xml:space="preserve"><value>Recognized artifacts: {0} temporary file(s), {1} staging directory/directories, {2} backup directory/directories</value></data>
+  <data name="LabelExecutionCleanId" xml:space="preserve"><value>Cleaned execution ID: {0}</value></data>
+  <data name="LabelExecutionArtifactsRemoved" xml:space="preserve"><value>Removed or recovered artifacts: {0}</value></data>
+  <data name="LabelExecutionBackupRestored" xml:space="preserve"><value>Previous review backup restored: {0}</value></data>
+  <data name="ExecutionStateMissing" xml:space="preserve"><value>no lock</value></data>
+  <data name="ExecutionStateInvalid" xml:space="preserve"><value>invalid lock</value></data>
+  <data name="ExecutionStateActive" xml:space="preserve"><value>active</value></data>
+  <data name="ExecutionStateCompleted" xml:space="preserve"><value>completed</value></data>
+  <data name="ExecutionStateInterrupted" xml:space="preserve"><value>interrupted</value></data>
   <data name="ErrorImportOutputMissing" xml:space="preserve"><value>A successful EPUB import did not produce an output path.</value></data>
   <data name="ErrorHtmlBookParentRequired" xml:space="preserve"><value>The HTML book output must have a parent directory.</value></data>
   <data name="ErrorHtmlBookFilesystemRoot" xml:space="preserve"><value>The HTML book output cannot be a filesystem root.</value></data>

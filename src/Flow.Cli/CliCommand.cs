@@ -50,6 +50,13 @@ public sealed record ReviewEpubCommand(
     bool Force = false,
     bool Resume = false) : CliCommand;
 
+public sealed record ExecutionStatusCommand(
+    string DestinationPath,
+    string? JsonOutputPath,
+    bool Force = false) : CliCommand;
+
+public sealed record ExecutionCleanCommand(string DestinationPath, Guid ExecutionId) : CliCommand;
+
 public sealed record InspectCommand(string DocumentPath) : CliCommand;
 
 public sealed record ValidateCommand(string DocumentPath) : CliCommand;

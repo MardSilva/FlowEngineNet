@@ -115,6 +115,17 @@ public sealed class CliCommandParserTests
         Assert.Equal(HtmlBookUiLanguage.PortugueseBrazil, review.UiLanguage);
         Assert.True(review.Force);
         Assert.True(review.Resume);
+
+        var status = Assert.IsType<ExecutionStatusCommand>(_parser.Parse(
+            ["execution-status", "gate.json", "--json", "status.json", "--force"]).Command);
+        Assert.Equal("gate.json", status.DestinationPath);
+        Assert.Equal("status.json", status.JsonOutputPath);
+        Assert.True(status.Force);
+
+        var executionId = Guid.NewGuid();
+        var clean = Assert.IsType<ExecutionCleanCommand>(_parser.Parse(
+            ["execution-clean", "gate.json", "--execution-id", executionId.ToString("N")]).Command);
+        Assert.Equal(executionId, clean.ExecutionId);
     }
 
     [Fact]
@@ -170,6 +181,10 @@ public sealed class CliCommandParserTests
             _parser.Parse(
                 ["import", "book.epub", "--output", "one.json", "--output", "two.json"])
                 .Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_INVALID_VALUE:",
+            _parser.Parse(["execution-clean", "gate.json", "--execution-id", "not-an-id"]).Error,
             StringComparison.Ordinal);
         Assert.StartsWith(
             "FLOWCLI_DECLARATION_REQUIRED:",

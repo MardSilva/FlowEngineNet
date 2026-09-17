@@ -6,8 +6,8 @@ Flow 0.1 is a research-grade reference implementation. This list is part of the 
 
 - All public APIs, `.flow.json` fields, canonicalization rules, renderer output, and diagnostics are experimental and can change during `0.x`.
 - `.flow.json` is a development interchange representation, not a registered media type, standard, archival format, or final Flow container.
-- No NuGet package, executable package, release artifact, schema registry, compatibility guarantee, or migration tool is published.
-- The repository currently pins .NET SDK 10.0.401. Consumers must build from source.
+- No NuGet package, release artifact, schema registry, compatibility guarantee, or migration tool is published. `Flow.Cli` can produce the local tool package `FlowEngineNet.Tool` for development and CI smoke testing only.
+- The repository currently pins .NET SDK 10.0.401. The CLI package is framework-dependent and still requires a compatible .NET 10 installation; there is no signed installer or self-contained build.
 
 ## Semantic model
 
@@ -72,8 +72,11 @@ Flow 0.1 is a research-grade reference implementation. This list is part of the 
 - Human-readable CLI framing has resource catalogs for `en-US` and `pt-BR`; omitting `--language` selects `en-US`, and unsupported values are rejected with an English fallback error. Commands, options, JSON fields and diagnostic codes are invariant. All current stable EPUB, document-validation and Flow JSON diagnostic codes have a Portuguese summary. The original technical detail is shown after that summary because it can contain source paths, IDs, rejected values or parser messages that are not yet represented as typed localization arguments. Unknown future codes fall back to their original message instead of hiding information. Deterministic JSON evidence always retains the original language-neutral diagnostic payload.
 - It has no signing, verification, EPUB export, preference/theme flags, streaming pipeline, batch mode, or interactive prompts. Fidelity, metadata, package-processing, and source-map data are optional noncanonical sidecars rather than one durable publication container.
 - `corpus`, `epub-qualify`, and `epub-review` require `--force` before replacing a completed destination. `--resume` safely restarts recognized interrupted transactions but does not continue from partial semantic or HTML output. Other legacy output commands retain their documented replacement behavior, so callers should still use copies for experiments.
-- The CLI does not coordinate two concurrent processes targeting the same output path. Run one operation per destination; atomic commit protects against partial final output but is not a cross-process job scheduler.
+- `corpus`, `epub-qualify`, and `epub-review` hold a destination-specific file lock across processes. This relies on the host filesystem honoring .NET exclusive file-sharing semantics; unusual or remote filesystems that ignore those semantics are not supported. The lock coordinates one destination, not a queue or distributed job scheduler.
+- `execution-clean` removes only recognized local transaction artifacts after an exact UUID match. It does not repair invalid sidecars, choose between multiple backups, remove arbitrary files or continue computation from a partial phase. The completed sidecar remains intentionally available for later inspection.
+- The execution UUID prevents accidental cleanup of a different run; it is not an authentication token or a substitute for filesystem permissions. Anyone who can modify the destination directory can also modify or remove its local operational artifacts.
 - CI validates Windows and Linux only. macOS and alternative .NET SDK/runtime implementations are not in the matrix.
+- The distribution smoke test installs the locally packed CLI into an isolated tool directory and exercises startup plus a small document workflow. It does not test a public feed, package signing, upgrades from an older version, global installation, native/self-contained deployment, a real EPUB, or every CLI command.
 
 ## Explicitly out of scope
 

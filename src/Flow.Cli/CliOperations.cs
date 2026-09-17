@@ -98,6 +98,9 @@ public sealed class CliOperations
                 .ConfigureAwait(false),
             ReviewEpubCommand review => await ReviewEpubAsync(review, output, error, text, cancellationToken)
                 .ConfigureAwait(false),
+            ExecutionStatusCommand status => await ExecutionStatusAsync(status, output, error, text, cancellationToken)
+                .ConfigureAwait(false),
+            ExecutionCleanCommand clean => await ExecutionCleanAsync(clean, output, error, text).ConfigureAwait(false),
             InspectCommand inspect => await InspectAsync(inspect, output, text, cancellationToken).ConfigureAwait(false),
             ValidateCommand validate => await ValidateAsync(validate, output, text, cancellationToken).ConfigureAwait(false),
             HashCommand hash => await HashAsync(hash, output, text, cancellationToken).ConfigureAwait(false),
@@ -116,6 +119,7 @@ public sealed class CliOperations
                      "HelpCommands", "HelpSample", "HelpImport1", "HelpImport2", "HelpImport3", "HelpEpubInspect",
                      "HelpCorpus1", "HelpCorpus2", "HelpEpubQualify1", "HelpEpubQualify2", "HelpEpubQualify3",
                      "HelpEpubReview1", "HelpEpubReview2", "HelpEpubReview3", "HelpOutputPolicy",
+                     "HelpExecutionStatus", "HelpExecutionClean",
                      "HelpInspect", "HelpValidate", "HelpHash", "HelpRenderHtml", "HelpRenderBook", "HelpExitCodes",
                  })
         {
@@ -123,6 +127,129 @@ public sealed class CliOperations
         }
 
         return 0;
+    }
+
+    private static async Task<int> ExecutionStatusAsync(
+        ExecutionStatusCommand command,
+        TextWriter output,
+        TextWriter error,
+        CliTextCatalog text,
+        CancellationToken cancellationToken)
+    {
+        var destination = Path.TrimEndingDirectorySeparator(Path.GetFullPath(command.DestinationPath));
+        var inspection = CliExecutionLock.Inspect(destination);
+        var artifacts = CliOutputPolicy.InspectArtifacts(destination);
+        var report = new CliExecutionStatusReport(
+            inspection,
+            artifacts,
+            File.Exists(destination),
+            Directory.Exists(destination));
+
+        if (command.JsonOutputPath is not null)
+        {
+            var jsonPath = Path.GetFullPath(command.JsonOutputPath);
+            if (PathsEqual(jsonPath, destination) || PathsEqual(jsonPath, inspection.LockPath))
+            {
+                await error.WriteLineAsync(text.Diagnostic(
+                        "FLOWCLI_INVALID_OUTPUT",
+                        "ErrorExecutionStatusOutputConflict"))
+                    .ConfigureAwait(false);
+                return 1;
+            }
+
+            var preparation = CliOutputPolicy.PrepareFile(jsonPath, command.Force, resume: command.Force);
+            if (!await ReportOutputPreparationAsync(preparation, jsonPath, output, error, text).ConfigureAwait(false))
+            {
+                return 1;
+            }
+
+            await CliExecutionStatusReportJsonSerializer.WriteAtomicallyAsync(report, jsonPath, cancellationToken)
+                .ConfigureAwait(false);
+            await output.WriteLineAsync(text.Format("LabelExecutionStatusJson", jsonPath)).ConfigureAwait(false);
+        }
+
+        await output.WriteLineAsync(text.Format(
+                "LabelExecutionLockStatus",
+                LockStatus(report.Lock, text)))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format(
+                "LabelExecutionStatusId",
+                report.Lock.ExecutionId?.ToString("N") ?? text.Get("ValueNone")))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format(
+                "LabelExecutionArtifacts",
+                artifacts.TemporaryFiles,
+                artifacts.StagingDirectories,
+                artifacts.BackupDirectories))
+            .ConfigureAwait(false);
+        return inspection.IsValid ? 0 : 2;
+    }
+
+    private static async Task<int> ExecutionCleanAsync(
+        ExecutionCleanCommand command,
+        TextWriter output,
+        TextWriter error,
+        CliTextCatalog text)
+    {
+        var destination = Path.TrimEndingDirectorySeparator(Path.GetFullPath(command.DestinationPath));
+        var acquisition = CliExecutionLock.AcquireForMaintenance(destination, command.ExecutionId);
+        using var executionLock = acquisition.ExecutionLock;
+        if (!acquisition.IsSuccess)
+        {
+            await error.WriteLineAsync(text.Diagnostic(
+                    "FLOWCLI_EXECUTION_CLEAN",
+                    acquisition.ErrorResourceKey!,
+                    destination))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        var cleanup = CliOutputPolicy.CleanupArtifacts(destination);
+        if (!cleanup.IsSuccess)
+        {
+            await error.WriteLineAsync(text.Diagnostic(
+                    "FLOWCLI_EXECUTION_CLEAN",
+                    cleanup.ErrorResourceKey!,
+                    destination))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        executionLock!.Complete();
+        await output.WriteLineAsync(text.Format("LabelExecutionCleanId", command.ExecutionId.ToString("N")))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelExecutionArtifactsRemoved", cleanup.RemovedArtifacts))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format(
+                "LabelExecutionBackupRestored",
+                text.Get(cleanup.RestoredBackup ? "ValueYes" : "ValueNo")))
+            .ConfigureAwait(false);
+        return 0;
+    }
+
+    private static string LockStatus(CliExecutionInspection inspection, CliTextCatalog text)
+    {
+        if (!inspection.Exists)
+        {
+            return text.Get("ExecutionStateMissing");
+        }
+
+        if (!inspection.IsValid)
+        {
+            return text.Get("ExecutionStateInvalid");
+        }
+
+        if (inspection.IsWriterActive)
+        {
+            return text.Get("ExecutionStateActive");
+        }
+
+        return inspection.RecordedState switch
+        {
+            CliExecutionRecordedState.Completed => text.Get("ExecutionStateCompleted"),
+            CliExecutionRecordedState.Interrupted => text.Get("ExecutionStateInterrupted"),
+            _ => text.Get("ExecutionStateActive"),
+        };
     }
 
     private async Task<int> ExecuteCorpusAsync(
@@ -180,9 +307,17 @@ public sealed class CliOperations
                 await File.ReadAllBytesAsync(baselinePath, cancellationToken).ConfigureAwait(false));
         }
 
+        var lockAcquisition = CliExecutionLock.Acquire(reportPath, command.Resume);
+        using var executionLock = lockAcquisition.ExecutionLock;
+        if (!await ReportLockAcquisitionAsync(lockAcquisition, reportPath, output, error, text).ConfigureAwait(false))
+        {
+            return 1;
+        }
+
         var outputPreparation = CliOutputPolicy.PrepareFile(reportPath, command.Force, command.Resume);
         if (!await ReportOutputPreparationAsync(outputPreparation, reportPath, output, error, text).ConfigureAwait(false))
         {
+            executionLock!.Complete();
             return 1;
         }
 
@@ -219,6 +354,7 @@ public sealed class CliOperations
             && summary.Skipped == 0
             && summary.Inconclusive == 0
             && (result.AcceptedBaselineComparison is null || result.AcceptedBaselineComparison.IsMatch);
+        executionLock!.Complete();
         return passed ? 0 : 2;
     }
 
@@ -260,9 +396,17 @@ public sealed class CliOperations
             return 1;
         }
 
+        var lockAcquisition = CliExecutionLock.Acquire(reportPath, command.Resume);
+        using var executionLock = lockAcquisition.ExecutionLock;
+        if (!await ReportLockAcquisitionAsync(lockAcquisition, reportPath, output, error, text).ConfigureAwait(false))
+        {
+            return 1;
+        }
+
         var outputPreparation = CliOutputPolicy.PrepareFile(reportPath, command.Force, command.Resume);
         if (!await ReportOutputPreparationAsync(outputPreparation, reportPath, output, error, text).ConfigureAwait(false))
         {
+            executionLock!.Complete();
             return 1;
         }
 
@@ -300,6 +444,7 @@ public sealed class CliOperations
                 warningCount))
             .ConfigureAwait(false);
         await output.WriteLineAsync(text.Get("GateHumanReviewPending")).ConfigureAwait(false);
+        executionLock!.Complete();
         return failedAutomatic == 0 ? 0 : 2;
     }
 
@@ -335,6 +480,14 @@ public sealed class CliOperations
             return 1;
         }
 
+        var lockAcquisition = CliExecutionLock.Acquire(outputDirectory, command.Resume);
+        using var executionLock = lockAcquisition.ExecutionLock;
+        if (!await ReportLockAcquisitionAsync(lockAcquisition, outputDirectory, output, error, text)
+                .ConfigureAwait(false))
+        {
+            return 1;
+        }
+
         var outputPreparation = CliOutputPolicy.PrepareReviewDirectory(
             outputDirectory,
             command.Force,
@@ -342,6 +495,7 @@ public sealed class CliOperations
         if (!await ReportOutputPreparationAsync(outputPreparation, outputDirectory, output, error, text)
                 .ConfigureAwait(false))
         {
+            executionLock!.Complete();
             return 1;
         }
 
@@ -369,7 +523,32 @@ public sealed class CliOperations
             .ConfigureAwait(false);
         await output.WriteLineAsync(text.Format("LabelReviewSamples", result.Samples.Length)).ConfigureAwait(false);
         await output.WriteLineAsync(text.Format("LabelReviewTargets", result.Targets.Length)).ConfigureAwait(false);
+        executionLock!.Complete();
         return 0;
+    }
+
+    private static async Task<bool> ReportLockAcquisitionAsync(
+        CliExecutionLockAcquisition acquisition,
+        string path,
+        TextWriter output,
+        TextWriter error,
+        CliTextCatalog text)
+    {
+        if (!acquisition.IsSuccess)
+        {
+            await error.WriteLineAsync(text.Diagnostic(
+                    "FLOWCLI_EXECUTION_LOCK",
+                    acquisition.ErrorResourceKey!,
+                    path))
+                .ConfigureAwait(false);
+            return false;
+        }
+
+        await output.WriteLineAsync(text.Format(
+                "LabelExecutionStarted",
+                acquisition.ExecutionLock!.ExecutionId.ToString("N")))
+            .ConfigureAwait(false);
+        return true;
     }
 
     private static async Task<bool> ReportOutputPreparationAsync(

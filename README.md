@@ -219,6 +219,18 @@ dotnet run --project src/Flow.Cli -- --language pt-BR --banner help
 dotnet run --project src/Flow.Cli -- --language en-US --no-color help
 ```
 
+### Test the packaged CLI
+
+The repository can also build `Flow.Cli` as the local .NET tool `FlowEngineNet.Tool`, whose command is `flow`. Nothing is published to NuGet yet. The distribution smoke test creates the package, installs it in an isolated directory, runs representative commands through the installed launcher, and uninstalls it without changing the user's global tools:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\eng\smoke-test-cli.ps1 -Configuration Release
+```
+
+On PowerShell 7, including Linux, use `pwsh` instead of `powershell.exe`. A successful run leaves its report and package under `artifacts/cli-smoke/`, which is ignored by Git. GitHub Actions runs the same smoke test on Windows and Ubuntu after restore, formatting, build and tests.
+
+This check requires the .NET 10 SDK selected by `global.json`. It proves that the locally built framework-dependent package can be installed, started and used for the basic document workflow; it is not a signed release or an operating-system installer.
+
 Global options must appear before the command. They affect terminal text only: generated `.flow.json`, evidence JSON, canonical bytes, hashes and stable diagnostic codes do not change. In `pt-BR`, every current EPUB, document-validation and Flow JSON code receives a short Portuguese summary followed by its original technical detail. This keeps paths, IDs and rejected values available for troubleshooting without changing deterministic reports.
 
 To see the current end-to-end result without generating anything, open the committed mobile and desktop files:
@@ -269,7 +281,9 @@ dotnet run --project .\src\Flow.Cli -- --language pt-BR epub-review $epub `
 
 The gate runs the automatic pipeline at least twice. Its overall JSON status normally remains `inconclusive` until a person completes the separate checklist, but the command returns `0` when every automatic check passes. `epub-review` generates `review.html`, `review-checklist.json`, mobile and desktop packages. It never approves review decisions automatically.
 
-These operational commands refuse to replace existing reports or review directories unless `--force` is present. If a process is interrupted and leaves a recognized hidden transaction artifact beside the destination, rerun it with `--resume`; add `--force` as well when the interrupted operation was replacing a completed result. Recovery restarts processing from the verified EPUB and never treats partial JSON or HTML as complete.
+These operational commands refuse to replace existing reports or review directories unless `--force` is present. A hidden destination-specific lock prevents concurrent Flow processes from writing the same output. The CLI prints a random execution ID for log correlation, while the lock stores only that ID, its state and a SHA-256 fingerprint of the normalized destination. It contains no book data or physical path and does not enter deterministic evidence. If a process is interrupted, rerun it with `--resume`; add `--force` as well when the interrupted operation was replacing a completed result. Recovery restarts processing from the verified EPUB and never treats partial JSON or HTML as complete.
+
+Use `flow execution-status <destination>` to inspect that state without changing it. If abandoned transaction artifacts need removal, copy the exact ID shown by the status command into `flow execution-clean <destination> --execution-id <id>`. Cleanup refuses active, invalid or mismatched locks and never deletes unrelated files.
 
 ### Import a real EPUB and generate its HTML book
 
@@ -341,7 +355,7 @@ The detailed [sample walkthrough](samples/SampleBook/README.md) explains prerequ
 
 ## Versioning and compatibility
 
-All `0.x` APIs, JSON fields, canonicalization rules, and layout profiles are experimental and may change. Canonicalization changes require a new named profile so that an existing document hash never silently acquires different semantics. No packages are published for 0.1; see the complete [known limitations](docs/known-limitations.md).
+All `0.x` APIs, JSON fields, canonicalization rules, and layout profiles are experimental and may change. Canonicalization changes require a new named profile so that an existing document hash never silently acquires different semantics. The CLI can be packed and installed locally for testing, but no package is published yet; see the complete [known limitations](docs/known-limitations.md).
 
 ## License
 

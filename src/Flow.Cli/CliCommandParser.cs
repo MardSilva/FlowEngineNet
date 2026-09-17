@@ -25,6 +25,8 @@ public sealed class CliCommandParser
             "corpus" => ParseCorpus(arguments),
             "epub-qualify" => ParseEpubQualify(arguments),
             "epub-review" => ParseEpubReview(arguments),
+            "execution-status" => ParseExecutionStatus(arguments),
+            "execution-clean" => ParseExecutionClean(arguments),
             "inspect" => ParseDocumentCommand(arguments, static path => new InspectCommand(path)),
             "validate" => ParseDocumentCommand(arguments, static path => new ValidateCommand(path)),
             "hash" => ParseDocumentCommand(arguments, static path => new HashCommand(path)),
@@ -430,6 +432,74 @@ public sealed class CliCommandParser
             _ => CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", "flow sample [output]"),
         };
 
+    private static CommandParseResult ParseExecutionStatus(IReadOnlyList<string> arguments)
+    {
+        if (arguments.Count < 2)
+        {
+            return CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", ExecutionStatusUsage);
+        }
+
+        string? jsonPath = null;
+        var force = false;
+        for (var index = 2; index < arguments.Count; index++)
+        {
+            var option = arguments[index];
+            if (option == "--force")
+            {
+                if (force)
+                {
+                    return CommandParseResult.Failure("FLOWCLI_DUPLICATE_OPTION", "ErrorDuplicateOption", option);
+                }
+
+                force = true;
+                continue;
+            }
+
+            if (option != "--json")
+            {
+                return CommandParseResult.Failure(
+                    "FLOWCLI_UNKNOWN_OPTION",
+                    "ErrorUnknownOption",
+                    "execution-status",
+                    option,
+                    ExecutionStatusUsage);
+            }
+
+            if (jsonPath is not null)
+            {
+                return CommandParseResult.Failure("FLOWCLI_DUPLICATE_OPTION", "ErrorDuplicateOption", option);
+            }
+
+            if (++index >= arguments.Count || string.IsNullOrWhiteSpace(arguments[index]))
+            {
+                return CommandParseResult.Failure(
+                    "FLOWCLI_USAGE",
+                    "ErrorOptionRequiresValue",
+                    option,
+                    ExecutionStatusUsage);
+            }
+
+            jsonPath = arguments[index];
+        }
+
+        return CommandParseResult.Success(new ExecutionStatusCommand(arguments[1], jsonPath, force));
+    }
+
+    private static CommandParseResult ParseExecutionClean(IReadOnlyList<string> arguments)
+    {
+        if (arguments.Count != 4 || arguments[2] != "--execution-id")
+        {
+            return CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", ExecutionCleanUsage);
+        }
+
+        if (!Guid.TryParseExact(arguments[3], "N", out var executionId))
+        {
+            return CommandParseResult.Failure("FLOWCLI_INVALID_VALUE", "ErrorInvalidExecutionId");
+        }
+
+        return CommandParseResult.Success(new ExecutionCleanCommand(arguments[1], executionId));
+    }
+
     private static CommandParseResult ParseDocumentCommand(
         IReadOnlyList<string> arguments,
         Func<string, CliCommand> create) =>
@@ -602,4 +672,10 @@ public sealed class CliCommandParser
 
     private const string EpubReviewUsage =
         "flow epub-review <book.epub> --candidate-id <id> --sha256 <hash> --output <absolute-directory> --repository-root <absolute-directory> --legal-use --drm-free [--ui-language <auto|en|pt-PT|pt-BR>] [--force] [--resume]";
+
+    private const string ExecutionStatusUsage =
+        "flow execution-status <destination> [--json <report.json>] [--force]";
+
+    private const string ExecutionCleanUsage =
+        "flow execution-clean <destination> --execution-id <32-hex-id>";
 }

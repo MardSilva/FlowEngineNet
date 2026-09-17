@@ -121,6 +121,26 @@ public sealed class CliOutputPolicyTests
         Assert.True(Directory.Exists(second));
     }
 
+    [Fact]
+    public void CleanupArtifacts_RemovesOnlyDestinationBoundTransactions()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var output = workspace.PathOf("gate.json");
+        var recognized = workspace.PathOf($".gate.json.{Guid.NewGuid():N}.tmp");
+        var unrelated = workspace.PathOf(".gate.json.manual.tmp");
+        File.WriteAllText(recognized, "partial", Encoding.UTF8);
+        File.WriteAllText(unrelated, "keep", Encoding.UTF8);
+
+        var before = CliOutputPolicy.InspectArtifacts(output);
+        var cleanup = CliOutputPolicy.CleanupArtifacts(output);
+
+        Assert.Equal(1, before.TemporaryFiles);
+        Assert.True(cleanup.IsSuccess);
+        Assert.Equal(1, cleanup.RemovedArtifacts);
+        Assert.False(File.Exists(recognized));
+        Assert.True(File.Exists(unrelated));
+    }
+
     private sealed class TemporaryWorkspace : IDisposable
     {
         public TemporaryWorkspace()

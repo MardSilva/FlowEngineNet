@@ -40,7 +40,9 @@
   <data name="HelpEpubReview1" xml:space="preserve"><value>  flow epub-review &lt;livro.epub&gt; --candidate-id &lt;id&gt; --sha256 &lt;hash&gt; --output &lt;diretório-absoluto&gt;</value></data>
   <data name="HelpEpubReview2" xml:space="preserve"><value>    --repository-root &lt;diretório-absoluto&gt; --legal-use --drm-free [--ui-language &lt;auto|en|pt-PT|pt-BR&gt;] [--force] [--resume]</value></data>
   <data name="HelpEpubReview3" xml:space="preserve"><value>    Gera material local para celular/desktop e um checklist humano separado.</value></data>
-  <data name="HelpOutputPolicy" xml:space="preserve"><value>    Saídas existentes exigem --force. Use --resume somente para remover resíduos reconhecidos de uma execução interrompida e reiniciá-la.</value></data>
+  <data name="HelpOutputPolicy" xml:space="preserve"><value>    Saídas existentes exigem --force. Os destinos têm lock entre processos; --resume assume somente uma execução interrompida reconhecida.</value></data>
+  <data name="HelpExecutionStatus" xml:space="preserve"><value>  flow execution-status &lt;destino&gt; [--json &lt;relatório.json&gt;] [--force]    Inspeciona o estado local sem alterá-lo.</value></data>
+  <data name="HelpExecutionClean" xml:space="preserve"><value>  flow execution-clean &lt;destino&gt; --execution-id &lt;id-hexadecimal-de-32-caracteres&gt;    Remove somente resíduos reconhecidos sob o lock correspondente.</value></data>
   <data name="HelpInspect" xml:space="preserve"><value>  flow inspect &lt;documento&gt;                     Exibe as contagens semânticas do documento.</value></data>
   <data name="HelpValidate" xml:space="preserve"><value>  flow validate &lt;documento&gt;                    Valida as invariantes semânticas.</value></data>
   <data name="HelpHash" xml:space="preserve"><value>  flow hash &lt;documento&gt;                        Calcula o hash SHA-256 canônico.</value></data>
@@ -99,6 +101,26 @@
   <data name="ErrorOutputExpectedDirectory" xml:space="preserve"><value>A saída de diretório '{0}' aponta para um arquivo existente.</value></data>
   <data name="ErrorAmbiguousReviewRecovery" xml:space="preserve"><value>Há mais de um backup reconhecido para '{0}'. A recuperação foi recusada para não escolher um deles silenciosamente.</value></data>
   <data name="LabelInterruptedRunRecovered" xml:space="preserve"><value>Resíduos da execução interrompida removidos; reiniciando: {0}</value></data>
+  <data name="ErrorOutputExecutionActive" xml:space="preserve"><value>Outro processo do Flow mantém o lock de execução para '{0}'. Aguarde o término ou use outro destino.</value></data>
+  <data name="ErrorInterruptedExecutionRequiresResume" xml:space="preserve"><value>O lock de execução para '{0}' registra uma execução interrompida. Use --resume para assumi-la e reiniciar com segurança.</value></data>
+  <data name="ErrorOutputLockInvalid" xml:space="preserve"><value>O lock de execução para '{0}' é inválido, pertence a outro destino ou usa um formato desconhecido. Ele foi preservado para inspeção manual.</value></data>
+  <data name="LabelExecutionStarted" xml:space="preserve"><value>ID da execução: {0}</value></data>
+  <data name="ErrorInvalidExecutionId" xml:space="preserve"><value>--execution-id deve conter exatamente os 32 caracteres hexadecimais, em maiúsculas ou minúsculas, exibidos pelo Flow.</value></data>
+  <data name="ErrorExecutionLockMissing" xml:space="preserve"><value>Não existe um lock de execução do Flow para '{0}'. Nada foi limpo.</value></data>
+  <data name="ErrorExecutionIdMismatch" xml:space="preserve"><value>O ID informado não corresponde ao lock de '{0}'. Nada foi limpo.</value></data>
+  <data name="ErrorExecutionStatusOutputConflict" xml:space="preserve"><value>O caminho do JSON de status deve ser diferente do destino inspecionado e do respectivo sidecar de lock.</value></data>
+  <data name="LabelExecutionStatusJson" xml:space="preserve"><value>JSON do estado da execução: {0}</value></data>
+  <data name="LabelExecutionLockStatus" xml:space="preserve"><value>Estado da execução: {0}</value></data>
+  <data name="LabelExecutionStatusId" xml:space="preserve"><value>ID de execução registrado: {0}</value></data>
+  <data name="LabelExecutionArtifacts" xml:space="preserve"><value>Resíduos reconhecidos: {0} arquivo(s) temporário(s), {1} diretório(s) de staging, {2} diretório(s) de backup</value></data>
+  <data name="LabelExecutionCleanId" xml:space="preserve"><value>ID da execução limpa: {0}</value></data>
+  <data name="LabelExecutionArtifactsRemoved" xml:space="preserve"><value>Resíduos removidos ou recuperados: {0}</value></data>
+  <data name="LabelExecutionBackupRestored" xml:space="preserve"><value>Backup anterior da revisão restaurado: {0}</value></data>
+  <data name="ExecutionStateMissing" xml:space="preserve"><value>sem lock</value></data>
+  <data name="ExecutionStateInvalid" xml:space="preserve"><value>lock inválido</value></data>
+  <data name="ExecutionStateActive" xml:space="preserve"><value>ativa</value></data>
+  <data name="ExecutionStateCompleted" xml:space="preserve"><value>concluída</value></data>
+  <data name="ExecutionStateInterrupted" xml:space="preserve"><value>interrompida</value></data>
   <data name="ErrorImportOutputMissing" xml:space="preserve"><value>Uma importação EPUB bem-sucedida não produziu um caminho de saída.</value></data>
   <data name="ErrorHtmlBookParentRequired" xml:space="preserve"><value>A saída do livro HTML deve estar dentro de um diretório.</value></data>
   <data name="ErrorHtmlBookFilesystemRoot" xml:space="preserve"><value>A saída do livro HTML não pode ser a raiz do sistema de arquivos.</value></data>

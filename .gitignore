@@ -9,6 +9,7 @@ coverage/
 artifacts/
 *.nupkg
 *.snupkg
+.*.flow-execution.lock
 samples/SampleBook/*.html
 !samples/SampleBook/mobile.html
 !samples/SampleBook/desktop.html

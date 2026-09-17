@@ -811,6 +811,8 @@ public sealed class FlowCliIntegrationTests
         Assert.Contains("flow corpus <manifest.json>", result.Output, StringComparison.Ordinal);
         Assert.Contains("flow epub-qualify <book.epub>", result.Output, StringComparison.Ordinal);
         Assert.Contains("flow epub-review <book.epub>", result.Output, StringComparison.Ordinal);
+        Assert.Contains("flow execution-status <destination>", result.Output, StringComparison.Ordinal);
+        Assert.Contains("flow execution-clean <destination>", result.Output, StringComparison.Ordinal);
         Assert.Contains("flow validate <document>", result.Output, StringComparison.Ordinal);
         Assert.Contains("Exit codes: 0 completed operation, 1 command/input/I/O failure, 2 semantic validation or automatic qualification failure, 130 cancellation.", result.Output, StringComparison.Ordinal);
         Assert.Contains("--language <en-US|pt-BR>", result.Output, StringComparison.Ordinal);
@@ -971,8 +973,48 @@ public sealed class FlowCliIntegrationTests
         Assert.Contains("Use --resume", interruptedRefused.Error, StringComparison.Ordinal);
         Assert.Equal(2, resumed.ExitCode);
         Assert.Contains("Resíduos da execução interrompida removidos", resumed.Output, StringComparison.Ordinal);
+        Assert.Matches("ID da execução: [0-9a-f]{32}", resumed.Output);
         Assert.False(File.Exists(interrupted));
         Assert.True(File.Exists(reportPath));
+        var lockPath = workspace.PathOf(".corpus-report.json.flow-execution.lock");
+        using var executionLock = JsonDocument.Parse(await File.ReadAllBytesAsync(lockPath));
+        Assert.Equal("completed", executionLock.RootElement.GetProperty("state").GetString());
+        Assert.DoesNotContain(workspace.Root, await File.ReadAllTextAsync(lockPath), StringComparison.OrdinalIgnoreCase);
+        var executionId = executionLock.RootElement.GetProperty("executionId").GetString()!;
+
+        var statusPath = workspace.PathOf("execution-status.json");
+        var status = await RunAsync(
+            application,
+            ["--language", "pt-BR", "execution-status", reportPath, "--json", statusPath]);
+        Assert.Equal(0, status.ExitCode);
+        Assert.Contains("Estado da execução: concluída", status.Output, StringComparison.Ordinal);
+        Assert.Contains(executionId, status.Output, StringComparison.Ordinal);
+        AssertJsonEncoding(statusPath);
+        var statusJson = await File.ReadAllTextAsync(statusPath);
+        Assert.Contains("flow-cli-execution-status-0.1", statusJson, StringComparison.Ordinal);
+        Assert.DoesNotContain(workspace.Root, statusJson, StringComparison.OrdinalIgnoreCase);
+        var statusAgain = await RunAsync(
+            application,
+            ["execution-status", reportPath, "--json", statusPath, "--force"]);
+        Assert.Equal(0, statusAgain.ExitCode);
+        Assert.Equal(statusJson, await File.ReadAllTextAsync(statusPath));
+
+        var cleanupArtifact = workspace.PathOf($".corpus-report.json.{Guid.NewGuid():N}.tmp");
+        await File.WriteAllTextAsync(cleanupArtifact, "partial", new UTF8Encoding(false));
+        var wrongClean = await RunAsync(
+            application,
+            ["execution-clean", reportPath, "--execution-id", Guid.NewGuid().ToString("N")]);
+
+        Assert.Equal(1, wrongClean.ExitCode);
+        Assert.True(File.Exists(cleanupArtifact));
+
+        var clean = await RunAsync(
+            application,
+            ["--language", "pt-BR", "execution-clean", reportPath, "--execution-id", executionId]);
+
+        Assert.Equal(0, clean.ExitCode);
+        Assert.Contains("Resíduos removidos ou recuperados: 1", clean.Output, StringComparison.Ordinal);
+        Assert.False(File.Exists(cleanupArtifact));
     }
 
     [Fact]

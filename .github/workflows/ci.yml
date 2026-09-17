@@ -39,3 +39,7 @@ jobs:
 
       - name: Test
         run: dotnet test Flow.sln --no-build
+
+      - name: Smoke test packaged CLI
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/smoke-test-cli.ps1 -Configuration Release

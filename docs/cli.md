@@ -4,6 +4,18 @@ The `flow` executable is a deliberately small composition layer over the documen
 
 The help output identifies the CLI and `.flow.json` representation as experimental. Stable `FLOWCLI_*` prefixes distinguish command, option, value, and operation failures. Exit code `0` means the requested operation completed, `1` means command/input/I/O failure, `2` means semantic validation or automatic qualification failed, and `130` means cancellation.
 
+## Local tool package
+
+`Flow.Cli` is packable as the framework-dependent .NET tool `FlowEngineNet.Tool`; the installed command is `flow`. The package is not published. To exercise the same distribution path used by CI without changing the global tool list, run from the repository root:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\eng\smoke-test-cli.ps1 -Configuration Release
+```
+
+Use `pwsh` on PowerShell 7 or Linux. The script obtains the package identity from MSBuild, packs the current source, creates a NuGet configuration containing only that local package source, and installs it with `--tool-path`. It then verifies English and Brazilian Portuguese help, `sample`, `inspect`, `validate`, `hash`, and standalone HTML rendering through the installed launcher. Cleanup removes the isolated tool installation even when a command fails.
+
+The deterministic summary is written to `artifacts/cli-smoke/smoke-result.json`; build products remain under the ignored `artifacts/` directory. The script requires the .NET 10 SDK selected by `global.json`. It does not publish, sign or install a machine-wide tool.
+
 ## Global output options
 
 Global options appear before the command:
@@ -27,6 +39,8 @@ flow epub-inspect <book.epub> [--json <report.json>]
 flow corpus <manifest.json> --repository-root <directory> --report <report.json> [--external-root <directory>] [--baseline <baseline.json>] [--force] [--resume]
 flow epub-qualify <book.epub> --candidate-id <id> --sha256 <hash> --report <report.json> --repository-root <absolute-directory> --legal-use --drm-free [--repetitions <n>] [--include-environment] [--force] [--resume]
 flow epub-review <book.epub> --candidate-id <id> --sha256 <hash> --output <absolute-directory> --repository-root <absolute-directory> --legal-use --drm-free [--ui-language <auto|en|pt-PT|pt-BR>] [--force] [--resume]
+flow execution-status <destination> [--json <report.json>] [--force]
+flow execution-clean <destination> --execution-id <32-hex-id>
 flow inspect <document>
 flow validate <document>
 flow hash <document>
@@ -67,7 +81,13 @@ The imported `.flow.json` contains only canonical Flow metadata. Publisher, cont
 
 `corpus`, `epub-qualify`, and `epub-review` do not replace an existing final output by default. `--force` permits replacement, but the final file or directory remains untouched until the new result is complete and ready for its atomic commit. Existing review directories must still contain a recognized Flow review manifest; `--force` never authorizes deletion of an arbitrary directory.
 
-An interrupted atomic write may leave a hidden staging, backup, or temporary artifact beside its destination. The next invocation stops and asks for `--resume`. This option removes only artifacts whose exact destination-specific name contains a valid transaction identifier, restores a recognized review backup when necessary, and restarts the operation from the source. Partial JSON and HTML are never reused as completed evidence. Use `--force --resume` together when an interrupted attempt was replacing a completed output. Ambiguous or unrecognized backups are left untouched and reported as errors.
+Each command holds a hidden `.<destination>.flow-execution.lock` sidecar for its complete execution. The handle allows read-only status inspection but rejects another writer. The sidecar persists after release and records a random 128-bit execution ID, state, format and SHA-256 fingerprint of the normalized destination. It never contains the destination path, book content or source metadata, and it is excluded from Git, reports, canonicalization and hashes. The execution ID is printed for local log correlation but is intentionally nondeterministic.
+
+An interrupted atomic write leaves its lock in `interrupted` state, or `active` if the process ended before it could update the state, and may also leave a hidden staging, backup or temporary artifact. The next invocation stops and asks for `--resume`. This option takes over only a recognized lock for the exact destination, assigns a new execution ID, removes recognized transaction artifacts and restarts from the source. Partial JSON and HTML are never reused as completed evidence. Use `--force --resume` together when an interrupted attempt was replacing a completed output. Invalid locks and ambiguous or unrecognized backups are preserved for manual inspection.
+
+`execution-status` reads this local state without acquiring the destination for writing. It reports a missing, active, completed, interrupted or invalid lock, the recorded UUID and counts of recognized temporary, staging and backup artifacts. `--json` writes the path-free `flow-cli-execution-status-0.1` report in UTF-8 without BOM and LF. An existing status report requires `--force`; its path cannot be the inspected destination or lock sidecar.
+
+`execution-clean` is an explicit maintenance operation. It requires the exact 32-character execution ID reported by `execution-status`, refuses a lock held by an active writer, and then holds the lock exclusively while cleaning. Only exact destination-bound transaction names are considered. A single recognized review backup is restored when the destination is missing; ambiguous backups, reparse points, copied locks, invalid manifests and unrelated files are preserved. The sidecar itself remains, marked `completed`, so later inspection retains the local execution identity.
 
 `inspect` reports identity, metadata, total nodes, chapters, sections, paragraphs, figures, footnotes, assets, addressable anchors, and presentation availability.
 
@@ -92,6 +112,8 @@ dotnet run --project src/Flow.Cli -- epub-inspect book.epub --json inspection.js
 dotnet run --project src/Flow.Cli -- corpus epub-corpus.json --repository-root C:\src\FlowEngineNet --report C:\flow-local\corpus.json --force
 dotnet run --project src/Flow.Cli -- epub-qualify C:\books\book.epub --candidate-id candidate-001 --sha256 $sha256 --report C:\flow-local\gate.json --repository-root C:\src\FlowEngineNet --legal-use --drm-free
 dotnet run --project src/Flow.Cli -- epub-review C:\books\book.epub --candidate-id candidate-001 --sha256 $sha256 --output C:\flow-local\review --repository-root C:\src\FlowEngineNet --legal-use --drm-free --ui-language pt-BR
+dotnet run --project src/Flow.Cli -- execution-status C:\flow-local\gate.json --json C:\flow-local\gate-status.json
+dotnet run --project src/Flow.Cli -- execution-clean C:\flow-local\gate.json --execution-id 0123456789abcdef0123456789abcdef
 dotnet run --project src/Flow.Cli -- --language pt-BR import book.epub --diagnostics-json import-report.json
 dotnet run --project src/Flow.Cli -- validate sample.flow.json
 dotnet run --project src/Flow.Cli -- render sample.flow.json --html sample.html --width 390 --height 844
