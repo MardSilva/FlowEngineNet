@@ -105,7 +105,7 @@ jobs:
           global-json-file: global.json
 
       - name: Download canonical release candidate
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.1
         with:
           name: canonical-release
           path: artifacts/canonical-release
@@ -137,13 +137,13 @@ jobs:
           persist-credentials: false
 
       - name: Download canonical release candidate
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.1
         with:
           name: canonical-release
           path: artifacts/cross-platform/canonical
 
       - name: Download platform validation evidence
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.1
         with:
           pattern: release-validation-*
           path: artifacts/cross-platform/validations
