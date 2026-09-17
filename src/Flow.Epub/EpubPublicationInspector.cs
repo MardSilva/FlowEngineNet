@@ -275,6 +275,7 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
             var isNavigation = properties.Contains("nav", StringComparer.Ordinal)
                 || string.Equals(mediaType, NcxMediaType, StringComparison.OrdinalIgnoreCase);
             var exists = entries.ContainsKey(resourcePath);
+            entries.TryGetValue(resourcePath, out var archiveEntry);
             var supported = IsStructurallySupported(mediaType, isNavigation);
             var item = new EpubManifestItemInfo(
                 id,
@@ -286,7 +287,9 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
                 isNavigation,
                 supported,
                 NormalizedOptional((string?)element.Attribute("fallback")),
-                NormalizedOptional((string?)element.Attribute("media-overlay")));
+                NormalizedOptional((string?)element.Attribute("media-overlay")),
+                archiveEntry?.CompressedLength ?? 0,
+                archiveEntry?.Length ?? 0);
             if (!manifestById.TryAdd(id, item))
             {
                 diagnostics.Add(Error(
@@ -334,7 +337,7 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
                          property is not "nav" and not "cover-image"))
             {
                 diagnostics.Add(Warning(
-                    EpubDiagnosticCodes.UnsupportedResource,
+                    EpubDiagnosticCodes.UnsupportedManifestProperty,
                     $"Manifest property '{property}' on item '{id}' is retained but is not interpreted.",
                     resourcePath));
             }
@@ -551,6 +554,7 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
     private static bool IsStructurallySupported(string mediaType, bool isNavigation) =>
         isNavigation
         || string.Equals(mediaType, "application/xhtml+xml", StringComparison.OrdinalIgnoreCase)
+        || string.Equals(mediaType, "text/css", StringComparison.OrdinalIgnoreCase)
         || mediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
 
     private static string? FirstMetadataValue(XElement? metadata, XName name) =>

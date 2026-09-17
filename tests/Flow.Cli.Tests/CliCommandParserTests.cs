@@ -26,10 +26,19 @@ public sealed class CliCommandParserTests
                 "library/book.flow.json",
                 "--fidelity-report",
                 "fidelity.json",
+                "--metadata-json",
+                "metadata.json",
+                "--processing-json",
+                "processing.json",
+                "--source-map-json",
+                "source-map.json",
             ]).Command);
         Assert.Equal("library/book.flow.json", importWithOutput.OutputPath);
         Assert.Equal("import-report.json", importWithOutput.DiagnosticsJsonOutputPath);
         Assert.Equal("fidelity.json", importWithOutput.FidelityReportOutputPath);
+        Assert.Equal("metadata.json", importWithOutput.MetadataJsonOutputPath);
+        Assert.Equal("processing.json", importWithOutput.ProcessingJsonOutputPath);
+        Assert.Equal("source-map.json", importWithOutput.SourceMapJsonOutputPath);
         var epubInspect = Assert.IsType<InspectEpubCommand>(
             _parser.Parse(["epub-inspect", "book.epub", "--json", "report.json"]).Command);
         Assert.Equal("report.json", epubInspect.JsonOutputPath);
@@ -71,6 +80,76 @@ public sealed class CliCommandParserTests
                 "livro",
             ]).Command);
         Assert.Equal(HtmlBookUiLanguage.PortuguesePortugal, portugueseHtmlBook.UiLanguage);
+
+        var corpus = Assert.IsType<CorpusCommand>(_parser.Parse(
+        [
+            "corpus", "epub-corpus.json", "--repository-root", "repository", "--report", "corpus-report.json",
+            "--external-root", "external", "--baseline", "baseline.json", "--force", "--resume",
+        ]).Command);
+        Assert.Equal("epub-corpus.json", corpus.ManifestPath);
+        Assert.Equal("external", corpus.ExternalCorpusRoot);
+        Assert.Equal("baseline.json", corpus.AcceptedBaselinePath);
+        Assert.True(corpus.Force);
+        Assert.True(corpus.Resume);
+
+        var hash = new string('A', 64);
+        var qualify = Assert.IsType<QualifyEpubCommand>(_parser.Parse(
+        [
+            "epub-qualify", "book.epub", "--candidate-id", "candidate-001", "--sha256", hash,
+            "--report", "gate.json", "--repository-root", "repository", "--legal-use", "--drm-free", "--repetitions", "3",
+            "--include-environment", "--force", "--resume",
+        ]).Command);
+        Assert.Equal("candidate-001", qualify.CandidateId.Value);
+        Assert.Equal(3, qualify.RepetitionCount);
+        Assert.True(qualify.IncludeEnvironment);
+        Assert.True(qualify.Force);
+        Assert.True(qualify.Resume);
+
+        var review = Assert.IsType<ReviewEpubCommand>(_parser.Parse(
+        [
+            "epub-review", "book.epub", "--candidate-id", "candidate-001", "--sha256", hash,
+            "--output", "review", "--repository-root", "repository", "--legal-use", "--drm-free",
+            "--ui-language", "pt-BR",
+            "--force", "--resume",
+        ]).Command);
+        Assert.Equal(HtmlBookUiLanguage.PortugueseBrazil, review.UiLanguage);
+        Assert.True(review.Force);
+        Assert.True(review.Resume);
+
+        var status = Assert.IsType<ExecutionStatusCommand>(_parser.Parse(
+            ["execution-status", "gate.json", "--json", "status.json", "--force"]).Command);
+        Assert.Equal("gate.json", status.DestinationPath);
+        Assert.Equal("status.json", status.JsonOutputPath);
+        Assert.True(status.Force);
+
+        var executionId = Guid.NewGuid();
+        var clean = Assert.IsType<ExecutionCleanCommand>(_parser.Parse(
+            ["execution-clean", "gate.json", "--execution-id", executionId.ToString("N")]).Command);
+        Assert.Equal(executionId, clean.ExecutionId);
+    }
+
+    [Fact]
+    public void InvocationOptions_RecognizeLanguageBannerAndPlainOutput()
+    {
+        var result = CliInvocationOptionsParser.Parse(
+            ["--language", "pt-BR", "--banner", "--no-color", "inspect", "book.flow.json"]);
+
+        Assert.True(result.IsSuccess);
+        Assert.Equal("pt-BR", result.Options!.CultureName);
+        Assert.True(result.Options.ShowBanner);
+        Assert.False(result.Options.UseColor);
+        Assert.Equal(["inspect", "book.flow.json"], result.Options.CommandArguments);
+    }
+
+    [Theory]
+    [InlineData("fr-FR", "FLOWCLI_INVALID_VALUE")]
+    [InlineData("", "FLOWCLI_USAGE")]
+    public void InvocationOptions_RejectUnknownLanguagesWithStableCode(string language, string code)
+    {
+        var result = CliInvocationOptionsParser.Parse(["--language", language, "help"]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal(code, result.DiagnosticCode);
     }
 
     [Theory]
@@ -101,6 +180,53 @@ public sealed class CliCommandParserTests
             "FLOWCLI_DUPLICATE_OPTION:",
             _parser.Parse(
                 ["import", "book.epub", "--output", "one.json", "--output", "two.json"])
+                .Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_INVALID_VALUE:",
+            _parser.Parse(["execution-clean", "gate.json", "--execution-id", "not-an-id"]).Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_DECLARATION_REQUIRED:",
+            _parser.Parse(
+                [
+                    "epub-qualify", "book.epub", "--candidate-id", "candidate", "--sha256", new string('A', 64),
+                    "--report", "gate.json",
+                ])
+                .Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_INVALID_VALUE:",
+            _parser.Parse(
+                [
+                    "epub-qualify", "book.epub", "--candidate-id", "INVALID", "--sha256", new string('A', 64),
+                    "--report", "gate.json", "--repository-root", "repository", "--legal-use", "--drm-free",
+                ])
+                .Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_INVALID_VALUE:",
+            _parser.Parse(
+                [
+                    "epub-qualify", "book.epub", "--candidate-id", "candidate", "--sha256", new string('A', 64),
+                    "--report", "gate.json", "--repository-root", "repository", "--legal-use", "--drm-free", "--repetitions", "1",
+                ])
+                .Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_DUPLICATE_OPTION:",
+            _parser.Parse(
+                ["import", "book.epub", "--source-map-json", "one.json", "--source-map-json", "two.json"])
+                .Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_DUPLICATE_OPTION:",
+            _parser.Parse(
+                [
+                    "epub-review", "book.epub", "--candidate-id", "candidate", "--sha256", new string('A', 64),
+                    "--output", "review", "--repository-root", "repository", "--legal-use", "--drm-free",
+                    "--force", "--force",
+                ])
                 .Error,
             StringComparison.Ordinal);
         Assert.StartsWith(

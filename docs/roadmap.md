@@ -17,6 +17,8 @@
 - EPUB navigation, metadata, fidelity reports, and broader semantics
 - Self-contained HTML book packages with separate TOC and chapters
 - Large-publication performance and fidelity gates
+- Resource-based `en-US`/`pt-BR` CLI and assisted-review localization
+- Completed automatic and assisted large-publication qualification for one verified local reflowable EPUB
 
 Physical production pagination is not part of the EPUB import gate.
 

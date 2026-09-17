@@ -15,13 +15,17 @@ public sealed record EpubManifestItemInfo
         bool isNavigationDocument,
         bool isSupported,
         string? fallbackId = null,
-        string? mediaOverlayId = null)
+        string? mediaOverlayId = null,
+        long compressedBytes = 0,
+        long uncompressedBytes = 0)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(id);
         ArgumentException.ThrowIfNullOrWhiteSpace(declaredHref);
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentException.ThrowIfNullOrWhiteSpace(mediaType);
         ArgumentNullException.ThrowIfNull(properties);
+        ArgumentOutOfRangeException.ThrowIfNegative(compressedBytes);
+        ArgumentOutOfRangeException.ThrowIfNegative(uncompressedBytes);
 
         Id = id;
         DeclaredHref = declaredHref;
@@ -33,6 +37,8 @@ public sealed record EpubManifestItemInfo
         IsSupported = isSupported;
         FallbackId = fallbackId;
         MediaOverlayId = mediaOverlayId;
+        CompressedBytes = compressedBytes;
+        UncompressedBytes = uncompressedBytes;
     }
 
     public string Id { get; }
@@ -54,4 +60,10 @@ public sealed record EpubManifestItemInfo
     public string? FallbackId { get; }
 
     public string? MediaOverlayId { get; }
+
+    /// <summary>Gets the compressed archive bytes when the resource exists.</summary>
+    public long CompressedBytes { get; }
+
+    /// <summary>Gets the uncompressed archive bytes when the resource exists.</summary>
+    public long UncompressedBytes { get; }
 }

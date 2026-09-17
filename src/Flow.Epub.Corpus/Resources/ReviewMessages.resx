@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <resheader name="resmimetype"><value>text/microsoft-resx</value></resheader>
+  <resheader name="version"><value>2.0</value></resheader>
+  <resheader name="reader"><value>System.Resources.ResXResourceReader, System.Windows.Forms</value></resheader>
+  <resheader name="writer"><value>System.Resources.ResXResourceWriter, System.Windows.Forms</value></resheader>
+  <data name="Title" xml:space="preserve"><value>Flow EPUB review</value></data>
+  <data name="Candidate" xml:space="preserve"><value>Candidate:</value></data>
+  <data name="Instructions" xml:space="preserve"><value>This page contains local shortcuts only. Record decisions in review-checklist.json. No result is approved automatically.</value></data>
+  <data name="ChapterSamples" xml:space="preserve"><value>Chapter samples</value></data>
+  <data name="RepresentativeFeatures" xml:space="preserve"><value>Representative features</value></data>
+  <data name="Mobile" xml:space="preserve"><value>mobile</value></data>
+  <data name="Desktop" xml:space="preserve"><value>desktop</value></data>
+  <data name="Label_beginning" xml:space="preserve"><value>beginning</value></data>
+  <data name="Label_middle" xml:space="preserve"><value>middle</value></data>
+  <data name="Label_end" xml:space="preserve"><value>end</value></data>
+  <data name="Label_cover" xml:space="preserve"><value>cover</value></data>
+  <data name="Label_image" xml:space="preserve"><value>image</value></data>
+  <data name="Label_link" xml:space="preserve"><value>link</value></data>
+  <data name="Label_note" xml:space="preserve"><value>note</value></data>
+  <data name="Label_table" xml:space="preserve"><value>table</value></data>
+  <data name="Label_table-of-contents" xml:space="preserve"><value>table of contents</value></data>
+</root>

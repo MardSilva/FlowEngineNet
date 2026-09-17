@@ -1,3 +1,4 @@
+using Flow.Epub;
 using Flow.Rendering.Html;
 
 namespace Flow.Cli;
@@ -12,9 +13,49 @@ public sealed record ImportEpubCommand(
     string SourcePath,
     string? OutputPath,
     string? DiagnosticsJsonOutputPath,
-    string? FidelityReportOutputPath = null) : CliCommand;
+    string? FidelityReportOutputPath = null,
+    string? MetadataJsonOutputPath = null,
+    string? ProcessingJsonOutputPath = null,
+    string? SourceMapJsonOutputPath = null) : CliCommand;
 
 public sealed record InspectEpubCommand(string SourcePath, string? JsonOutputPath) : CliCommand;
+
+public sealed record CorpusCommand(
+    string ManifestPath,
+    string RepositoryRoot,
+    string ReportPath,
+    string? ExternalCorpusRoot,
+    string? AcceptedBaselinePath,
+    bool Force = false,
+    bool Resume = false) : CliCommand;
+
+public sealed record QualifyEpubCommand(
+    string SourcePath,
+    EpubCorpusPublicationId CandidateId,
+    EpubCorpusSha256 ExpectedSourceSha256,
+    string ReportPath,
+    string RepositoryRoot,
+    int RepetitionCount,
+    bool IncludeEnvironment,
+    bool Force = false,
+    bool Resume = false) : CliCommand;
+
+public sealed record ReviewEpubCommand(
+    string SourcePath,
+    EpubCorpusPublicationId CandidateId,
+    EpubCorpusSha256 ExpectedSourceSha256,
+    string OutputDirectory,
+    string RepositoryRoot,
+    HtmlBookUiLanguage UiLanguage,
+    bool Force = false,
+    bool Resume = false) : CliCommand;
+
+public sealed record ExecutionStatusCommand(
+    string DestinationPath,
+    string? JsonOutputPath,
+    bool Force = false) : CliCommand;
+
+public sealed record ExecutionCleanCommand(string DestinationPath, Guid ExecutionId) : CliCommand;
 
 public sealed record InspectCommand(string DocumentPath) : CliCommand;
 
@@ -35,15 +76,20 @@ public sealed record RenderHtmlBookCommand(
 
 public sealed record CommandParseResult
 {
-    private CommandParseResult(CliCommand? command, string? error)
+    private readonly string? legacyError;
+
+    private CommandParseResult(CliCommand? command, CliParseDiagnostic? diagnostic, string? legacyError = null)
     {
         Command = command;
-        Error = error;
+        Diagnostic = diagnostic;
+        this.legacyError = legacyError;
     }
 
     public CliCommand? Command { get; }
 
-    public string? Error { get; }
+    public CliParseDiagnostic? Diagnostic { get; }
+
+    public string? Error => legacyError ?? Diagnostic?.Format(new CliTextCatalog());
 
     public bool IsSuccess => Command is not null;
 
@@ -53,9 +99,22 @@ public sealed record CommandParseResult
         return new CommandParseResult(command, null);
     }
 
+    public static CommandParseResult Failure(string code, string resourceKey, params object?[] arguments)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(code);
+        ArgumentException.ThrowIfNullOrWhiteSpace(resourceKey);
+        return new CommandParseResult(null, new CliParseDiagnostic(code, resourceKey, arguments));
+    }
+
+    /// <summary>Creates a legacy literal parse failure. New parsers should use the structured overload.</summary>
     public static CommandParseResult Failure(string error)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(error);
-        return new CommandParseResult(null, error);
+        return new CommandParseResult(null, null, error);
     }
+}
+
+public sealed record CliParseDiagnostic(string Code, string ResourceKey, IReadOnlyList<object?> Arguments)
+{
+    public string Format(CliTextCatalog text) => text.Diagnostic(Code, ResourceKey, Arguments.ToArray());
 }

@@ -7,14 +7,36 @@
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <NeutralLanguage>en-US</NeutralLanguage>
+    <IsPackable>true</IsPackable>
+    <PackAsTool>true</PackAsTool>
+    <ToolCommandName>flow</ToolCommandName>
+    <PackageId>FlowEngineNet.Tool</PackageId>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/MardSilva/FlowEngineNet</RepositoryUrl>
+    <Authors>Flow Engine contributors</Authors>
+    <Description>Experimental Flow Engine command-line tool for semantic documents and EPUB workflows.</Description>
+    <PackageTags>flow;epub;documents;cli</PackageTags>
   </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\..\README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\Flow.Documents\Flow.Documents.csproj" />
     <ProjectReference Include="..\Flow.Epub\Flow.Epub.csproj" />
+    <ProjectReference Include="..\Flow.Epub.Corpus\Flow.Epub.Corpus.csproj" />
     <ProjectReference Include="..\Flow.Layout\Flow.Layout.csproj" />
     <ProjectReference Include="..\Flow.Rendering.Html\Flow.Rendering.Html.csproj" />
     <ProjectReference Include="..\Flow.Security\Flow.Security.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Flow.Cli.Tests" />
   </ItemGroup>
 
 </Project>

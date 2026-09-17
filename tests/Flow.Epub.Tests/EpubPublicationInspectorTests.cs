@@ -57,12 +57,12 @@ public sealed class EpubPublicationInspectorTests
         Assert.Equal("EPUB/nav.xhtml", Assert.Single(inspection.NavigationDocumentPaths));
         Assert.Equal(5, inspection.Resources.ManifestItemCount);
         Assert.Equal(5, inspection.Resources.ExistingManifestItemCount);
-        Assert.Equal(1, inspection.Resources.UnsupportedManifestItemCount);
+        Assert.Equal(0, inspection.Resources.UnsupportedManifestItemCount);
         Assert.Equal(1, inspection.Resources.NavigationDocumentCount);
         Assert.True(inspection.Resources.TotalCompressedBytes > 0);
         Assert.True(inspection.Resources.TotalUncompressedBytes > 0);
         Assert.Equal(3, inspection.Resources.MediaTypeCounts["application/xhtml+xml"]);
-        Assert.Contains(inspection.Diagnostics, static diagnostic =>
+        Assert.DoesNotContain(inspection.Diagnostics, static diagnostic =>
             diagnostic.Code == EpubDiagnosticCodes.UnsupportedResource
             && diagnostic.Resource == "EPUB/styles/book.css");
     }

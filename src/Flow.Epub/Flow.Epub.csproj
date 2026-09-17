@@ -11,4 +11,9 @@
     <ProjectReference Include="..\Flow.Documents\Flow.Documents.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Flow.Epub.Corpus" />
+    <InternalsVisibleTo Include="Flow.Epub.Tests" />
+  </ItemGroup>
+
 </Project>

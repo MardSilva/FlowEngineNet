@@ -21,10 +21,13 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Install .NET SDK
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
@@ -39,3 +42,117 @@ jobs:
 
       - name: Test
         run: dotnet test Flow.sln --no-build
+
+      - name: Smoke test packaged CLI
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/smoke-test-cli.ps1 -Configuration Release
+
+  canonical-release:
+    name: Build canonical CLI release
+    needs: validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore Flow.sln
+
+      - name: Build and validate local release artifacts
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/build-release-artifacts.ps1 -Configuration Release
+
+      - name: Dry-run versioned release
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/invoke-release-dry-run.ps1
+
+      - name: Store canonical release candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: canonical-release
+          path: artifacts/release
+          if-no-files-found: error
+          retention-days: 1
+
+  verify-release:
+    name: Verify canonical CLI / ${{ matrix.os }}
+    needs: canonical-release
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Download canonical release candidate
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: canonical-release
+          path: artifacts/canonical-release
+
+      - name: Validate and smoke test canonical package
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/verify-release-artifacts.ps1
+          -ArtifactsDirectory ./artifacts/canonical-release
+          -OutputDirectory ./artifacts/release-validation
+
+      - name: Store platform validation evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: release-validation-${{ runner.os }}
+          path: artifacts/release-validation/release-validation.json
+          if-no-files-found: error
+          retention-days: 1
+
+  compare-release:
+    name: Confirm canonical Windows/Linux validation
+    needs: [canonical-release, verify-release]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Download canonical release candidate
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: canonical-release
+          path: artifacts/cross-platform/canonical
+
+      - name: Download platform validation evidence
+        uses: actions/download-artifact@v8.0.1
+        with:
+          pattern: release-validation-*
+          path: artifacts/cross-platform/validations
+
+      - name: Confirm both platforms validated the canonical artifact
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/compare-release-evidence.ps1
+          -CanonicalEvidenceDirectory ./artifacts/cross-platform/canonical
+          -WindowsValidationDirectory ./artifacts/cross-platform/validations/release-validation-Windows
+          -LinuxValidationDirectory ./artifacts/cross-platform/validations/release-validation-Linux
+          -OutputPath ./artifacts/cross-platform/release-comparison.json

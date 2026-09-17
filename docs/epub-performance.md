@@ -21,7 +21,9 @@ await using var source = File.OpenRead(epubPath);
 var result = await new EpubImporter().ImportAsync(source, observations, cancellationToken);
 ```
 
-`EpubImportMetrics` records total and per-phase duration, archive entries, compressed/uncompressed bytes, imported asset bytes, processed spine documents, semantic nodes, semantic text characters, `.flow.json` size when supplied by the host, HTML file/byte totals when supplied by the host, and a sampled approximate managed-heap peak. The memory value uses `GC.GetTotalMemory(false)` at phase boundaries. It is process-wide, sampling-based, affected by runtime activity, and is not a precise allocation or working-set measurement.
+`EpubImportMetrics` records total and per-phase duration, archive entries, compressed/uncompressed bytes, imported asset bytes, processed spine documents, semantic nodes, semantic text characters, `.flow.json` size when supplied by the host, HTML file/byte totals when supplied by the host, and a sampled approximate managed-heap peak. The importer value uses `GC.GetTotalMemory(false)` at phase boundaries.
+
+The corpus gate separately samples managed heap and process working set across its complete pipeline. Both values are process-wide, environment-dependent observations rather than precise allocation measurements. They are excluded from deterministic reports and baselines. The gate does not force garbage collection and does not treat measurements from one machine as a universal limit.
 
 The CLI prints an invariant-culture noncanonical summary after `flow import`. `flow render --html-book` reports file count, HTML payload bytes, render duration, and atomic-write duration.
 
@@ -36,8 +38,11 @@ CLI final outputs use temporary files/directories. Cancellation or failure remov
 - `.flow.json` is written through an LF-normalizing stream rather than first retaining a complete JSON `MemoryStream` and then copying it;
 - generated HTML/CSS/manifest byte arrays enter immutable package files without a second full copy;
 - package writes use immutable memory directly instead of allocating `ToArray()` for every file.
+- corpus JSON round-trips use a private temporary file that is removed after the restored hash is checked;
+- corpus mobile and desktop packages are laid out, rendered, verified, summarized, and released sequentially;
+- HTML package verification retains path and ID indexes instead of every parsed XML tree at once.
 
-The EPUB ZIP is still buffered in memory to provide bounded, seekable `ZipArchive` processing. XML trees, the semantic document, standalone HTML used by package splitting, and package files can coexist temporarily. These are known remaining memory costs for Prompt 19 measurement, not evidence of a universal supported book size.
+The EPUB ZIP is still buffered in memory to provide bounded, seekable `ZipArchive` processing. During one package phase, XML trees, the semantic document, standalone HTML used by package splitting, and that package's files can coexist temporarily. These are known remaining memory costs for Prompt 19 measurement, not evidence of a universal supported book size.
 
 ## Recommended host limits
 

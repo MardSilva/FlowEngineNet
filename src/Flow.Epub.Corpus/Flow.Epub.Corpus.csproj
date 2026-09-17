@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <NeutralLanguage>en-US</NeutralLanguage>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Flow.Documents\Flow.Documents.csproj" />
+    <ProjectReference Include="..\Flow.Epub\Flow.Epub.csproj" />
+    <ProjectReference Include="..\Flow.Layout\Flow.Layout.csproj" />
+    <ProjectReference Include="..\Flow.Rendering.Html\Flow.Rendering.Html.csproj" />
+    <ProjectReference Include="..\Flow.Security\Flow.Security.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Flow.Epub.Tests" />
+  </ItemGroup>
+
+</Project>

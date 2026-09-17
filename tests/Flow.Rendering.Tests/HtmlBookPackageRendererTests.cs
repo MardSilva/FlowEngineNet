@@ -264,7 +264,10 @@ public sealed class HtmlBookPackageRendererTests
         Assert.Contains("#ffffff", css, StringComparison.Ordinal);
         Assert.Contains("#171717", css, StringComparison.Ordinal);
         Assert.Contains("#f4ecd8", css, StringComparison.Ordinal);
-        Assert.Contains("max-width: 46rem", css, StringComparison.Ordinal);
+        Assert.Contains("inline-size: min(100%, 46rem)", css, StringComparison.Ordinal);
+        Assert.Contains("overflow-x: clip", css, StringComparison.Ordinal);
+        Assert.Contains(".table-scroll", css, StringComparison.Ordinal);
+        Assert.Contains("scroll-margin-block-start", css, StringComparison.Ordinal);
         Assert.Contains("--book-reader-scale: 1.3", css, StringComparison.Ordinal);
         Assert.DoesNotContain("javascript", css, StringComparison.OrdinalIgnoreCase);
 
@@ -272,6 +275,71 @@ public sealed class HtmlBookPackageRendererTests
         Assert.Contains(controls, input => (string?)input.Attribute("name") == "flow-reader-theme" && (string?)input.Attribute("value") == "sepia");
         Assert.Contains(controls, input => (string?)input.Attribute("name") == "flow-reader-font" && (string?)input.Attribute("value") == "sans");
         Assert.Contains(controls, input => (string?)input.Attribute("name") == "flow-reader-scale" && (string?)input.Attribute("value") == "larger");
+    }
+
+    [Fact]
+    public void Render_MobileContainsWideContentAndMakesFootnoteTargetsReviewable()
+    {
+        var coverAsset = new AssetId("wide-cover.png");
+        var coverId = new NodeId("wide-cover");
+        var noteId = new NodeId("late-note");
+        var longToken = new string('W', 160);
+        var table = new Table(
+            new NodeId("wide-table"),
+            [
+                new TableBody(
+                    new NodeId("wide-table-body"),
+                    [
+                        new TableRow(
+                            new NodeId("wide-table-row"),
+                            [
+                                new TableCell(
+                                    new NodeId("wide-table-cell"),
+                                    [new Paragraph(new NodeId("wide-table-text"), [new Text(longToken)])]),
+                            ]),
+                    ]),
+            ]);
+        var chapter = new Chapter(
+            new NodeId("responsive-chapter"),
+            [
+                new Figure(coverId, coverAsset, alternativeText: "Wide cover"),
+                new Heading(new NodeId("long-heading"), 1, [new Text(longToken)]),
+                new Paragraph(
+                    new NodeId("note-reference"),
+                    [new Text("Reference"), new FootnoteReference(noteId, [new Text("1")])]),
+                table,
+                new Paragraph(new NodeId("long-content"), [new Text(string.Concat(Enumerable.Repeat("Content. ", 300)))]),
+                new Footnote(noteId, [new Paragraph(new NodeId("late-note-text"), [new Text("Late note")])]),
+            ]);
+        var document = new FlowDocument(
+            new DocumentIdentity(new DocumentId("urn:flow:html-book:responsive")),
+            new DocumentMetadata("Responsive", "en"),
+            new DocumentContent([chapter]),
+            [new FlowAsset(coverAsset, "image/png", "wide-cover.png", new byte[] { 1, 2, 3 })],
+            new DocumentPresentation(cover: new CoverPresentation(coverId)));
+
+        var package = Render(document, 390, 844);
+        var html = Parse(package, "chapters/chapter-001.html");
+        var renderedTable = Assert.Single(html.Descendants("table"));
+        var tableRegion = Assert.IsType<XElement>(renderedTable.Parent);
+        Assert.Equal("div", tableRegion.Name.LocalName);
+        Assert.Equal("table-scroll", (string?)tableRegion.Attribute("class"));
+        Assert.Equal("region", (string?)tableRegion.Attribute("role"));
+        Assert.Equal("Scrollable table", (string?)tableRegion.Attribute("aria-label"));
+        Assert.Equal("0", (string?)tableRegion.Attribute("tabindex"));
+        Assert.Null(tableRegion.Attribute("id"));
+        Assert.Equal(longToken, html.Descendants("h1").Single().Value);
+        Assert.Single(html.Descendants("figure"), element => (string?)element.Attribute("id") == coverId.Value);
+        Assert.Single(html.Descendants(), element => (string?)element.Attribute("id") == noteId.Value);
+        Assert.Equal($"#{noteId}", (string?)html.Descendants("a").Single(element => (string?)element.Attribute("role") == "doc-noteref").Attribute("href"));
+
+        var css = Encoding.UTF8.GetString(package.GetFile("styles/book.css").Content.AsSpan());
+        Assert.Contains("overflow-x: clip", css, StringComparison.Ordinal);
+        Assert.Contains("inline-size: min(100%, 46rem)", css, StringComparison.Ordinal);
+        Assert.Contains(".table-scroll > table", css, StringComparison.Ordinal);
+        Assert.Contains(".page-notes:has(> [role=\"doc-footnote\"]:target)", css, StringComparison.Ordinal);
+        AssertAllInternalLinksResolve(package);
+        AssertAllLocalResourcesResolveWithoutScripts(package);
     }
 
     [Fact]

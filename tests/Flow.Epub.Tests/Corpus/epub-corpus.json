@@ -1,0 +1,129 @@
+{
+  "format": "flow-epub-corpus-0.1",
+  "publications": [
+    {
+      "id": "flow-epub2-ncx",
+      "title": "Fixture EPUB 2 com NCX",
+      "origin": "project:Flow.Epub.Tests/EpubCorpusFixtureFactory",
+      "license": {
+        "name": "Flow project fixture",
+        "evidence": "Generated entirely from source code owned by the Flow project"
+      },
+      "kind": "projectFixture",
+      "redistribution": "allowed",
+      "relativePath": "generated/flow-epub2-ncx.epub",
+      "expectedEpubVersion": "epub2",
+      "expectedSizeBytes": 2718,
+      "languages": [
+        "pt-BR"
+      ],
+      "expectedResources": [
+        "ncx",
+        "xhtml"
+      ],
+      "expectedFeatures": [
+        "internal-link",
+        "spine",
+        "table-of-contents"
+      ],
+      "expectedResults": [
+        "canonical-hash-stable",
+        "desktop-layout",
+        "html-book-package",
+        "import-success",
+        "inspection-success",
+        "mobile-layout",
+        "roundtrip-stable",
+        "valid-flow-document"
+      ],
+      "knownLimitations": [],
+      "sha256": "EA8B591BC8B0679E1DCE6105BACD22523DEA434A0341A71C863F5259072C9538"
+    },
+    {
+      "id": "flow-epub3-varied",
+      "title": "Corpus variado: edição São Paulo",
+      "origin": "project:Flow.Epub.Tests/EpubCorpusFixtureFactory",
+      "license": {
+        "name": "Flow project fixture",
+        "evidence": "Generated entirely from source code owned by the Flow project"
+      },
+      "kind": "projectFixture",
+      "redistribution": "allowed",
+      "relativePath": "generated/flow-epub3-varied.epub",
+      "expectedEpubVersion": "epub3",
+      "expectedSizeBytes": 7215,
+      "languages": [
+        "pt-BR",
+        "ar",
+        "ja"
+      ],
+      "expectedResources": [
+        "css",
+        "png",
+        "svg",
+        "xhtml"
+      ],
+      "expectedFeatures": [
+        "cover",
+        "figure",
+        "footnote",
+        "internal-link",
+        "spine",
+        "table",
+        "table-of-contents"
+      ],
+      "expectedResults": [
+        "canonical-hash-stable",
+        "desktop-layout",
+        "html-book-package",
+        "import-success",
+        "inspection-success",
+        "mobile-layout",
+        "roundtrip-stable",
+        "valid-flow-document"
+      ],
+      "knownLimitations": [
+        "contains-deliberately-malicious-inline-svg-and-mathml",
+        "contains-unsupported-resource-for-diagnostic-coverage"
+      ],
+      "sha256": "D3CB5B3A01184895C7711673BED6082FDBB12D4AECA97B1671B4AA34AAC3CC0B"
+    },
+    {
+      "id": "flow-minimal-epub3",
+      "title": "EPUB mínimo do Flow",
+      "origin": "project:Flow.Epub.Tests/MinimalEpubFactory",
+      "license": {
+        "name": "Flow project fixture",
+        "evidence": "Generated entirely from source code owned by the Flow project"
+      },
+      "kind": "projectFixture",
+      "redistribution": "allowed",
+      "relativePath": "generated/flow-minimal-epub3.epub",
+      "expectedEpubVersion": "epub3",
+      "expectedSizeBytes": 2724,
+      "languages": [
+        "pt-PT"
+      ],
+      "expectedResources": [
+        "png",
+        "xhtml"
+      ],
+      "expectedFeatures": [
+        "figure",
+        "internal-link",
+        "ordered-list",
+        "spine",
+        "unordered-list"
+      ],
+      "expectedResults": [
+        "import-success",
+        "inspection-success",
+        "valid-flow-document"
+      ],
+      "knownLimitations": [
+        "no-navigation-document"
+      ],
+      "sha256": "3E19D28C59EFE471AEC21A01A5487199E30BECA308BA06618FB23EF5193D7F45"
+    }
+  ]
+}

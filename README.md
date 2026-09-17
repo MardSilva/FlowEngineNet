@@ -45,6 +45,7 @@ Implemented:
 - a lightweight CLI for sampling, inspection, validation, hashing, and HTML rendering;
 - readable UTF-8 JSON output, deterministic EPUB diagnostic reports, and title-derived portable `.flow.json` names;
 - a typed, deterministic EPUB fidelity sidecar with explicit preserved/transformed/approximated/unsupported/lost evidence;
+- deterministic noncanonical EPUB metadata, package-processing, and source-map sidecars for editorial diagnostics;
 - small, medium, and large viewport profiles;
 - responsive figures, semantic ID preservation, and typed layout intentions;
 - unit and semantic-conformance tests;
@@ -183,10 +184,13 @@ The final clean-directory review passes 134 tests with zero build warnings; see 
 - [Standalone HTML renderer](docs/html-renderer.md)
 - [HTML book package](docs/html-book-package.md)
 - [Command-line interface](docs/cli.md)
+- [Local release artifacts](docs/release-artifacts.md)
 - [Canonicalization and hashing](docs/canonicalization.md)
 - [Experimental document signatures](docs/signatures.md)
 - [Experimental EPUB import](docs/epub-import.md)
 - [EPUB fidelity report](docs/epub-fidelity.md)
+- [Experimental EPUB corpus catalog](docs/epub-corpus.md)
+- [Public EPUB corpus coverage matrix](docs/epub-corpus-matrix.md)
 - [0.1 conformance profile](docs/conformance.md)
 - [Known limitations](docs/known-limitations.md)
 - [0.1 release review](docs/0.1-release-review.md)
@@ -203,11 +207,48 @@ The real EPUB cycle now follows these increments:
 4. validate fidelity and performance against legal real-world publications;
 5. pass the large-book gate before beginning the PDF importer.
 
-The first five increments now have executable implementations, including measured progress and cancellation behavior. The next work is a legal reproducible corpus and the large-publication gate; this does not yet justify a universal EPUB-support, performance, or accessibility-conformance claim. See [EPUB performance, progress, and cancellation](docs/epub-performance.md).
+The EPUB work now includes measured progress and cancellation, a deterministic legal-corpus catalog, bounded offline discovery, end-to-end execution, optional local EPUBCheck evidence, reviewed baselines for three project-owned fixtures, a typed structural/reference audit, and transactional material for assisted local review. The review package provides mobile and desktop HTML, beginning/middle/end samples, feature shortcuts, hashes and a separate human checklist without copying licensed material into Git. After the first local large-publication run exposed missing inline images and approximate reference evidence, the importer began preserving those images as ordered figures and the auditor began classifying links through their nearest mapped semantic ancestor. Two final automatic runs on the same verified input produced identical stable evidence, reconciled all 56 image occurrences, classified and resolved all 146 internal links, and resolved all 120 footnote backlinks. A focused renderer correction then contained covers, figures, long headings and tables within the reading surface, gave wide tables their own scroll region, and made note targets visible. Human review passed the beginning, middle, end, TOC, images, links, notes and tables at an exact 390 x 844 CSS-pixel viewport and at 1600 x 1000. This is evidence for one verified real publication, not a universal EPUB-support, performance, or accessibility-conformance claim. See [EPUB performance, progress, and cancellation](docs/epub-performance.md), the [experimental EPUB corpus](docs/epub-corpus.md), and its [public coverage matrix](docs/epub-corpus-matrix.md).
 
-A document can only be considered end-to-end usable when an EPUB can be imported without silent semantic loss, represented as a valid `FlowDocument`, laid out, rendered, inspected, and round-tripped through the supported Flow format. The repository has not reached that point yet.
+The qualified fixtures and the locally supplied real publication now complete that end-to-end path for the documented subset: import without measured silent loss, a valid `FlowDocument`, round-trip, layout, inspection, rendering and assisted human review. Broader EPUB coverage remains open, so this is not yet an “open any EPUB” guarantee. The [Flow 0.2 EPUB cycle review](docs/0.2-epub-cycle-review.md) records the evidence and the wording that is safe to use publicly.
 
 ## CLI quick start
+
+The CLI keeps command names, option names, JSON fields and diagnostic codes invariant. Human-readable help, CLI errors, labels and summaries can be selected with the global `--language` option. The first catalogs are `en-US` and `pt-BR`; omitting the option selects `en-US`, while an unsupported value is rejected with an English fallback error. `--banner` adds an optional FIGlet-style ASCII heading, while normal output remains plain and contains no required ANSI color sequences:
+
+```powershell
+dotnet run --project src/Flow.Cli -- --language pt-BR --banner help
+dotnet run --project src/Flow.Cli -- --language en-US --no-color help
+```
+
+### Test the packaged CLI
+
+The repository can also build `Flow.Cli` as the local .NET tool `FlowEngineNet.Tool`, whose command is `flow`. Nothing is published to NuGet yet. The distribution smoke test creates the package, installs it in an isolated directory, runs representative commands through the installed launcher, and uninstalls it without changing the user's global tools:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\eng\smoke-test-cli.ps1 -Configuration Release
+```
+
+On PowerShell 7, including Linux, use `pwsh` instead of `powershell.exe`. A successful run leaves its report and package under `artifacts/cli-smoke/`, which is ignored by Git. GitHub Actions runs the same smoke test on Windows and Ubuntu after restore, formatting, build and tests.
+
+This check requires the .NET 10 SDK selected by `global.json`. It proves that the locally built framework-dependent package can be installed, started and used for the basic document workflow; it is not a signed release or an operating-system installer.
+
+To assemble the complete local release candidate, including checksums, a CycloneDX SBOM and a validation manifest:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\eng\build-release-artifacts.ps1 -Configuration Release
+```
+
+The command performs two independent packs and accepts the package only when the normalized bytes match. It writes the result under `artifacts/release/` and does not publish anything. See [local release artifacts](docs/release-artifacts.md) for the exact contents, validation rules and reproducibility boundary.
+
+The checked-in `eng/release-plan.json` also supports a versioned dry-run:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\eng\invoke-release-dry-run.ps1
+```
+
+The plan explicitly disables publication. After the ordinary Windows/Linux validation matrix passes, CI builds one canonical candidate on Ubuntu and retains it for one day. Ubuntu and Windows then install and exercise that exact `.nupkg`; a final job requires both validation reports to name the same revision, SDK, package identity and SHA-256. The candidate is transferred only between workflow jobs and is never published to NuGet, attached to a GitHub Release or associated with a created tag.
+
+Global options must appear before the command. They affect terminal text only: generated `.flow.json`, evidence JSON, canonical bytes, hashes and stable diagnostic codes do not change. In `pt-BR`, every current EPUB, document-validation and Flow JSON code receives a short Portuguese summary followed by its original technical detail. This keeps paths, IDs and rejected values available for troubleshooting without changing deterministic reports.
 
 To see the current end-to-end result without generating anything, open the committed mobile and desktop files:
 
@@ -221,12 +262,45 @@ To reproduce the pipeline from the semantic source:
 ```powershell
 dotnet run --project src/Flow.Cli -- epub-inspect path/to/book.epub --json epub-report.json
 dotnet run --project src/Flow.Cli -- import path/to/book.epub --diagnostics-json import-report.json --fidelity-report fidelity.json
+dotnet run --project src/Flow.Cli -- corpus path/to/epub-corpus.json --repository-root path/to/repository --report path/to/corpus-report.json
 dotnet run --project src/Flow.Cli -- inspect samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- validate samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- hash samples/SampleBook/sample.flow.json
 dotnet run --project src/Flow.Cli -- render samples/SampleBook/sample.flow.json --html sample.html --width 390 --height 844
 dotnet run --project src/Flow.Cli -- render samples/SampleBook/sample.flow.json --html-book sample-book
 ```
+
+### Qualify and review a real EPUB
+
+The corpus, automatic gate and assisted review are available through the CLI. They remain evidence workflows, not EPUB conformance certification. A real publication must be DRM-free and legally available to the caller. Flow records those declarations but cannot verify publication rights.
+
+Keep the EPUB, gate report and generated review package outside the repository:
+
+```powershell
+$epub = 'C:\books\book.epub'
+$sha256 = (Get-FileHash $epub -Algorithm SHA256).Hash
+$repository = (Get-Location).Path
+
+dotnet run --project .\src\Flow.Cli -- --language pt-BR epub-qualify $epub `
+  --candidate-id candidate-001 `
+  --sha256 $sha256 `
+  --report 'C:\flow-local\candidate-001-gate.json' `
+  --repository-root $repository `
+  --legal-use --drm-free
+
+dotnet run --project .\src\Flow.Cli -- --language pt-BR epub-review $epub `
+  --candidate-id candidate-001 `
+  --sha256 $sha256 `
+  --output 'C:\flow-local\candidate-001-review' `
+  --repository-root $repository `
+  --legal-use --drm-free --ui-language pt-BR
+```
+
+The gate runs the automatic pipeline at least twice. Its overall JSON status normally remains `inconclusive` until a person completes the separate checklist, but the command returns `0` when every automatic check passes. `epub-review` generates `review.html`, `review-checklist.json`, mobile and desktop packages. It never approves review decisions automatically.
+
+These operational commands refuse to replace existing reports or review directories unless `--force` is present. A hidden destination-specific lock prevents concurrent Flow processes from writing the same output. The CLI prints a random execution ID for log correlation, while the lock stores only that ID, its state and a SHA-256 fingerprint of the normalized destination. It contains no book data or physical path and does not enter deterministic evidence. If a process is interrupted, rerun it with `--resume`; add `--force` as well when the interrupted operation was replacing a completed result. Recovery restarts processing from the verified EPUB and never treats partial JSON or HTML as complete.
+
+Use `flow execution-status <destination>` to inspect that state without changing it. If abandoned transaction artifacts need removal, copy the exact ID shown by the status command into `flow execution-clean <destination> --execution-id <id>`. Cleanup refuses active, invalid or mismatched locks and never deletes unrelated files.
 
 ### Import a real EPUB and generate its HTML book
 
@@ -236,7 +310,7 @@ Pass the complete EPUB path to `flow import`. Quotes are recommended because boo
 Set-Location 'C:\caminho\para\FlowEngineNet'
 
 $epub = 'C:\caminho\para\Meu livro.epub'
-dotnet run --project .\src\Flow.Cli -- import $epub
+dotnet run --project .\src\Flow.Cli -- --language pt-BR import $epub
 ```
 
 When `--output` is omitted, the CLI creates the `.flow.json` beside the EPUB. Its portable file name is derived from the book title, while the original title—including accents—remains in the document metadata. For the example above, the result can be:
@@ -245,14 +319,27 @@ When `--output` is omitted, the CLI creates the `.flow.json` beside the EPUB. It
 C:\caminho\para\meu_livro.flow.json
 ```
 
+For a noisy publication, pass `--diagnostics-json <report.json>`. The terminal then shows totals, counts by stable diagnostic code, and at most 40 detail lines; the JSON file still contains every finding.
+
+The optional `--metadata-json`, `--processing-json`, and `--source-map-json` sidecars expose the source evidence retained by the importer without adding it to the canonical Flow document:
+
+```powershell
+dotnet run --project .\src\Flow.Cli -- import $epub `
+  --metadata-json '.\metadata.json' `
+  --processing-json '.\processing.json' `
+  --source-map-json '.\source-map.json'
+```
+
+The metadata report keeps OPF values and refinements. The processing report explains every manifest and spine decision. The source map connects EPUB resource paths and fragments to stable Flow node IDs. These files are deterministic diagnostic/editorial evidence; changing or deleting them does not change the `.flow.json` or its hash.
+
 The CLI prints the exact generated path. Validate it and create the multi-file HTML book in a directory beside the EPUB:
 
 ```powershell
 $flow = 'C:\caminho\para\meu_livro.flow.json'
 $book = 'C:\caminho\para\meu_livro_book'
 
-dotnet run --project .\src\Flow.Cli -- validate $flow
-dotnet run --project .\src\Flow.Cli -- render $flow --html-book $book --ui-language pt-PT
+dotnet run --project .\src\Flow.Cli -- --language pt-BR validate $flow
+dotnet run --project .\src\Flow.Cli -- --language pt-BR render $flow --html-book $book --ui-language pt-BR
 Start-Process "$book\index.html"
 ```
 
@@ -285,7 +372,7 @@ The detailed [sample walkthrough](samples/SampleBook/README.md) explains prerequ
 
 ## Versioning and compatibility
 
-All `0.x` APIs, JSON fields, canonicalization rules, and layout profiles are experimental and may change. Canonicalization changes require a new named profile so that an existing document hash never silently acquires different semantics. No packages are published for 0.1; see the complete [known limitations](docs/known-limitations.md).
+All `0.x` APIs, JSON fields, canonicalization rules, and layout profiles are experimental and may change. Canonicalization changes require a new named profile so that an existing document hash never silently acquires different semantics. The CLI can be packed and installed locally for testing, but no package is published yet; see the complete [known limitations](docs/known-limitations.md).
 
 ## License
 
