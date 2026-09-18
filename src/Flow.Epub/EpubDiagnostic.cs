@@ -90,6 +90,8 @@ public static class EpubDiagnosticCodes
     public const string LegacyPageMapNotImported = "EPUB076";
     public const string ArchivePathCaseMismatchRecovered = "EPUB077";
     public const string CssImageResourceNotPreserved = "EPUB078";
+    public const string ImageAlternativeTextRecovered = "EPUB079";
+    public const string TableColumnMetadataNotRepresented = "EPUB080";
     public const string InvalidCssValue = "EPUB050";
     public const string ExternalStylesheetBlocked = "EPUB051";
     public const string CssTargetNotRepresentable = "EPUB052";

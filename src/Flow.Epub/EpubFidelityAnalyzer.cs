@@ -267,6 +267,11 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
             return (EpubFidelityStatus.Transformed, EpubFidelityImpact.Informational);
         }
 
+        if (code == EpubDiagnosticCodes.MissingImageAlternativeText)
+        {
+            return (EpubFidelityStatus.Approximated, EpubFidelityImpact.Moderate);
+        }
+
         if (code is EpubDiagnosticCodes.UnsupportedElement
             or EpubDiagnosticCodes.UnsupportedManifestProperty
             or EpubDiagnosticCodes.HeadingLevelNormalized
@@ -278,7 +283,9 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
             or EpubDiagnosticCodes.MathSemanticLoss
             or EpubDiagnosticCodes.EmbeddedFontBytesNotPreserved
             or EpubDiagnosticCodes.LegacyPageMapNotImported
-            or EpubDiagnosticCodes.CssImageResourceNotPreserved)
+            or EpubDiagnosticCodes.CssImageResourceNotPreserved
+            or EpubDiagnosticCodes.ImageAlternativeTextRecovered
+            or EpubDiagnosticCodes.TableColumnMetadataNotRepresented)
         {
             return (EpubFidelityStatus.Approximated, EpubFidelityImpact.Minor);
         }

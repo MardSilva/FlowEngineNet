@@ -158,6 +158,18 @@ The last generic `EPUB009` in the private corpus was a valid local JPEG referenc
 
 External URLs, absolute paths, unsafe traversal, missing entries and non-image resources are not associated. The change deliberately does not claim support for CSS backgrounds or visual equivalence.
 
+### Authored image alternative recovery
+
+XHTML images without `alt` previously produced `EPUB041` even when the publication supplied an explicit accessible name or caption elsewhere. The importer now checks `aria-label`, an unambiguous local `aria-labelledby`, `title`, and `figcaption` in that order. Recovered text enters the immutable `Figure.AlternativeText`, survives serialization and rendering, and produces `EPUB079` so the fallback remains visible.
+
+An explicitly empty `alt` still means decorative content and takes precedence over every fallback. If the publication provides no authored alternative, `EPUB041` remains and the private matrix classifies it as a source accessibility defect requiring human review. Flow does not use OCR or infer descriptions from file names, metadata, or nearby prose.
+
+### XHTML table column-group triage
+
+The private corpus contained 24 `EPUB058` findings across four candidates. All came from valid XHTML `colgroup` elements containing only one or more `col` children; none was a malformed table recovery. The importer now recognizes that shape, leaves the real rows and cells untouched, and emits `EPUB080` for the column metadata that the Flow model does not represent. A malformed `colgroup` with visible text or another child still follows the `EPUB058` recovery path.
+
+Two complete 21.8 qualifications were byte-identical with SHA-256 `29EFF347B578C901594692B08F8F592D9CB991A5C3241205DEF2547EB4B00C11`. All 14 eligible publications passed, the 24 findings moved from `EPUB058` to `EPUB080`, and no canonical document hash changed. The resulting matrix has 13 candidates with approximations, one source-accessibility case requiring human review, and one corrupt source; it has no measured loss, unsupported content, or Flow error.
+
 ## Flow 0.1 foundation
 
 The 0.1 cycle closed the original absence of a semantic document model, stable typed IDs and anchors, structural validation, optional typed presentation, user preference cascade, deterministic `.flow.json`, versioned canonicalization, SHA-256 integrity, a renderer-independent Flow layout, standalone semantic HTML, a sample book, a framework-free CLI, local RSA signature proof of concept and the first bounded EPUB importer.

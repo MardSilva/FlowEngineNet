@@ -2911,6 +2911,17 @@ public sealed class EpubImporter : IEpubImporter
                     continue;
                 }
 
+                if (node is XElement columnGroup
+                    && columnGroup.Name == XhtmlNamespace + "colgroup"
+                    && IsTableColumnMetadataOnly(columnGroup))
+                {
+                    diagnostics.Add(Warning(
+                        EpubDiagnosticCodes.TableColumnMetadataNotRepresented,
+                        "Table column metadata in <colgroup> is not represented by the Flow table model; semantic rows and cells were preserved unchanged.",
+                        resourcePath));
+                    continue;
+                }
+
                 if (node is XText text && string.IsNullOrWhiteSpace(text.Value))
                 {
                     continue;
@@ -2952,6 +2963,17 @@ public sealed class EpubImporter : IEpubImporter
 
             return new Table(IdFor(table, "table"), bodies, caption, head, foot);
         }
+
+        private static bool IsTableColumnMetadataOnly(XElement columnGroup) =>
+            columnGroup.Nodes().All(static node => node switch
+            {
+                XText text => string.IsNullOrWhiteSpace(text.Value),
+                XComment => true,
+                XElement column when column.Name == XhtmlNamespace + "col" =>
+                    column.Nodes().All(static child => child is XComment
+                        || child is XText text && string.IsNullOrWhiteSpace(text.Value)),
+                _ => false,
+            });
 
         private async Task<IReadOnlyList<TableRow>> ConvertRowsAsync(
             XElement group,
@@ -3481,14 +3503,7 @@ public sealed class EpubImporter : IEpubImporter
             var fallbackImage = imageSource.Name == XhtmlNamespace + "picture"
                 ? imageSource.Elements(XhtmlNamespace + "img").LastOrDefault()
                 : imageSource;
-            var alternativeText = (string?)fallbackImage?.Attribute("alt");
-            if (fallbackImage is null || fallbackImage.Attribute("alt") is null)
-            {
-                diagnostics.Add(Warning(
-                    EpubDiagnosticCodes.MissingImageAlternativeText,
-                    "An image has no alt attribute; no textual alternative can be preserved.",
-                    resourcePath));
-            }
+            var alternativeText = ReadXhtmlImageAlternativeText(fallbackImage, caption, resourcePath);
 
             foreach (var reference in ReadImageReferences(imageSource, fallbackImage, resourcePath))
             {
@@ -3511,6 +3526,94 @@ public sealed class EpubImporter : IEpubImporter
 
             return AlternativeTextFallback(alternativeText, idSource);
         }
+
+        private string? ReadXhtmlImageAlternativeText(
+            XElement? image,
+            Caption? caption,
+            string resourcePath)
+        {
+            if (image is null)
+            {
+                ReportMissingImageAlternative(resourcePath);
+                return null;
+            }
+
+            var alt = image.Attribute("alt");
+            if (alt is not null)
+            {
+                return alt.Value;
+            }
+
+            var candidates = new (string Source, string? Value)[]
+            {
+                ("aria-label", NormalizeAlternative((string?)image.Attribute("aria-label"))),
+                ("aria-labelledby", ReadAriaLabelledBy(image)),
+                ("title", NormalizeAlternative((string?)image.Attribute("title"))),
+                ("figcaption", caption is null ? null : NormalizeAlternative(InlineText(caption.Content))),
+            };
+            var recovered = candidates.FirstOrDefault(static candidate => candidate.Value is not null);
+            if (recovered.Value is not null)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.ImageAlternativeTextRecovered,
+                    $"An image has no alt attribute; its textual alternative was recovered from {recovered.Source}.",
+                    resourcePath));
+                return recovered.Value;
+            }
+
+            ReportMissingImageAlternative(resourcePath);
+            return null;
+        }
+
+        private static string? ReadAriaLabelledBy(XElement image)
+        {
+            var tokens = ((string?)image.Attribute("aria-labelledby"))
+                ?.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (tokens is not { Length: > 0 })
+            {
+                return null;
+            }
+
+            var root = image.Document?.Root;
+            if (root is null)
+            {
+                return null;
+            }
+
+            var values = new List<string>(tokens.Length);
+            foreach (var token in tokens)
+            {
+                var matches = root.DescendantsAndSelf()
+                    .Where(element => string.Equals((string?)element.Attribute("id"), token, StringComparison.Ordinal))
+                    .Take(2)
+                    .ToArray();
+                if (matches.Length != 1 || ReadSafeElementText(matches[0]) is not { } value)
+                {
+                    return null;
+                }
+
+                values.Add(value);
+            }
+
+            return NormalizeAlternative(string.Join(' ', values));
+        }
+
+        private static string? ReadSafeElementText(XElement element)
+        {
+            var text = string.Concat(element
+                .DescendantNodesAndSelf()
+                .OfType<XText>()
+                .Where(static node => !node.Ancestors().Any(static ancestor =>
+                    ancestor.Name == XhtmlNamespace + "script"
+                    || ancestor.Name == XhtmlNamespace + "style"))
+                .Select(static node => node.Value));
+            return NormalizeAlternative(text);
+        }
+
+        private void ReportMissingImageAlternative(string resourcePath) => diagnostics.Add(Warning(
+            EpubDiagnosticCodes.MissingImageAlternativeText,
+            "An image has no alt attribute or other explicit textual alternative; human review is required.",
+            resourcePath));
 
         private Figure CreateFigure(
             XElement idSource,

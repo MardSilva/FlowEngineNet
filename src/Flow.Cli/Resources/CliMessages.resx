@@ -321,6 +321,8 @@
   <data name="Diagnostic_EPUB076" xml:space="preserve"><value>A legacy EPUB 2 page map is recognized, but its source-page navigation is not imported.</value></data>
   <data name="Diagnostic_EPUB077" xml:space="preserve"><value>An image path used different letter casing from its unique manifest resource; the manifest path was used.</value></data>
   <data name="Diagnostic_EPUB078" xml:space="preserve"><value>A local image is referenced only through CSS and is not retained as a semantic Flow asset.</value></data>
+  <data name="Diagnostic_EPUB079" xml:space="preserve"><value>An image without alt text used another explicit textual alternative from the publication.</value></data>
+  <data name="Diagnostic_EPUB080" xml:space="preserve"><value>Table column metadata is not represented by the Flow table model.</value></data>
   <data name="Diagnostic_EPC001" xml:space="preserve"><value>The corpus manifest JSON is invalid.</value></data>
   <data name="Diagnostic_EPC002" xml:space="preserve"><value>The corpus manifest encoding is invalid.</value></data>
   <data name="Diagnostic_EPC003" xml:space="preserve"><value>The corpus manifest format is unsupported.</value></data>

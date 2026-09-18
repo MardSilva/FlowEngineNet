@@ -160,6 +160,26 @@ public sealed class EpubPrivateDifferenceMatrixTests
     }
 
     [Fact]
+    public void Create_ClassifiesUnrepresentedTableColumnMetadataAsTableApproximation()
+    {
+        var report = new EpubPrivateQualificationReport(true,
+        [
+            Publication("table-columns",
+            [
+                Diagnostic(EpubDiagnosticCodes.TableColumnMetadataNotRepresented, count: 24),
+            ]),
+        ]);
+
+        var matrix = new EpubPrivateDifferenceMatrixService().Create(report, Hash('T'));
+
+        var difference = Assert.Single(Assert.Single(matrix.Candidates).Differences);
+        Assert.Equal(EpubPrivateDifferenceCategory.ApprovedWithApproximations, difference.Category);
+        Assert.Equal(EpubPrivateDifferenceCause.SourceApproximation, difference.Cause);
+        Assert.Equal(EpubPrivateDifferenceMetric.Tables, difference.Metric);
+        Assert.Equal(24, difference.Count);
+    }
+
+    [Fact]
     public async Task AtomicWrite_CancellationPreservesExistingDestinationAndLeavesNoTemporaryFile()
     {
         var directory = Directory.CreateDirectory(Path.Combine(

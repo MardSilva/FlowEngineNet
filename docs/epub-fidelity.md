@@ -39,6 +39,10 @@ Each safe image occurrence that becomes a `Figure` counts as a transformed image
 
 A paragraph whose semantic output is one or more figures is counted as transformed rather than lost. Its image and any visible text remain measured by their own destination units. This avoids treating an image-only XHTML wrapper as missing paragraph content while keeping empty paragraphs and failed image imports visible through the ordinary source/destination reconciliation.
 
+Image bytes and accessible text are separate evidence. `EPUB079` is a minor approximation when an explicit XHTML source other than `alt` supplies the Flow alternative text. `EPUB041` is moderate: the image remains present, but the publication supplied no explicit textual alternative that Flow can preserve. The report does not run OCR or infer authorial intent.
+
+Valid XHTML `colgroup`/`col` metadata is reported as the minor table approximation `EPUB080`, not as malformed table recovery. It does not add a source content unit or a destination cell: the current model preserves the table's semantic rows and cells but has no column-definition node. Malformed column groups with visible recoverable content continue to use `EPUB058`.
+
 ## CLI
 
 Use the report alongside, or independently from, the diagnostic JSON:

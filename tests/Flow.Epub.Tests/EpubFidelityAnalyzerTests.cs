@@ -124,6 +124,25 @@ public sealed class EpubFidelityAnalyzerTests
     }
 
     [Fact]
+    public async Task Analyze_ClassifiesUnrepresentedTableColumnMetadataAsMinorApproximation()
+    {
+        const string chapter = """
+            <html xmlns="http://www.w3.org/1999/xhtml"><body>
+              <table><colgroup><col /><col /></colgroup><tbody><tr><td>A</td><td>B</td></tr></tbody></table>
+            </body></html>
+            """;
+        await using var epub = MinimalEpubFactory.Create(chapterOne: chapter);
+
+        var report = new EpubFidelityAnalyzer().Analyze(await new EpubImporter().ImportAsync(epub));
+
+        var finding = Assert.Single(report.Findings, static item =>
+            item.RelatedDiagnosticCode == EpubDiagnosticCodes.TableColumnMetadataNotRepresented);
+        Assert.Equal(EpubFidelityStatus.Approximated, finding.Status);
+        Assert.Equal(EpubFidelityImpact.Minor, finding.Impact);
+        Assert.Equal(1, finding.Count);
+    }
+
+    [Fact]
     public async Task Analyze_FailedImportIsPartialAndNeverInventsOneHundredPercent()
     {
         await using var invalid = new MemoryStream("not a zip"u8.ToArray());
