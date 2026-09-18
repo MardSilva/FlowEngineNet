@@ -57,7 +57,7 @@ The CLI accepts only the known `flow-epub-private-qualification-0.1` contract, v
 
 The matrix remains private. Exact source and qualification hashes can identify bytes even though the format excludes paths, file names, titles, authors, publisher identifiers, publication text and asset bytes. It is regression evidence, not an editorial approval or an EPUB conformance certificate.
 
-The first resource-cause triage found 28 embedded font files across five private candidates. Every file was referenced by publication CSS. They now produce `EPUB074` with the typed `EmbeddedFontSubstitution` cause instead of generic `EPUB009` evidence. Two complete qualifications and two matrix generations were byte-stable: five candidates contained approximations, one retained unsupported image-link associations, and none contained measured loss or Flow errors. The same 28 fonts appear once in inspection and once in import evidence, so their aggregated occurrence total is 56 without implying 56 distinct files.
+The first resource-cause triage found 28 embedded font files across five private candidates. Every file was referenced by publication CSS. They now produce `EPUB074` with the typed `EmbeddedFontSubstitution` cause instead of generic `EPUB009` evidence. A later run preserved the four external image-link destinations through typed figure links. Two complete qualifications and two matrix generations were byte-stable: all six candidates contained explicit approximations, and none contained unsupported content, measured loss, broken source references or Flow errors. The same 28 fonts appear once in inspection and once in import evidence, so their aggregated occurrence total is 56 without implying 56 distinct files.
 
 ## What "corpus" means here
 

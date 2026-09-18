@@ -134,8 +134,15 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
                 case CodeBlock code:
                     counts[EpubFidelityMetric.SignificantCharacters] += CountSignificant(code.Code);
                     break;
-                case Figure:
+                case Figure figure:
                     counts[EpubFidelityMetric.Images]++;
+                    if (figure.Link is not null)
+                    {
+                        counts[figure.Link.IsInternal
+                            ? EpubFidelityMetric.InternalLinks
+                            : EpubFidelityMetric.ExternalLinks]++;
+                    }
+
                     break;
                 case Footnote:
                     counts[EpubFidelityMetric.Notes]++;

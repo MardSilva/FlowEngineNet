@@ -4,7 +4,7 @@ namespace Flow.Documents;
 
 internal static class FlowJsonWriter
 {
-    internal const string FormatVersion = "flow-json-0.1";
+    internal const string FormatVersion = "flow-json-0.2";
 
     internal static void Write(
         Utf8JsonWriter writer,
@@ -138,6 +138,24 @@ internal static class FlowJsonWriter
             case Figure figure:
                 writer.WriteString("assetId", figure.AssetId.Value);
                 WriteOptionalString(writer, "alternativeText", figure.AlternativeText);
+                if (figure.Link is not null)
+                {
+                    writer.WritePropertyName("link");
+                    writer.WriteStartObject();
+                    if (figure.Link.Anchor is not null)
+                    {
+                        writer.WriteString("kind", "internal");
+                        writer.WriteString("anchor", figure.Link.Anchor.Value);
+                    }
+                    else
+                    {
+                        writer.WriteString("kind", "external");
+                        writer.WriteString("uri", figure.Link.ExternalUri);
+                    }
+
+                    writer.WriteEndObject();
+                }
+
                 if (figure.Caption is not null)
                 {
                     writer.WritePropertyName("caption");

@@ -402,8 +402,19 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
                 : string.Empty;
 
             Line($"<figure id=\"{Id(figure.Id)}\"{publicationRole}{StyleAttribute(layoutNode, style)}>");
+            var linkTarget = figure.Link is null ? null : SafeHref(figure.Link.ToTargetString());
+            if (linkTarget is not null)
+            {
+                Line($"<a href=\"{Attribute(linkTarget)}\">");
+            }
+
             Line(
                 $"<img src=\"{Attribute(source)}\" alt=\"{Attribute(figure.AlternativeText ?? string.Empty)}\" />");
+            if (linkTarget is not null)
+            {
+                Line("</a>");
+            }
+
             foreach (var child in layoutNode.Children)
             {
                 WriteNode(child, figure);

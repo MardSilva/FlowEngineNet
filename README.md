@@ -23,7 +23,7 @@ Implemented:
 - typed, optional presentation and typography intentions;
 - reader-preference cascade with renderer safety constraints;
 - deterministic experimental `.flow.json` serialization;
-- `flow-c14n-0.1` canonicalization and SHA-256 document hashes;
+- versioned canonicalization (`flow-c14n-0.2`, with a legacy 0.1 compatibility writer) and SHA-256 document hashes;
 - experimental local RSA-PSS-SHA256 signatures over canonical bytes;
 - a diagnostic-first, security-bounded EPUB import prototype;
 - non-converting EPUB 2/3 package inspection with deterministic JSON reports;
@@ -311,7 +311,7 @@ dotnet run --project src/Flow.Cli -- `
   --drm-free
 ```
 
-The qualification report contains neutral IDs, source and canonical hashes, phase and semantic counts, aggregated diagnostic codes and the repeated-run result. It omits physical paths, file names, editorial metadata and publication text. Protected, corrupt or structurally unsuitable candidates appear as explicitly skipped entries. The current private run covered six eligible publications twice: all completed the 12 automatic phases with stable evidence and no measured lost units. Embedded fonts are recorded as typography approximations because Flow retains the authored family name but not the font bytes. An unsupported image-only link association also remains explicit rather than being counted as preserved. This automatic batch is regression evidence, not human review or EPUB conformance certification.
+The qualification report contains neutral IDs, source and canonical hashes, phase and semantic counts, aggregated diagnostic codes and the repeated-run result. It omits physical paths, file names, editorial metadata and publication text. Protected, corrupt or structurally unsuitable candidates appear as explicitly skipped entries. The current private run covered six eligible publications twice: all completed the 12 automatic phases with stable evidence and no measured lost units. Embedded fonts remain typography approximations because Flow retains the authored family name but not the font bytes. Image-only links now retain safe typed destinations and no longer appear as unsupported evidence. This automatic batch is regression evidence, not human review or EPUB conformance certification.
 
 The qualification report can then be classified without opening the EPUB files again. The command requires the exact SHA-256 of the input report and writes a separate private matrix:
 

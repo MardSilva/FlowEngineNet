@@ -36,7 +36,7 @@ After the change, the candidate completed all 12 qualification phases, including
 
 The first private batch left 24 source units classified as lost. Nineteen were note references that targeted a resource rather than a fragment; the destination resource contained exactly one semantic note without a source ID. The importer now resolves only that unambiguous structure, assigns a deterministic Flow ID and records `EPUB072` as an approximation.
 
-The remaining five units came from one safely representable percent-encoded `mailto` link and four image-only external links. Safe encoded mail is now retained and checked consistently by import, HTML rendering and package verification. The four images were already preserved; their link destinations are now reported as unsupported through `EPUB073` instead of appearing as unexplained loss. Two complete runs qualified all six candidates through all 12 phases with zero lost units, identical report SHA-256 and unchanged source hashes. The unsupported figure-link association remains in `known-limitations.md`.
+The remaining five units came from one safely representable percent-encoded `mailto` link and four image-only external links. Safe encoded mail is retained and checked consistently by import, HTML rendering and package verification. The first correction made the four image associations explicit through `EPUB073`; the later typed `FigureLink` model now preserves their destinations without loading them. Two complete runs qualified all six candidates through all 12 phases with zero lost units and identical report SHA-256.
 
 ### Private difference classification
 
@@ -52,7 +52,13 @@ The first private difference matrix classified five candidates as containing uns
 
 The inspector now recognizes EPUB font media types structurally. Import keeps the typed `font-family` intent, excludes the font bytes and emits `EPUB074`; fidelity and the private matrix classify that evidence as a typography approximation with cause `EmbeddedFontSubstitution`. A host may use an installed matching family, but import does not depend on host font discovery. Unknown binary resources and unsupported spine content continue to use `EPUB009`.
 
-Two private qualifications and two matrix generations produced identical bytes within each pair. The current matrix contains five candidates with approximations and one with unsupported image-link associations, with no measured content loss or Flow errors. This reduces the generic-resource false positive without claiming exact visual fidelity or permission to redistribute embedded fonts.
+Two private qualifications and two matrix generations produced identical bytes within each pair. After figure-link support, the current matrix contains six candidates with approximations and none with unsupported content, measured loss, broken source references or Flow errors. This reduces the generic-resource false positive without claiming exact visual fidelity or permission to redistribute embedded fonts.
+
+### Figure links
+
+`Figure` now has an optional immutable `FigureLink`. Internal targets use `DocumentAnchor`; safe HTTP, HTTPS and `mailto` targets retain their original absolute URI. EPUB image-only anchors therefore survive import, JSON round trips, layout and standalone or multipage HTML without network access during conversion. Unsafe, empty, unresolved or ambiguous targets still leave the figure intact and produce a diagnostic.
+
+Because the destination is semantic content, the current writers use `flow-json-0.2` and `flow-c14n-0.2`. The reader still accepts `flow-json-0.1`, and `FlowDocumentCanonicalizerV01` preserves the previous projection for compatibility checks. Two private qualifications and two matrices were byte-identical within each pair: all six candidates now have approximations, with no `EPUB073`, unsupported-content classification, measured loss or Flow error.
 
 ### Real large-publication gate
 

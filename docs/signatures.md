@@ -4,7 +4,7 @@ Flow `0.1.0-rc.1` includes a deliberately narrow local proof of concept for sign
 
 ## Signed bytes
 
-`RsaDocumentSignatureService` calls the configured `IDocumentCanonicalizer` and passes exactly the returned bytes to the standard .NET `RSA.SignData` API. For the current implementation, those bytes use `flow-c14n-0.1`.
+`RsaDocumentSignatureService` calls the configured `IDocumentCanonicalizer` and passes exactly the returned bytes to the standard .NET `RSA.SignData` API. The default current implementation uses `flow-c14n-0.2`; callers that must verify legacy 0.1 evidence can explicitly provide `FlowDocumentCanonicalizerV01`.
 
 The service does not sign:
 
@@ -13,7 +13,7 @@ The service does not sign:
 - presentation, reader preferences, layout, or renderer output;
 - the `DocumentSignature` itself.
 
-Because presentation is excluded from `flow-c14n-0.1`, the same signature remains valid when only theme or other non-canonical presentation changes. A semantic content or canonical metadata change invalidates it.
+Because presentation is excluded from both supported canonical profiles, the same signature remains valid when only theme or other non-canonical presentation changes. A semantic content or canonical metadata change invalidates it. In 0.2, this includes changing a figure-link destination.
 
 ## Algorithm profile
 

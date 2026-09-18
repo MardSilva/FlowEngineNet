@@ -19,7 +19,7 @@ public sealed class FlowJsonDocumentSerializerTests
         Assert.Equal(first, second);
         Assert.Contains('\n', json);
         Assert.DoesNotContain('\r', json);
-        Assert.Contains("\"format\": \"flow-json-0.1\"", json, StringComparison.Ordinal);
+        Assert.Contains("\"format\": \"flow-json-0.2\"", json, StringComparison.Ordinal);
         Assert.True(
             json.IndexOf("\"id\": \"asset-a.bin\"", StringComparison.Ordinal)
             < json.IndexOf("\"id\": \"asset-z.bin\"", StringComparison.Ordinal));
@@ -134,6 +134,46 @@ public sealed class FlowJsonDocumentSerializerTests
         Assert.Equal(2, header.ColumnSpan);
         Assert.Equal(TableHeaderScope.Column, header.Scope);
         Assert.Empty(restoredTable.Bodies[0].Rows[0].Cells[2].Children);
+    }
+
+    [Fact]
+    public async Task RoundTrip_PreservesFigureLinksAndReadsLegacyDocumentsWithoutThem()
+    {
+        var document = new FlowDocument(
+            new DocumentIdentity(new DocumentId("urn:test:figure-link-json")),
+            new DocumentMetadata("Figure link"),
+            new DocumentContent(
+            [
+                new Figure(
+                    new NodeId("linked-figure"),
+                    new AssetId("image"),
+                    alternativeText: "Linked image",
+                    link: FigureLink.External("https://example.invalid/book")),
+            ]),
+            [new FlowAsset(new AssetId("image"), "image/png", "image.png", new byte[] { 1 })]);
+
+        var bytes = await SerializeAsync(document);
+        await using var input = new MemoryStream(bytes);
+        var restored = await _serializer.DeserializeAsync(input);
+        var figure = Assert.IsType<Figure>(Assert.Single(restored.Content.Children));
+        Assert.Equal("https://example.invalid/book", figure.Link?.ExternalUri);
+
+        var legacyDocument = new FlowDocument(
+            document.Identity,
+            document.Metadata,
+            new DocumentContent(
+            [
+                new Figure(
+                    new NodeId("linked-figure"),
+                    new AssetId("image"),
+                    alternativeText: "Linked image"),
+            ]),
+            document.Assets.Values);
+        var legacyJson = Encoding.UTF8.GetString(await SerializeAsync(legacyDocument))
+            .Replace("flow-json-0.2", "flow-json-0.1", StringComparison.Ordinal);
+        await using var legacyInput = new MemoryStream(Encoding.UTF8.GetBytes(legacyJson));
+        var legacy = await _serializer.DeserializeAsync(legacyInput);
+        Assert.Null(Assert.IsType<Figure>(Assert.Single(legacy.Content.Children)).Link);
     }
 
     [Fact]

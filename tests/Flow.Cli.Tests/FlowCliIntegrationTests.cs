@@ -88,7 +88,7 @@ public sealed class FlowCliIntegrationTests
         Assert.Equal((0, "Valid: no semantic validation errors."), (validate.ExitCode, validate.Output.Trim()));
         Assert.Equal(0, hash.ExitCode);
         Assert.Contains("Hash: SHA-256:", hash.Output, StringComparison.Ordinal);
-        Assert.Contains("Canonicalization: flow-c14n-0.1", hash.Output, StringComparison.Ordinal);
+        Assert.Contains("Canonicalization: flow-c14n-0.2", hash.Output, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1026,7 +1026,7 @@ public sealed class FlowCliIntegrationTests
         Assert.Contains("Título: The Flow Experiment", inspect.Output, StringComparison.Ordinal);
         Assert.Contains("Capítulos: 5", inspect.Output, StringComparison.Ordinal);
         Assert.Contains("Válido: nenhum erro de validação semântica.", validate.Output, StringComparison.Ordinal);
-        Assert.Contains("Canonicalização: flow-c14n-0.1", hash.Output, StringComparison.Ordinal);
+        Assert.Contains("Canonicalização: flow-c14n-0.2", hash.Output, StringComparison.Ordinal);
     }
 
     [Fact]

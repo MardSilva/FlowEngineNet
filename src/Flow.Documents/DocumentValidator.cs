@@ -181,6 +181,15 @@ public sealed class DocumentValidator
                     $"Figure '{figure.Id}' references missing asset '{figure.AssetId}'.",
                     figure.Id));
             }
+
+            if (figure.Link?.Anchor is { } anchor && !document.TryResolveAnchor(anchor, out _))
+            {
+                diagnostics.Add(Error(
+                    ValidationDiagnosticCodes.UnresolvedAnchor,
+                    $"Figure '{figure.Id}' targets unresolved anchor '{anchor}'.",
+                    figure.Id,
+                    anchor));
+            }
         }
     }
 

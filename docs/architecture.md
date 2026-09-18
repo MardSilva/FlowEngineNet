@@ -53,7 +53,7 @@ Safety constraints run last and may clamp font sizes, line height, paragraph spa
 
 ## Security boundary
 
-`Flow.Documents` owns the deterministic, readable `flow-json-0.1` development serializer. `Flow.Security` independently projects a document into `flow-c14n-0.1` bytes and hashes them with standard SHA-256. Keeping the writers separate prevents formatting or presentation round-trip changes from silently changing the canonical profile.
+`Flow.Documents` owns the deterministic, readable `flow-json-0.2` development serializer and still reads 0.1 documents. `Flow.Security` independently projects a document into current `flow-c14n-0.2` bytes and hashes them with standard SHA-256; the legacy 0.1 projector remains explicit. Keeping the writers separate prevents formatting or presentation round-trip changes from silently changing the canonical profile.
 
 Canonicalization includes identity, all currently modeled canonical metadata, semantic structure/content, asset references, asset metadata, and complete asset bytes. It excludes `DocumentPresentation`, `DocumentIntegrity`, layout context, `UserReadingPreferences`, resolved styles, renderer constraints, pagination, and renderer output. See [canonicalization.md](canonicalization.md) for the normative 0.1 field list.
 

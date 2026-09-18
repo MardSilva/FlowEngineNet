@@ -53,7 +53,7 @@ Heading sequences are checked within each imported XHTML resource. When the sour
 
 Internal XHTML links are translated to stable Flow anchors when their targets can be represented. IDs on inline-only constructs are explicitly diagnosed and mapped to the nearest containing semantic block. External `http`, `https`, and safe `mailto` links are retained. A percent-encoded `mailto` address is accepted only after its decoded form has been checked for control characters; the HTML renderer and package verifier apply the same rule. Unknown schemes are not activated.
 
-An anchor containing only an image exposes a model boundary: the image and its reading-order position survive as a `Figure`, but the current Flow model cannot attach a link destination to that block. `EPUB073` reports this as unsupported rather than treating the preserved image as lost or inventing visible link text.
+An anchor containing an image can attach a typed `FigureLink` to the resulting `Figure`. Internal destinations resolve to `DocumentAnchor`; safe absolute HTTP, HTTPS, and `mailto` destinations remain external links and are never loaded by the importer. Empty, unresolved, nested, or unsafe destinations leave the image intact and produce an explicit reference diagnostic. The standalone renderer and HTML-book package make valid figure links actionable, including cross-chapter rewriting for internal anchors.
 
 ## Images, covers, and asset safety
 

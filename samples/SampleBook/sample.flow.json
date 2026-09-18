@@ -1,5 +1,5 @@
 {
-  "format": "flow-json-0.1",
+  "format": "flow-json-0.2",
   "identity": {
     "id": "urn:flow:sample:the-flow-experiment",
     "version": "1.0"

@@ -808,9 +808,7 @@ public sealed class EpubImporter : IEpubImporter
             void AddLinkCounts(EpubFidelityMetric metric, IEnumerable<XElement> links)
             {
                 var items = links.ToArray();
-                var unsupported = items.LongCount(IsImageOnlyAnchor);
-                Add(metric, xhtml.Item.Path, items.LongLength - unsupported);
-                Add(metric, xhtml.Item.Path, unsupported, EpubFidelityStatus.Unsupported);
+                Add(metric, xhtml.Item.Path, items.LongLength);
             }
         }
 
@@ -878,12 +876,6 @@ public sealed class EpubImporter : IEpubImporter
 
     private static bool HasHref(XElement element) =>
         !string.IsNullOrWhiteSpace((string?)element.Attribute("href"));
-
-    private static bool IsImageOnlyAnchor(XElement element) =>
-        element.Descendants().Any(static descendant =>
-            IsXhtml(descendant, "img") || descendant.Name == SvgNamespace + "image")
-        && !element.DescendantNodes().OfType<XText>().Any(static text =>
-            text.Value.EnumerateRunes().Any(static rune => !Rune.IsWhiteSpace(rune)));
 
     private static bool IsSafeMailtoHref(string? href)
     {
@@ -1247,7 +1239,6 @@ public sealed class EpubImporter : IEpubImporter
         private readonly Dictionary<SvgImageIssueKey, int> svgImageIssues = [];
         private readonly Dictionary<HeadingLevelNormalizationKey, int> headingLevelNormalizations = [];
         private readonly Dictionary<string, int> noteResourceFallbacks = new(StringComparer.Ordinal);
-        private readonly Dictionary<string, int> linkedImageTargets = new(StringComparer.Ordinal);
         private readonly HashSet<XElement> footnoteElements = [];
         private readonly Dictionary<XElement, NodeId> footnoteReferenceTargets = [];
         private readonly HashSet<XElement> invalidFootnoteReferences = [];
@@ -1401,16 +1392,6 @@ public sealed class EpubImporter : IEpubImporter
                     count));
             }
 
-            foreach (var (resourcePath, count) in linkedImageTargets.OrderBy(
-                         static item => item.Key,
-                         StringComparer.Ordinal))
-            {
-                diagnostics.Add(Warning(
-                    EpubDiagnosticCodes.LinkedImageTargetNotRepresentable,
-                    $"Preserved the image content of {count} image-only link(s), but the current Flow model cannot attach their destinations to figures.",
-                    resourcePath,
-                    count));
-            }
         }
 
         internal void PrepareIds(IEnumerable<XhtmlModel> xhtmlDocuments)
@@ -1433,16 +1414,6 @@ public sealed class EpubImporter : IEpubImporter
                 RegisterNodeTypography(body, chapterId);
                 anchors.TryAdd(xhtml.Item.Path, chapterId);
                 AddSourceLocation(xhtml.Item.Path, null, chapterId);
-                var linkedImageCount = body.Descendants(XhtmlNamespace + "a")
-                    .LongCount(static anchor => HasHref(anchor)
-                                                       && !IsTableOfContentsLink(anchor)
-                                                       && !IsNoteReference(anchor)
-                                                       && IsImageOnlyAnchor(anchor));
-                if (linkedImageCount > 0)
-                {
-                    linkedImageTargets[xhtml.Item.Path] = checked((int)linkedImageCount);
-                }
-
                 var sourceIds = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var element in body.Descendants())
                 {
@@ -3225,7 +3196,9 @@ public sealed class EpubImporter : IEpubImporter
                     figureSource,
                     imported.AssetId,
                     index == 0 ? caption : null,
-                    alternativeText));
+                    alternativeText,
+                    image,
+                    resourcePath));
             }
 
             if (result.Count > 0)
@@ -3311,7 +3284,7 @@ public sealed class EpubImporter : IEpubImporter
                     .ConfigureAwait(false);
                 if (imported is not null)
                 {
-                    return [CreateFigure(idSource, imported.AssetId, caption, alternativeText)];
+                    return [CreateFigure(idSource, imported.AssetId, caption, alternativeText, fallbackImage!, resourcePath)];
                 }
             }
 
@@ -3322,15 +3295,76 @@ public sealed class EpubImporter : IEpubImporter
             XElement idSource,
             AssetId assetId,
             Caption? caption,
-            string? alternativeText)
+            string? alternativeText,
+            XElement linkSource,
+            string resourcePath)
         {
-            var figure = new Figure(IdFor(idSource, "figure"), assetId, caption, alternativeText);
+            var figure = new Figure(
+                IdFor(idSource, "figure"),
+                assetId,
+                caption,
+                alternativeText,
+                TryCreateFigureLink(linkSource, resourcePath));
             if (CoverFigureId is null && IsPublicationCover(assetId))
             {
                 CoverFigureId = figure.Id;
             }
 
             return figure;
+        }
+
+        private FigureLink? TryCreateFigureLink(XElement source, string resourcePath)
+        {
+            var anchorsAroundImage = source.Ancestors(XhtmlNamespace + "a").ToArray();
+            if (anchorsAroundImage.Length == 0)
+            {
+                return null;
+            }
+
+            if (anchorsAroundImage.Length > 1)
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidReference,
+                    "An image is nested in multiple links; the ambiguous destinations were rejected.",
+                    resourcePath));
+                return null;
+            }
+
+            var href = (string?)anchorsAroundImage[0].Attribute("href");
+            if (string.IsNullOrWhiteSpace(href))
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidReference,
+                    "An image link has no href; the image was preserved without a destination.",
+                    resourcePath));
+                return null;
+            }
+
+            if (FigureLink.TryCreateExternal(href, out var external))
+            {
+                return external;
+            }
+
+            if (Uri.TryCreate(href, UriKind.Absolute, out _))
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.InvalidReference,
+                    $"Image link target '{href}' uses an unsafe or unsupported external scheme; the image was preserved without a destination.",
+                    resourcePath));
+                return null;
+            }
+
+            if (TryBuildReferenceKey(resourcePath, href, out _, out var key)
+                && anchors.TryGetValue(key, out var nodeId))
+            {
+                return FigureLink.Internal(DocumentAnchor.Create([nodeId]));
+            }
+
+            diagnostics.Add(Warning(
+                EpubDiagnosticCodes.InvalidReference,
+                $"Image link target '{href}' could not be resolved; the image was preserved without a destination.",
+                resourcePath));
+            return null;
         }
 
         private bool IsPublicationCover(AssetId assetId) =>

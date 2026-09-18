@@ -1,3 +1,4 @@
+using Flow.Core;
 using Flow.Documents;
 using Flow.Layout;
 using Flow.Rendering.Html;
@@ -141,8 +142,9 @@ public sealed class EpubRealWorldHardeningTests
             .SelectMany(static paragraph => paragraph.Content)
             .OfType<Link>());
         Assert.Equal("mailto:reader%40example.invalid?subject=Hello%20Flow", link.Target);
-        Assert.Single(document.Index.Locations.Select(static item => item.Node).OfType<Figure>());
-        Assert.Single(result.Diagnostics, static item =>
+        var figure = Assert.Single(document.Index.Locations.Select(static item => item.Node).OfType<Figure>());
+        Assert.Equal("https://example.invalid/image", figure.Link?.ExternalUri);
+        Assert.DoesNotContain(result.Diagnostics, static item =>
             item.Code == EpubDiagnosticCodes.LinkedImageTargetNotRepresentable);
         Assert.Contains(result.Diagnostics, static item =>
             item.Code == EpubDiagnosticCodes.InvalidReference
@@ -152,12 +154,9 @@ public sealed class EpubRealWorldHardeningTests
         var externalLinks = fidelity.Measurements.Single(static item =>
             item.Metric == EpubFidelityMetric.ExternalLinks);
         Assert.Equal(2, externalLinks.SourceCount);
-        Assert.Equal(1, externalLinks.DestinationCount);
-        Assert.Equal(1, externalLinks.UnsupportedCount);
+        Assert.Equal(2, externalLinks.DestinationCount);
+        Assert.Equal(0, externalLinks.UnsupportedCount);
         Assert.Equal(0, externalLinks.LostCount);
-        Assert.Contains(fidelity.Findings, static finding =>
-            finding.RelatedDiagnosticCode == EpubDiagnosticCodes.LinkedImageTargetNotRepresentable
-            && finding.Status == EpubFidelityStatus.Unsupported);
 
         var serializer = new FlowJsonDocumentSerializer();
         var integrity = new Sha256DocumentIntegrityService(new FlowDocumentCanonicalizer());
@@ -174,6 +173,42 @@ public sealed class EpubRealWorldHardeningTests
         var html = new HtmlDocumentRenderer().RenderToString(roundTripped, layout, preferences);
         Assert.Contains("href=\"mailto:reader%40example.invalid?subject=Hello%20Flow\"", html, StringComparison.Ordinal);
         Assert.Contains("<figure", html, StringComparison.Ordinal);
-        Assert.DoesNotContain("https://example.invalid/image", html, StringComparison.Ordinal);
+        Assert.Contains("href=\"https://example.invalid/image\"", html, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ImageOnlyLinks_ResolveInternalTargetsAndRejectUnsafeTargets()
+    {
+        const string chapter = """
+            <html xmlns="http://www.w3.org/1999/xhtml"><body>
+              <p><a href="chapter-2.xhtml#end"><img src="../images/flow.png" alt="Go to the end" /></a></p>
+              <p><a href="javascript:alert(1)"><img src="../images/flow.png" alt="Unsafe" /></a></p>
+            </body></html>
+            """;
+        await using var epub = MinimalEpubFactory.Create(chapterOne: chapter);
+
+        var result = await new EpubImporter().ImportAsync(epub);
+
+        Assert.True(result.IsSuccess, string.Join(Environment.NewLine, result.Diagnostics));
+        var figures = result.Document!.Index.Locations
+            .Select(static item => item.Node)
+            .OfType<Figure>()
+            .ToArray();
+        Assert.Equal(2, figures.Length);
+        Assert.Equal(new NodeId("chapter-chapter-two-end"), figures[0].Link?.Anchor?.TargetId);
+        Assert.Null(figures[1].Link);
+        Assert.Contains(result.Diagnostics, static item =>
+            item.Code == EpubDiagnosticCodes.InvalidReference
+            && item.Message.Contains("unsafe", StringComparison.OrdinalIgnoreCase));
+
+        var validation = new DocumentValidator().Validate(result.Document);
+        Assert.True(validation.IsValid, string.Join(Environment.NewLine, validation.Diagnostics));
+        var preferences = new UserReadingPreferences();
+        var layout = new AdaptiveLayoutEngine().Layout(
+            result.Document,
+            new LayoutContext(390, 844, userPreferences: preferences));
+        var html = new HtmlDocumentRenderer().RenderToString(result.Document, layout, preferences);
+        Assert.Contains("href=\"#chapter-chapter-two-end\"", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("javascript:", html, StringComparison.OrdinalIgnoreCase);
     }
 }

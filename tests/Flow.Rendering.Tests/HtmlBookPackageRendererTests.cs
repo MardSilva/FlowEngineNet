@@ -478,6 +478,49 @@ public sealed class HtmlBookPackageRendererTests
         Assert.Equal(["cover", "section", "chapter", "chapter"], roles);
     }
 
+    [Fact]
+    public void Render_FigureLinksRemainClickableAndInternalTargetsAreRewrittenAcrossPages()
+    {
+        var assetId = new AssetId("linked.png");
+        var targetId = new NodeId("target-heading");
+        var document = new FlowDocument(
+            new DocumentIdentity(new DocumentId("urn:flow:html-book:figure-links")),
+            new DocumentMetadata("Linked figures", "en"),
+            new DocumentContent(
+            [
+                new Chapter(
+                    new NodeId("first"),
+                    [new Figure(
+                        new NodeId("internal-figure"),
+                        assetId,
+                        alternativeText: "Next chapter",
+                        link: FigureLink.Internal(DocumentAnchor.Create([targetId])))]),
+                new Chapter(
+                    new NodeId("second"),
+                    [
+                        new Heading(targetId, 1, [new Text("Target")]),
+                        new Figure(
+                            new NodeId("external-figure"),
+                            assetId,
+                            alternativeText: "External",
+                            link: FigureLink.External("https://example.invalid/details")),
+                    ]),
+            ]),
+            [new FlowAsset(assetId, "image/png", "linked.png", new byte[] { 1, 2, 3 })]);
+
+        var package = Render(document, 390, 844);
+        var first = Parse(package, "chapters/chapter-001.html");
+        var second = Parse(package, "chapters/chapter-002.html");
+
+        Assert.Equal(
+            "chapter-002.html#target-heading",
+            (string?)first.Descendants("figure").Single().Element("a")?.Attribute("href"));
+        Assert.Equal(
+            "https://example.invalid/details",
+            (string?)second.Descendants("figure").Single().Element("a")?.Attribute("href"));
+        AssertAllInternalLinksResolve(package);
+    }
+
     [Theory]
     [InlineData(HtmlBookUiLanguage.English, "en", "Reading appearance", "Contents", "Table of contents", "Next")]
     [InlineData(HtmlBookUiLanguage.PortuguesePortugal, "pt-PT", "Aspeto da leitura", "Índice", "Índice", "Seguinte")]

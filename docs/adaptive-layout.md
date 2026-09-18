@@ -34,4 +34,4 @@ Optional author intentions override these defaults except when the small-screen 
 
 ## Validation and identity
 
-The engine validates the semantic document before producing layout. Invalid hierarchy, references, assets, or IDs prevent layout and expose the validation diagnostic codes in the exception message. Layout identity and version are copied from `DocumentIdentity`; node identity is preserved from each semantic node. None of this runtime layout state participates in `flow-c14n-0.1` or `DocumentHash`.
+The engine validates the semantic document before producing layout. Invalid hierarchy, references, assets, or IDs prevent layout and expose the validation diagnostic codes in the exception message. Layout identity and version are copied from `DocumentIdentity`; node identity is preserved from each semantic node. None of this runtime layout state participates in a Flow canonical profile or `DocumentHash`.

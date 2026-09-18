@@ -12,7 +12,7 @@
       "validationDiagnosticCount": 0,
       "fidelityLostUnitCount": 0,
       "documentId": "urn:flow:fixture:epub2-ncx",
-      "canonicalHash": "5F380583526DDB0DD964FCEEC242931532166F89A9E02EB24C39A4584DFC67E3",
+      "canonicalHash": "A5D74BB42C2F3A190E8560FA5B74CA81F5726DB2C1A3763CD72B8C3453ECCEAF",
       "semantic": {
         "orderedNodeIds": [
           "toc-ncx",
@@ -52,7 +52,7 @@
       "validationDiagnosticCount": 0,
       "fidelityLostUnitCount": 31,
       "documentId": "urn:flow:fixture:epub3-varied",
-      "canonicalHash": "125FE2C2327F4E189AD590B6A758241F61981F9312F5F29C23305CB99DDB7E51",
+      "canonicalHash": "B7F057795B350BCE041DE8A41E491752A4F5F7806212F8938062F81D37CEF205",
       "semantic": {
         "orderedNodeIds": [
           "toc-nav",
@@ -123,7 +123,7 @@
       "validationDiagnosticCount": 0,
       "fidelityLostUnitCount": 0,
       "documentId": "urn:isbn:9780000000001",
-      "canonicalHash": "84FBDFCDEFEF771415BDB21CFBFF8F34DDED6917E5C72D23892FB91445AC7BC6",
+      "canonicalHash": "FA465D164E532063B7654F933DFC778FAB43697BA5E8FE39FFA4F0CBB6DD5096",
       "semantic": {
         "orderedNodeIds": [
           "chapter-chapter-one",

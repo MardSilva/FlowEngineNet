@@ -167,6 +167,25 @@ public sealed class DocumentValidatorTests
             diagnostic => diagnostic.Code == ValidationDiagnosticCodes.InvalidTableOfContentsTarget);
     }
 
+    [Fact]
+    public void Validate_ReportsUnresolvedInternalFigureLink()
+    {
+        var asset = new FlowAsset(new AssetId("image"), "image/png", "image.png", new byte[] { 1 });
+        var document = CreateDocument(
+        [
+            new Figure(
+                new NodeId("figure"),
+                asset.Id,
+                link: FigureLink.Internal(DocumentAnchor.Create([new NodeId("missing")]))),
+        ], [asset]);
+
+        var result = _validator.Validate(document);
+
+        Assert.Contains(result.Diagnostics, diagnostic =>
+            diagnostic.Code == ValidationDiagnosticCodes.UnresolvedAnchor
+            && diagnostic.NodeId == new NodeId("figure"));
+    }
+
     private static FlowDocument CreateDocument(
         IEnumerable<DocumentNode> children,
         IEnumerable<FlowAsset>? assets = null) =>

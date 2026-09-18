@@ -4,11 +4,11 @@ using Flow.Documents;
 
 namespace Flow.Security;
 
-/// <summary>Implements the current deterministic <c>flow-c14n-0.2</c> semantic projection.</summary>
-public sealed class FlowDocumentCanonicalizer : IDocumentCanonicalizer
+/// <summary>Implements the legacy <c>flow-c14n-0.1</c> projection for compatibility checks.</summary>
+public sealed class FlowDocumentCanonicalizerV01 : IDocumentCanonicalizer
 {
-    /// <summary>The canonicalization profile implemented by this writer.</summary>
-    public const string Version = "flow-c14n-0.2";
+    /// <summary>The legacy profile name.</summary>
+    public const string Version = "flow-c14n-0.1";
 
     /// <inheritdoc />
     public string CanonicalizationVersion => Version;
@@ -20,7 +20,7 @@ public sealed class FlowDocumentCanonicalizer : IDocumentCanonicalizer
 
         var buffer = new ArrayBufferWriter<byte>();
         using var writer = new Utf8JsonWriter(buffer, new JsonWriterOptions { Indented = false });
-        CanonicalDocumentWriter.Write(writer, document, Version, includeFigureLinks: true);
+        CanonicalDocumentWriter.Write(writer, document, Version, includeFigureLinks: false);
         writer.Flush();
         return buffer.WrittenSpan.ToArray();
     }
