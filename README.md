@@ -311,7 +311,7 @@ dotnet run --project src/Flow.Cli -- `
   --drm-free
 ```
 
-The qualification report contains neutral IDs, source and canonical hashes, phase and semantic counts, aggregated diagnostic codes and the repeated-run result. It omits physical paths, file names, editorial metadata and publication text. Protected, corrupt or structurally unsuitable candidates appear as explicitly skipped entries. This automatic batch is regression evidence, not human review or EPUB conformance certification.
+The qualification report contains neutral IDs, source and canonical hashes, phase and semantic counts, aggregated diagnostic codes and the repeated-run result. It omits physical paths, file names, editorial metadata and publication text. Protected, corrupt or structurally unsuitable candidates appear as explicitly skipped entries. The current private run covered six eligible publications twice: all completed the 12 automatic phases with stable evidence and no measured lost units, while an unsupported image-only link association remained explicit rather than being counted as preserved. This automatic batch is regression evidence, not human review or EPUB conformance certification.
 
 Keep the EPUB, gate report and generated review package outside the repository:
 

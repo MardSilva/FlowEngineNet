@@ -252,6 +252,7 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
         if (code is EpubDiagnosticCodes.UnsupportedElement
             or EpubDiagnosticCodes.UnsupportedManifestProperty
             or EpubDiagnosticCodes.HeadingLevelNormalized
+            or EpubDiagnosticCodes.NoteResourceFallbackUsed
             or EpubDiagnosticCodes.UnsupportedCssProperty
             or EpubDiagnosticCodes.UnsupportedCssSelector
             or EpubDiagnosticCodes.CssTargetNotRepresentable
@@ -264,6 +265,7 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
         if (code is EpubDiagnosticCodes.UnsupportedResource
             or EpubDiagnosticCodes.UnsupportedImageFormat
             or EpubDiagnosticCodes.UnsupportedMediaOverlay
+            or EpubDiagnosticCodes.LinkedImageTargetNotRepresentable
             or EpubDiagnosticCodes.UnsafeSvg)
         {
             return (EpubFidelityStatus.Unsupported, EpubFidelityImpact.Moderate);

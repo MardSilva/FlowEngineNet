@@ -32,6 +32,12 @@ One private candidate originally stopped before layout because its XHTML repeate
 
 After the change, the candidate completed all 12 qualification phases, including mobile and desktop layout and both HTML packages, with no validation diagnostics. Two complete private-batch executions produced the same report SHA-256, and the six source files remained unchanged. The repair does not reconstruct an editorial outline; that narrower boundary remains in `known-limitations.md`.
 
+### Private-batch fidelity reconciliation
+
+The first private batch left 24 source units classified as lost. Nineteen were note references that targeted a resource rather than a fragment; the destination resource contained exactly one semantic note without a source ID. The importer now resolves only that unambiguous structure, assigns a deterministic Flow ID and records `EPUB072` as an approximation.
+
+The remaining five units came from one safely representable percent-encoded `mailto` link and four image-only external links. Safe encoded mail is now retained and checked consistently by import, HTML rendering and package verification. The four images were already preserved; their link destinations are now reported as unsupported through `EPUB073` instead of appearing as unexplained loss. Two complete runs qualified all six candidates through all 12 phases with zero lost units, identical report SHA-256 and unchanged source hashes. The unsupported figure-link association remains in `known-limitations.md`.
+
 ### Real large-publication gate
 
 The earlier absence of a complete large-publication run was resolved for one verified, legally obtained and DRM-free private input. Two final automatic executions produced identical stable evidence. Import, validation, JSON round-trip, canonical integrity, layout, HTML-package verification and structural/reference auditing completed, followed by assisted review at exact mobile and desktop viewports.

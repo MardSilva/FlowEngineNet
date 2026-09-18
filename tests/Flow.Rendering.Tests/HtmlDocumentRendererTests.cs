@@ -66,6 +66,8 @@ public sealed class HtmlDocumentRendererTests
                     [
                         new Text(hostileText),
                         new Link("javascript:alert(1)", [new Text("unsafe")]),
+                        new Link("mailto:reader%40example.invalid?subject=Flow%20Engine", [new Text("safe mail")]),
+                        new Link("mailto:reader@example.invalid?subject=unsafe%0Aheader", [new Text("unsafe mail")]),
                     ]),
             ],
             presentation: presentation,
@@ -84,6 +86,9 @@ public sealed class HtmlDocumentRendererTests
             parsed.Descendants("a"),
             element => ((string?)element.Attribute("href"))?.StartsWith("javascript:", StringComparison.OrdinalIgnoreCase) == true);
         Assert.Contains(parsed.Descendants("span"), element => element.Value == "unsafe");
+        Assert.Contains(parsed.Descendants("a"), element =>
+            (string?)element.Attribute("href") == "mailto:reader%40example.invalid?subject=Flow%20Engine");
+        Assert.Contains(parsed.Descendants("span"), element => element.Value == "unsafe mail");
     }
 
     [Fact]

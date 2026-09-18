@@ -1,4 +1,7 @@
 using Flow.Documents;
+using Flow.Layout;
+using Flow.Rendering.Html;
+using Flow.Security;
 
 namespace Flow.Epub.Tests;
 
@@ -114,5 +117,63 @@ public sealed class EpubRealWorldHardeningTests
             && item.Resource is "EPUB/text/chapter-1.xhtml" or "EPUB/toc.ncx");
         Assert.Equal(0, fidelity.Summary.UnsupportedCount);
         Assert.Equal(0, fidelity.Summary.LostCount);
+    }
+
+    [Fact]
+    public async Task EncodedMailtoAndImageOnlyLink_ArePreservedOrReportedWithoutSilentLoss()
+    {
+        const string chapter = """
+            <html xmlns="http://www.w3.org/1999/xhtml"><body>
+              <p><a href="mailto:reader%40example.invalid?subject=Hello%20Flow">Email</a></p>
+              <p><a href="mailto:reader@example.invalid?subject=unsafe%0Aheader">Blocked</a></p>
+              <p><a href="https://example.invalid/image"><img src="../images/flow.png" alt="" /></a></p>
+            </body></html>
+            """;
+        await using var epub = MinimalEpubFactory.Create(chapterOne: chapter);
+
+        var result = await new EpubImporter().ImportAsync(epub);
+
+        Assert.True(result.IsSuccess, string.Join(Environment.NewLine, result.Diagnostics));
+        var document = Assert.IsType<FlowDocument>(result.Document);
+        var link = Assert.Single(document.Index.Locations
+            .Select(static item => item.Node)
+            .OfType<Paragraph>()
+            .SelectMany(static paragraph => paragraph.Content)
+            .OfType<Link>());
+        Assert.Equal("mailto:reader%40example.invalid?subject=Hello%20Flow", link.Target);
+        Assert.Single(document.Index.Locations.Select(static item => item.Node).OfType<Figure>());
+        Assert.Single(result.Diagnostics, static item =>
+            item.Code == EpubDiagnosticCodes.LinkedImageTargetNotRepresentable);
+        Assert.Contains(result.Diagnostics, static item =>
+            item.Code == EpubDiagnosticCodes.InvalidReference
+            && item.Message.Contains("Unsafe mailto", StringComparison.Ordinal));
+
+        var fidelity = new EpubFidelityAnalyzer().Analyze(result);
+        var externalLinks = fidelity.Measurements.Single(static item =>
+            item.Metric == EpubFidelityMetric.ExternalLinks);
+        Assert.Equal(2, externalLinks.SourceCount);
+        Assert.Equal(1, externalLinks.DestinationCount);
+        Assert.Equal(1, externalLinks.UnsupportedCount);
+        Assert.Equal(0, externalLinks.LostCount);
+        Assert.Contains(fidelity.Findings, static finding =>
+            finding.RelatedDiagnosticCode == EpubDiagnosticCodes.LinkedImageTargetNotRepresentable
+            && finding.Status == EpubFidelityStatus.Unsupported);
+
+        var serializer = new FlowJsonDocumentSerializer();
+        var integrity = new Sha256DocumentIntegrityService(new FlowDocumentCanonicalizer());
+        await using var json = new MemoryStream();
+        await serializer.SerializeAsync(document, json);
+        json.Position = 0;
+        var roundTripped = await serializer.DeserializeAsync(json);
+        Assert.Equal(integrity.ComputeHash(document), integrity.ComputeHash(roundTripped));
+
+        var preferences = new UserReadingPreferences();
+        var layout = new AdaptiveLayoutEngine().Layout(
+            roundTripped,
+            new LayoutContext(390, 844, userPreferences: preferences));
+        var html = new HtmlDocumentRenderer().RenderToString(roundTripped, layout, preferences);
+        Assert.Contains("href=\"mailto:reader%40example.invalid?subject=Hello%20Flow\"", html, StringComparison.Ordinal);
+        Assert.Contains("<figure", html, StringComparison.Ordinal);
+        Assert.DoesNotContain("https://example.invalid/image", html, StringComparison.Ordinal);
     }
 }

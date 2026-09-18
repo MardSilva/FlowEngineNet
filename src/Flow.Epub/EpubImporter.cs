@@ -772,22 +772,14 @@ public sealed class EpubImporter : IEpubImporter
                 body.DescendantNodes().OfType<XText>().Sum(static text => EpubFidelityAnalyzer.CountSignificant(text.Value)));
             Add(EpubFidelityMetric.Headings, xhtml.Item.Path, elements.LongCount(IsHeading));
             Add(EpubFidelityMetric.Paragraphs, xhtml.Item.Path, elements.LongCount(static element => IsXhtml(element, "p")));
-            Add(
-                EpubFidelityMetric.InternalLinks,
-                xhtml.Item.Path,
-                elements.LongCount(static element => IsXhtml(element, "a")
-                                                     && HasHref(element)
-                                                     && !IsTableOfContentsLink(element)
-                                                     && !IsNoteReference(element)
-                                                     && !IsExternalHref(element)));
-            Add(
-                EpubFidelityMetric.ExternalLinks,
-                xhtml.Item.Path,
-                elements.LongCount(static element => IsXhtml(element, "a")
-                                                     && HasHref(element)
-                                                     && !IsTableOfContentsLink(element)
-                                                     && !IsNoteReference(element)
-                                                     && IsExternalHref(element)));
+            var ordinaryLinks = elements
+                .Where(static element => IsXhtml(element, "a")
+                                         && HasHref(element)
+                                         && !IsTableOfContentsLink(element)
+                                         && !IsNoteReference(element))
+                .ToArray();
+            AddLinkCounts(EpubFidelityMetric.InternalLinks, ordinaryLinks.Where(static element => !IsExternalHref(element)));
+            AddLinkCounts(EpubFidelityMetric.ExternalLinks, ordinaryLinks.Where(IsExternalHref));
             Add(
                 EpubFidelityMetric.Images,
                 xhtml.Item.Path,
@@ -808,6 +800,14 @@ public sealed class EpubImporter : IEpubImporter
                                                         || KnownUnrepresentableXhtmlElements.Contains(
                                                             element.Name.LocalName))),
                 EpubFidelityStatus.Approximated);
+
+            void AddLinkCounts(EpubFidelityMetric metric, IEnumerable<XElement> links)
+            {
+                var items = links.ToArray();
+                var unsupported = items.LongCount(IsImageOnlyAnchor);
+                Add(metric, xhtml.Item.Path, items.LongLength - unsupported);
+                Add(metric, xhtml.Item.Path, unsupported, EpubFidelityStatus.Unsupported);
+            }
         }
 
         var epub3Tocs = navigationDocuments
@@ -863,12 +863,43 @@ public sealed class EpubImporter : IEpubImporter
     private static bool IsExternalHref(XElement element)
     {
         var href = (string?)element.Attribute("href");
+        if (href?.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase) == true)
+        {
+            return IsSafeMailtoHref(href);
+        }
+
         return href is not null && Uri.TryCreate(href, UriKind.Absolute, out var uri)
-                                && uri.Scheme is "http" or "https" or "mailto" or "tel";
+                                && uri.Scheme is "http" or "https" or "tel";
     }
 
     private static bool HasHref(XElement element) =>
         !string.IsNullOrWhiteSpace((string?)element.Attribute("href"));
+
+    private static bool IsImageOnlyAnchor(XElement element) =>
+        element.Descendants().Any(static descendant =>
+            IsXhtml(descendant, "img") || descendant.Name == SvgNamespace + "image")
+        && !element.DescendantNodes().OfType<XText>().Any(static text =>
+            text.Value.EnumerateRunes().Any(static rune => !Rune.IsWhiteSpace(rune)));
+
+    private static bool IsSafeMailtoHref(string? href)
+    {
+        if (string.IsNullOrWhiteSpace(href)
+            || !href.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase)
+            || href.Length == "mailto:".Length
+            || href.Any(static character => char.IsControl(character) || char.IsWhiteSpace(character)))
+        {
+            return false;
+        }
+
+        try
+        {
+            return !Uri.UnescapeDataString(href).Any(char.IsControl);
+        }
+        catch (UriFormatException)
+        {
+            return false;
+        }
+    }
 
     private static bool IsTableOfContentsLink(XElement element) => element
         .Ancestors(XhtmlNamespace + "nav")
@@ -1197,6 +1228,8 @@ public sealed class EpubImporter : IEpubImporter
         private readonly Dictionary<UnsupportedElementKey, int> mathLosses = [];
         private readonly Dictionary<SvgImageIssueKey, int> svgImageIssues = [];
         private readonly Dictionary<HeadingLevelNormalizationKey, int> headingLevelNormalizations = [];
+        private readonly Dictionary<string, int> noteResourceFallbacks = new(StringComparer.Ordinal);
+        private readonly Dictionary<string, int> linkedImageTargets = new(StringComparer.Ordinal);
         private readonly HashSet<XElement> footnoteElements = [];
         private readonly Dictionary<XElement, NodeId> footnoteReferenceTargets = [];
         private readonly HashSet<XElement> invalidFootnoteReferences = [];
@@ -1337,6 +1370,26 @@ public sealed class EpubImporter : IEpubImporter
                     $"Normalized {occurrenceText} from source level {key.SourceLevel} to level {key.NormalizedLevel} to preserve a valid heading sequence within the XHTML resource.",
                     key.ResourcePath));
             }
+
+            foreach (var (resourcePath, count) in noteResourceFallbacks.OrderBy(
+                         static item => item.Key,
+                         StringComparer.Ordinal))
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.NoteResourceFallbackUsed,
+                    $"Resolved {count} note reference(s) without a fragment because the target XHTML contained exactly one semantic note without a source ID.",
+                    resourcePath));
+            }
+
+            foreach (var (resourcePath, count) in linkedImageTargets.OrderBy(
+                         static item => item.Key,
+                         StringComparer.Ordinal))
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.LinkedImageTargetNotRepresentable,
+                    $"Preserved the image content of {count} image-only link(s), but the current Flow model cannot attach their destinations to figures.",
+                    resourcePath));
+            }
         }
 
         internal void PrepareIds(IEnumerable<XhtmlModel> xhtmlDocuments)
@@ -1359,6 +1412,16 @@ public sealed class EpubImporter : IEpubImporter
                 RegisterNodeTypography(body, chapterId);
                 anchors.TryAdd(xhtml.Item.Path, chapterId);
                 AddSourceLocation(xhtml.Item.Path, null, chapterId);
+                var linkedImageCount = body.Descendants(XhtmlNamespace + "a")
+                    .LongCount(static anchor => HasHref(anchor)
+                                                       && !IsTableOfContentsLink(anchor)
+                                                       && !IsNoteReference(anchor)
+                                                       && IsImageOnlyAnchor(anchor));
+                if (linkedImageCount > 0)
+                {
+                    linkedImageTargets[xhtml.Item.Path] = checked((int)linkedImageCount);
+                }
+
                 var sourceIds = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var element in body.Descendants())
                 {
@@ -1426,6 +1489,7 @@ public sealed class EpubImporter : IEpubImporter
         {
             var documents = xhtmlDocuments.ToArray();
             var notesByTarget = new Dictionary<string, List<XElement>>(StringComparer.Ordinal);
+            var notesByResource = new Dictionary<string, List<XElement>>(StringComparer.Ordinal);
             var referencesByTarget = new Dictionary<string, List<XElement>>(StringComparer.Ordinal);
             var resourcePaths = new Dictionary<XElement, string>();
 
@@ -1443,9 +1507,14 @@ public sealed class EpubImporter : IEpubImporter
                     if (IsFootnoteElement(element))
                     {
                         footnoteElements.Add(element);
+                        AddTarget(notesByResource, xhtml.Item.Path, element);
                         if ((string?)element.Attribute("id") is { Length: > 0 } noteId)
                         {
                             AddTarget(notesByTarget, $"{xhtml.Item.Path}#{noteId}", element);
+                        }
+                        else
+                        {
+                            _ = IdFor(element, "footnote");
                         }
                     }
 
@@ -1474,11 +1543,22 @@ public sealed class EpubImporter : IEpubImporter
                         continue;
                     }
 
-                    var href = (string?)reference.Attribute("href") ?? string.Empty;
                     var resourcePath = resourcePaths[reference];
+                    var href = (string?)reference.Attribute("href") ?? string.Empty;
                     if (targets is null)
                     {
-                        ReportOrphanReference(reference, href, resourcePath);
+                        if (!key.Contains('#')
+                            && notesByResource.TryGetValue(key, out var resourceNotes)
+                            && resourceNotes.Where(static note => string.IsNullOrWhiteSpace(
+                                (string?)note.Attribute("id"))).ToArray() is [var implicitNote])
+                        {
+                            ResolveFootnoteReference(reference, href, resourcePath, [implicitNote]);
+                            noteResourceFallbacks[resourcePath] = noteResourceFallbacks.GetValueOrDefault(resourcePath) + 1;
+                        }
+                        else
+                        {
+                            ReportOrphanReference(reference, href, resourcePath);
+                        }
                     }
                     else
                     {
@@ -4031,9 +4111,30 @@ public sealed class EpubImporter : IEpubImporter
                 return;
             }
 
+            if (href.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
+            {
+                if (IsSafeMailtoHref(href))
+                {
+                    result.Add(new Link(href, children));
+                }
+                else
+                {
+                    diagnostics.Add(Warning(
+                        EpubDiagnosticCodes.InvalidReference,
+                        "Unsafe mailto link was rejected; its label was preserved.",
+                        resourcePath));
+                    foreach (var child in children)
+                    {
+                        result.Add(child);
+                    }
+                }
+
+                return;
+            }
+
             if (Uri.TryCreate(href, UriKind.Absolute, out var absolute))
             {
-                if (absolute.Scheme is "http" or "https" or "mailto")
+                if (absolute.Scheme is "http" or "https")
                 {
                     result.Add(new Link(href, children));
                 }

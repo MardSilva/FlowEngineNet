@@ -49,7 +49,7 @@ internal static class HtmlBookPackageVerifier
                     continue;
                 }
 
-                if (Uri.TryCreate(target, UriKind.Absolute, out _))
+                if (IsSafeExternalReference(target))
                 {
                     externalReferences[target] = externalReferences.GetValueOrDefault(target) + 1;
                     continue;
@@ -89,6 +89,30 @@ internal static class HtmlBookPackageVerifier
                         .ToImmutableArray(),
                     StringComparer.Ordinal),
             externalReferences.ToImmutableDictionary(StringComparer.Ordinal));
+    }
+
+    private static bool IsSafeExternalReference(string target)
+    {
+        if (target.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
+        {
+            if (target.Length == "mailto:".Length
+                || target.Any(static character => char.IsControl(character) || char.IsWhiteSpace(character)))
+            {
+                return false;
+            }
+
+            try
+            {
+                return !Uri.UnescapeDataString(target).Any(char.IsControl);
+            }
+            catch (UriFormatException)
+            {
+                return false;
+            }
+        }
+
+        return Uri.TryCreate(target, UriKind.Absolute, out var uri)
+               && uri.Scheme is "http" or "https";
     }
 
     private static XDocument ParseHtml(HtmlBookFile file) =>

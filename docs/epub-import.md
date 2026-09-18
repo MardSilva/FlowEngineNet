@@ -51,7 +51,9 @@ Media overlays are never played or fetched. `EPUB031` reports each declaration a
 
 Heading sequences are checked within each imported XHTML resource. When the source skips upward from one level to a deeper nonadjacent level, such as `h1` to `h3`, the importer clamps the deeper heading to the next valid level and reports `EPUB071`. The first heading in another spine document starts an independent sequence. This keeps the resulting `FlowDocument` valid without hiding the source approximation or changing IDs, text, anchors, or reading order.
 
-Internal XHTML links are translated to stable Flow anchors when their targets can be represented. IDs on inline-only constructs are explicitly diagnosed and mapped to the nearest containing semantic block. External `http`, `https`, and `mailto` links are retained. Unknown schemes are not activated.
+Internal XHTML links are translated to stable Flow anchors when their targets can be represented. IDs on inline-only constructs are explicitly diagnosed and mapped to the nearest containing semantic block. External `http`, `https`, and safe `mailto` links are retained. A percent-encoded `mailto` address is accepted only after its decoded form has been checked for control characters; the HTML renderer and package verifier apply the same rule. Unknown schemes are not activated.
+
+An anchor containing only an image exposes a model boundary: the image and its reading-order position survive as a `Figure`, but the current Flow model cannot attach a link destination to that block. `EPUB073` reports this as unsupported rather than treating the preserved image as lost or inventing visible link text.
 
 ## Images, covers, and asset safety
 
@@ -97,9 +99,11 @@ The importer recognizes EPUB `noteref`, `footnote`, and `endnote` semantics toge
 
 Each uniquely resolved call becomes a `FootnoteReference` targeting the note's stable `NodeId`. Its visible XHTML children are retained as an immutable inline label, including supported nested formatting. A note becomes an addressable `Footnote`; an `li` endnote remains within its source list through a `ListItem` containing that footnote. Multiple references may intentionally share the same target.
 
+Some publications point a note reference to an XHTML resource without a fragment. The importer resolves that form only when the target resource contains exactly one semantic footnote or endnote without a source ID. It assigns the note a deterministic Flow ID and reports the resource-level approximation as `EPUB072`. Zero or multiple eligible notes remain unresolved and receive the ordinary orphan or ambiguity diagnostics; document order is never used to guess a target.
+
 Explicit backlinks identified by `epub:type="backlink"`, `role="doc-backlink"`, or `rel="backlink"` are checked against source IDs of valid note references. A valid backlink is retained as an ordinary internal Flow `Link`/`DocumentAnchor`; Flow 0.1 does not yet have a distinct backlink inline node. Unmarked ordinary links from a note are still preserved and resolved normally but are not inferred to be editorial backlinks.
 
-Malformed note relationships do not create invalid `FootnoteReference` nodes. Their visible labels remain in reading order and diagnostics retain the rejected destination: `EPUB053` orphan reference, `EPUB054` note without a valid reference, `EPUB055` missing explicit backlink, `EPUB056` cyclic note-to-note references, and `EPUB057` ambiguous destination. Cycles are retained because every individual target is valid, but the navigation risk is explicit. Duplicate source IDs continue to produce `EPUB034` as well as an ambiguity diagnostic when used as a note destination.
+Malformed note relationships do not create invalid `FootnoteReference` nodes. Their visible labels remain in reading order and diagnostics retain the rejected destination: `EPUB053` orphan reference, `EPUB054` note without a valid reference, `EPUB055` missing explicit backlink, `EPUB056` cyclic note-to-note references, `EPUB057` ambiguous destination, and `EPUB072` the narrowly defined resource-only fallback. Cycles are retained because every individual target is valid, but the navigation risk is explicit. Duplicate source IDs continue to produce `EPUB034` as well as an ambiguity diagnostic when used as a note destination.
 
 ## Semantic tables
 
