@@ -68,6 +68,19 @@ public sealed class CliCommandParserTests
         Assert.Equal("matrix.json", matrix.OutputPath);
         Assert.True(matrix.Force);
         Assert.True(matrix.Resume);
+        var inventoryReview = Assert.IsType<ReviewEpubInventoryCommand>(_parser.Parse(
+        [
+            "epub-inventory-review", "books", "--qualification", "qualification.json",
+            "--qualification-sha256", new string('B', 64), "--output", "review",
+            "--repository-root", "repository", "--legal-use", "--drm-free",
+            "--ui-language", "pt-BR", "--force", "--resume",
+        ]).Command);
+        Assert.Equal("books", inventoryReview.SourceDirectory);
+        Assert.Equal("qualification.json", inventoryReview.QualificationReportPath);
+        Assert.Equal("review", inventoryReview.OutputDirectory);
+        Assert.Equal(HtmlBookUiLanguage.PortugueseBrazil, inventoryReview.UiLanguage);
+        Assert.True(inventoryReview.Force);
+        Assert.True(inventoryReview.Resume);
         Assert.IsType<InspectCommand>(_parser.Parse(["inspect", "book.flow.json"]).Command);
         Assert.IsType<ValidateCommand>(_parser.Parse(["validate", "book.flow.json"]).Command);
         Assert.IsType<HashCommand>(_parser.Parse(["hash", "book.flow.json"]).Command);

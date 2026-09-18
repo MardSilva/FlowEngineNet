@@ -249,12 +249,15 @@ internal static class CliOutputPolicy
 
     private static void EnsureReviewManifest(string directory)
     {
-        var path = Path.Combine(directory, "review-manifest.json");
         try
         {
+            var perBookPath = Path.Combine(directory, "review-manifest.json");
+            var corpusPath = Path.Combine(directory, "corpus-review.json");
+            var path = File.Exists(perBookPath) ? perBookPath : corpusPath;
             using var manifest = JsonDocument.Parse(File.ReadAllBytes(path));
-            if (manifest.RootElement.GetProperty("format").GetString()
-                != "flow-epub-large-review-manifest-0.1")
+            var format = manifest.RootElement.GetProperty("format").GetString();
+            if (format is not "flow-epub-large-review-manifest-0.1"
+                and not "flow-epub-private-visual-review-0.1")
             {
                 throw new IOException("An interrupted review backup has an unknown format.");
             }

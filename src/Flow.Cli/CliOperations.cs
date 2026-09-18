@@ -30,6 +30,7 @@ public sealed class CliOperations
     private readonly IEpubPrivateInventoryService _privateInventoryService;
     private readonly IEpubPrivateQualificationService _privateQualificationService;
     private readonly EpubPrivateDifferenceMatrixService _privateDifferenceMatrixService;
+    private readonly IEpubPrivateVisualReviewService _privateVisualReviewService;
 
     public CliOperations(
         IFlowDocumentSerializer serializer,
@@ -46,7 +47,8 @@ public sealed class CliOperations
         IEpubLargePublicationReviewPackageGenerator? reviewPackageGenerator = null,
         IEpubPrivateInventoryService? privateInventoryService = null,
         IEpubPrivateQualificationService? privateQualificationService = null,
-        EpubPrivateDifferenceMatrixService? privateDifferenceMatrixService = null)
+        EpubPrivateDifferenceMatrixService? privateDifferenceMatrixService = null,
+        IEpubPrivateVisualReviewService? privateVisualReviewService = null)
     {
         ArgumentNullException.ThrowIfNull(serializer);
         ArgumentNullException.ThrowIfNull(epubImporter);
@@ -71,6 +73,7 @@ public sealed class CliOperations
         _privateInventoryService = privateInventoryService ?? new EpubPrivateInventoryService();
         _privateQualificationService = privateQualificationService ?? new EpubPrivateQualificationService();
         _privateDifferenceMatrixService = privateDifferenceMatrixService ?? new EpubPrivateDifferenceMatrixService();
+        _privateVisualReviewService = privateVisualReviewService ?? new EpubPrivateVisualReviewService();
     }
 
     /// <summary>Executes a parsed command and writes its normal output.</summary>
@@ -116,6 +119,13 @@ public sealed class CliOperations
                     output,
                     error,
                     text,
+                cancellationToken)
+                .ConfigureAwait(false),
+            ReviewEpubInventoryCommand inventoryReview => await ReviewEpubInventoryAsync(
+                    inventoryReview,
+                    output,
+                    error,
+                    text,
                     cancellationToken)
                 .ConfigureAwait(false),
             CorpusCommand corpus => await ExecuteCorpusAsync(corpus, output, error, text, cancellationToken)
@@ -146,6 +156,7 @@ public sealed class CliOperations
                      "HelpEpubInventory1", "HelpEpubInventory2",
                      "HelpEpubInventoryQualify1", "HelpEpubInventoryQualify2",
                      "HelpEpubInventoryMatrix1", "HelpEpubInventoryMatrix2",
+                     "HelpEpubInventoryReview1", "HelpEpubInventoryReview2", "HelpEpubInventoryReview3",
                      "HelpCorpus1", "HelpCorpus2", "HelpEpubQualify1", "HelpEpubQualify2", "HelpEpubQualify3",
                      "HelpEpubReview1", "HelpEpubReview2", "HelpEpubReview3", "HelpOutputPolicy",
                      "HelpExecutionStatus", "HelpExecutionClean",
@@ -934,6 +945,119 @@ public sealed class CliOperations
         {
             return false;
         }
+    }
+
+    private async Task<int> ReviewEpubInventoryAsync(
+        ReviewEpubInventoryCommand command,
+        TextWriter output,
+        TextWriter error,
+        CliTextCatalog text,
+        CancellationToken cancellationToken)
+    {
+        const long maximumReportBytes = 64L * 1024 * 1024;
+        if (!Path.IsPathFullyQualified(command.SourceDirectory)
+            || !Path.IsPathFullyQualified(command.QualificationReportPath)
+            || !Path.IsPathFullyQualified(command.OutputDirectory)
+            || !Path.IsPathFullyQualified(command.RepositoryRoot))
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorInventoryReviewAbsolutePaths"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        var sourceDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(command.SourceDirectory));
+        var qualificationPath = Path.GetFullPath(command.QualificationReportPath);
+        var outputDirectory = Path.TrimEndingDirectorySeparator(Path.GetFullPath(command.OutputDirectory));
+        var repositoryRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(command.RepositoryRoot));
+        if (IsInside(repositoryRoot, sourceDirectory)
+            || IsInside(repositoryRoot, qualificationPath)
+            || IsInside(repositoryRoot, outputDirectory))
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorInventoryReviewRepositoryPath"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        if (IsInside(sourceDirectory, qualificationPath) || IsInside(outputDirectory, qualificationPath))
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorInventoryReviewInputConflict"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        var input = new FileInfo(qualificationPath);
+        if (!input.Exists
+            || input.Attributes.HasFlag(FileAttributes.ReparsePoint)
+            || input.Length > maximumReportBytes)
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_INPUT", "ErrorInventoryReviewUnsafeInput"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        var bytes = await File.ReadAllBytesAsync(qualificationPath, cancellationToken).ConfigureAwait(false);
+        var actualHash = new EpubCorpusSha256(Convert.ToHexString(SHA256.HashData(bytes)));
+        if (actualHash != command.ExpectedQualificationSha256)
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_HASH_MISMATCH", "ErrorInventoryReviewHashMismatch"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        EpubPrivateQualificationReport qualification;
+        try
+        {
+            qualification = EpubPrivateQualificationReportJsonSerializer.Deserialize(bytes);
+        }
+        catch (Exception exception) when (exception is JsonException or InvalidDataException or ArgumentException)
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_INPUT", "ErrorInventoryReviewUnsafeInput"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        var lockAcquisition = CliExecutionLock.Acquire(outputDirectory, command.Resume);
+        using var executionLock = lockAcquisition.ExecutionLock;
+        if (!await ReportLockAcquisitionAsync(lockAcquisition, outputDirectory, output, error, text)
+                .ConfigureAwait(false))
+        {
+            return 1;
+        }
+
+        var outputPreparation = CliOutputPolicy.PrepareReviewDirectory(outputDirectory, command.Force, command.Resume);
+        if (!await ReportOutputPreparationAsync(outputPreparation, outputDirectory, output, error, text)
+                .ConfigureAwait(false))
+        {
+            executionLock!.Complete();
+            return 1;
+        }
+
+        var result = await _privateVisualReviewService.GenerateAsync(
+                qualification,
+                actualHash,
+                new EpubPrivateVisualReviewOptions(
+                    sourceDirectory,
+                    outputDirectory,
+                    repositoryRoot,
+                    legalUseDeclared: true,
+                    drmFreeDeclared: true,
+                    command.UiLanguage),
+                cancellationToken)
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelInventoryReviewDirectory", result.OutputDirectory))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelInventoryReviewIndex", Path.Combine(result.OutputDirectory, "index.html")))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format(
+                "LabelInventoryReviewSummary",
+                result.Report.Summary.Total,
+                result.Report.Summary.Generated,
+                result.Report.Summary.Missing,
+                result.Report.Summary.Skipped,
+                result.Report.Summary.Failed))
+            .ConfigureAwait(false);
+        executionLock!.Complete();
+        return result.Report.Summary.Generated == result.Report.Summary.Total ? 0 : 2;
     }
 
     private static async Task WriteEpubInspectionAsync(

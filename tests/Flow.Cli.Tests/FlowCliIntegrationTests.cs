@@ -1007,6 +1007,55 @@ public sealed class FlowCliIntegrationTests
     }
 
     [Fact]
+    public async Task EpubInventoryReview_GeneratesLocalizedNeutralPackageFromVerifiedQualification()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var repositoryRoot = Directory.CreateDirectory(workspace.PathOf("repository")).FullName;
+        var sourceDirectory = Directory.CreateDirectory(workspace.PathOf("private-books")).FullName;
+        var evidenceDirectory = Directory.CreateDirectory(workspace.PathOf("private-evidence")).FullName;
+        var epubPath = Path.Combine(sourceDirectory, "identifying-title.epub");
+        var outputDirectory = Path.Combine(evidenceDirectory, "visual-review");
+        var qualificationPath = Path.Combine(evidenceDirectory, "qualification.json");
+        CreateGateReadyEpub(epubPath, chapterCount: 3);
+        var sourceHash = new EpubCorpusSha256(Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(epubPath))));
+        var report = new EpubPrivateQualificationReport(true,
+        [
+            new EpubPrivateQualificationItem(
+                new EpubCorpusPublicationId("candidate-0001"),
+                sourceHash,
+                EpubPrivateInventoryStatus.ReviewRequired,
+                EpubPrivateQualificationStatus.Passed,
+                eligible: true,
+                stableAcrossRepeatedRuns: true,
+                Enum.GetValues<EpubCorpusExecutionPhase>(),
+                EpubPrivateQualificationEvidence.Empty,
+                []),
+        ]);
+        var reportBytes = EpubPrivateQualificationReportJsonSerializer.Serialize(report);
+        await File.WriteAllBytesAsync(qualificationPath, reportBytes);
+
+        var result = await RunAsync(
+            FlowCliApplication.CreateDefault(),
+            [
+                "--language", "pt-BR", "epub-inventory-review", sourceDirectory,
+                "--qualification", qualificationPath,
+                "--qualification-sha256", Convert.ToHexString(SHA256.HashData(reportBytes)),
+                "--output", outputDirectory, "--repository-root", repositoryRoot,
+                "--legal-use", "--drm-free", "--ui-language", "pt-BR",
+            ]);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("1 pacotes gerados", result.Output, StringComparison.Ordinal);
+        Assert.True(File.Exists(Path.Combine(outputDirectory, "index.html")));
+        Assert.True(File.Exists(Path.Combine(outputDirectory, "candidate-0001", "review.html")));
+        var corpusReport = await File.ReadAllTextAsync(Path.Combine(outputDirectory, "corpus-review.json"));
+        Assert.Contains(EpubPrivateVisualReviewReport.CurrentFormat, corpusReport, StringComparison.Ordinal);
+        Assert.DoesNotContain(sourceDirectory, corpusReport, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("identifying-title", corpusReport, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(sourceHash.Value, Convert.ToHexString(SHA256.HashData(await File.ReadAllBytesAsync(epubPath))));
+    }
+
+    [Fact]
     public async Task PortugueseReports_AreLocalizedWithoutChangingGeneratedDocumentBytes()
     {
         using var workspace = new TemporaryWorkspace();

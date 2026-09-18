@@ -59,6 +59,26 @@ The matrix remains private. Exact source and qualification hashes can identify b
 
 The first resource-cause triage found 28 embedded font files across five private candidates. Every file was referenced by publication CSS. They now produce `EPUB074` with the typed `EmbeddedFontSubstitution` cause instead of generic `EPUB009` evidence. A later run preserved the four external image-link destinations through typed figure links. Two complete qualifications and two matrix generations were byte-stable: all six candidates contained explicit approximations, and none contained unsupported content, measured loss, broken source references or Flow errors. The same 28 fonts appear once in inspection and once in import evidence, so their aggregated occurrence total is 56 without implying 56 distinct files.
 
+## Private assisted visual review
+
+`IEpubPrivateVisualReviewService` consumes a verified private qualification report and rediscovers eligible EPUBs by SHA-256. It reuses `EpubLargePublicationReviewPackageGenerator` for each candidate, so corpus review does not introduce another importer, layout engine or renderer. A failed candidate is recorded without preventing the remaining packages from being generated.
+
+```powershell
+$qualification = 'C:\flow-local\epub-qualification.json'
+$qualificationHash = (Get-FileHash $qualification -Algorithm SHA256).Hash
+
+flow --language pt-BR epub-inventory-review C:\books `
+  --qualification $qualification `
+  --qualification-sha256 $qualificationHash `
+  --output C:\flow-local\epub-visual-review `
+  --repository-root C:\src\FlowEngineNet `
+  --legal-use --drm-free --ui-language pt-BR
+```
+
+The output contains a localized `index.html`, a path-free `corpus-review.json` and one neutral directory per generated candidate. Each directory includes mobile and desktop packages, beginning/middle/end chapter samples, feature shortcuts and a human checklist. Feature shortcuts are emitted only when the imported document contains the relevant structure; they cover the TOC, links, images and covers, linked figures, notes, tables, ruby, bidirectional content, SVG, MathML and diagnostic concentration.
+
+The report uses deterministic UTF-8 without BOM and LF. It records neutral IDs, source and canonical hashes, generated sample positions, feature categories and stable failure codes. It excludes physical paths, file names, titles, authors, publisher identifiers, publication text and asset bytes. The HTML packages necessarily contain rendered book content and therefore remain private outside Git. Generation is review assistance, not an automatic visual, editorial or accessibility approval.
+
 ## What "corpus" means here
 
 The corpus is a list of EPUB files used to test the importer. It is not a new book format and it is not part of the Reader. Each catalog entry says which local EPUB to use, how to verify its bytes, what license rules apply, and which results Flow should produce.

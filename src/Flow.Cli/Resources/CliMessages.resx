@@ -39,6 +39,9 @@
   <data name="HelpEpubInventoryQualify2" xml:space="preserve"><value>    [--force] [--resume]    Qualify every eligible neutral candidate twice through the complete Flow pipeline.</value></data>
   <data name="HelpEpubInventoryMatrix1" xml:space="preserve"><value>  flow epub-inventory-matrix &lt;qualification.json&gt; --qualification-sha256 &lt;hash&gt; --output &lt;matrix.json&gt;</value></data>
   <data name="HelpEpubInventoryMatrix2" xml:space="preserve"><value>    --repository-root &lt;absolute-directory&gt; [--force] [--resume]    Classify existing neutral evidence without reopening EPUB files.</value></data>
+  <data name="HelpEpubInventoryReview1" xml:space="preserve"><value>  flow epub-inventory-review &lt;directory&gt; --qualification &lt;qualification.json&gt; --qualification-sha256 &lt;hash&gt; --output &lt;absolute-directory&gt;</value></data>
+  <data name="HelpEpubInventoryReview2" xml:space="preserve"><value>    --repository-root &lt;absolute-directory&gt; --legal-use --drm-free [--ui-language &lt;auto|en|pt-PT|pt-BR&gt;] [--force] [--resume]</value></data>
+  <data name="HelpEpubInventoryReview3" xml:space="preserve"><value>    Generate neutral mobile/desktop review packages for every qualified private candidate.</value></data>
   <data name="HelpCorpus1" xml:space="preserve"><value>  flow corpus &lt;manifest.json&gt; --repository-root &lt;directory&gt; --report &lt;report.json&gt;</value></data>
   <data name="HelpCorpus2" xml:space="preserve"><value>    [--external-root &lt;directory&gt;] [--baseline &lt;baseline.json&gt;] [--force] [--resume]    Run repeated offline corpus qualification.</value></data>
   <data name="HelpEpubQualify1" xml:space="preserve"><value>  flow epub-qualify &lt;book.epub&gt; --candidate-id &lt;id&gt; --sha256 &lt;hash&gt; --report &lt;report.json&gt;</value></data>
@@ -96,6 +99,11 @@
   <data name="ErrorInventoryMatrixInputLimit" xml:space="preserve"><value>The qualification report exceeds the 64 MiB input limit.</value></data>
   <data name="ErrorInventoryMatrixOutputUnrecognized" xml:space="preserve"><value>--force refused to replace a file that is not a recognized Flow private difference matrix.</value></data>
   <data name="ErrorInventoryMatrixHashMismatch" xml:space="preserve"><value>The qualification report SHA-256 does not match --qualification-sha256; no matrix was written.</value></data>
+  <data name="ErrorInventoryReviewAbsolutePaths" xml:space="preserve"><value>The EPUB source, qualification report, review output, and repository root must use absolute paths.</value></data>
+  <data name="ErrorInventoryReviewRepositoryPath" xml:space="preserve"><value>The private EPUBs, qualification report, and visual review must remain outside the repository.</value></data>
+  <data name="ErrorInventoryReviewUnsafeInput" xml:space="preserve"><value>The qualification report is missing, too large, or is an unsafe file-system link.</value></data>
+  <data name="ErrorInventoryReviewHashMismatch" xml:space="preserve"><value>The qualification report SHA-256 does not match --qualification-sha256; no review package was written.</value></data>
+  <data name="ErrorInventoryReviewInputConflict" xml:space="preserve"><value>The qualification report must remain outside the EPUB source and visual-review output directories.</value></data>
   <data name="ErrorImportOnlyEpub" xml:space="preserve"><value>The import command currently accepts only .epub files.</value></data>
   <data name="ErrorJsonSourceConflict" xml:space="preserve"><value>The JSON report path must differ from the EPUB source path.</value></data>
   <data name="ErrorOutputSourceConflict" xml:space="preserve"><value>The output path must differ from the EPUB source path.</value></data>
@@ -165,6 +173,9 @@
   <data name="LabelInventoryQualificationSummary" xml:space="preserve"><value>Qualification: {0} total, {1} eligible, {2} passed, {3} failed, {4} inconclusive, {5} nondeterministic, and {6} skipped.</value></data>
   <data name="LabelInventoryMatrixReport" xml:space="preserve"><value>Private EPUB difference matrix: {0}</value></data>
   <data name="LabelInventoryMatrixSummary" xml:space="preserve"><value>Matrix: {0} candidates; {1} approved, {2} with approximations, {3} with unsupported content, {4} with content loss, {5} with broken source references, {6} with Flow errors, and {7} requiring human review.</value></data>
+  <data name="LabelInventoryReviewDirectory" xml:space="preserve"><value>Private assisted-review directory: {0}</value></data>
+  <data name="LabelInventoryReviewIndex" xml:space="preserve"><value>Review index: {0}</value></data>
+  <data name="LabelInventoryReviewSummary" xml:space="preserve"><value>Visual review: {0} candidates; {1} packages generated, {2} missing sources, {3} skipped by qualification, and {4} failed.</value></data>
   <data name="LabelCorpusReport" xml:space="preserve"><value>Corpus qualification report: {0}</value></data>
   <data name="LabelCorpusTotal" xml:space="preserve"><value>Corpus publications: {0}</value></data>
   <data name="LabelCorpusSummary" xml:space="preserve"><value>Corpus result: {0} passed, {1} failed, {2} skipped, {3} inconclusive.</value></data>

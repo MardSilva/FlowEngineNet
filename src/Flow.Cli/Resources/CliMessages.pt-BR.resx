@@ -39,6 +39,9 @@
   <data name="HelpEpubInventoryQualify2" xml:space="preserve"><value>    [--force] [--resume]    Qualifica duas vezes cada candidato neutro elegível pela pipeline completa do Flow.</value></data>
   <data name="HelpEpubInventoryMatrix1" xml:space="preserve"><value>  flow epub-inventory-matrix &lt;qualification.json&gt; --qualification-sha256 &lt;hash&gt; --output &lt;matriz.json&gt;</value></data>
   <data name="HelpEpubInventoryMatrix2" xml:space="preserve"><value>    --repository-root &lt;diretório-absoluto&gt; [--force] [--resume]    Classifica a evidência neutra existente sem reabrir os EPUBs.</value></data>
+  <data name="HelpEpubInventoryReview1" xml:space="preserve"><value>  flow epub-inventory-review &lt;diretório&gt; --qualification &lt;qualificação.json&gt; --qualification-sha256 &lt;hash&gt; --output &lt;diretório-absoluto&gt;</value></data>
+  <data name="HelpEpubInventoryReview2" xml:space="preserve"><value>    --repository-root &lt;diretório-absoluto&gt; --legal-use --drm-free [--ui-language &lt;auto|en|pt-PT|pt-BR&gt;] [--force] [--resume]</value></data>
+  <data name="HelpEpubInventoryReview3" xml:space="preserve"><value>    Gera pacotes neutros de revisão mobile e desktop para cada candidato qualificado do corpus privado.</value></data>
   <data name="HelpCorpus1" xml:space="preserve"><value>  flow corpus &lt;manifesto.json&gt; --repository-root &lt;diretório&gt; --report &lt;relatório.json&gt;</value></data>
   <data name="HelpCorpus2" xml:space="preserve"><value>    [--external-root &lt;diretório&gt;] [--baseline &lt;baseline.json&gt;] [--force] [--resume]    Executa a qualificação offline repetida do corpus.</value></data>
   <data name="HelpEpubQualify1" xml:space="preserve"><value>  flow epub-qualify &lt;livro.epub&gt; --candidate-id &lt;id&gt; --sha256 &lt;hash&gt; --report &lt;relatório.json&gt;</value></data>
@@ -96,6 +99,11 @@
   <data name="ErrorInventoryMatrixInputLimit" xml:space="preserve"><value>O relatório de qualificação excede o limite de entrada de 64 MiB.</value></data>
   <data name="ErrorInventoryMatrixOutputUnrecognized" xml:space="preserve"><value>--force recusou substituir um arquivo que não é uma matriz privada reconhecida pelo Flow.</value></data>
   <data name="ErrorInventoryMatrixHashMismatch" xml:space="preserve"><value>O SHA-256 do relatório de qualificação não corresponde a --qualification-sha256; nenhuma matriz foi gravada.</value></data>
+  <data name="ErrorInventoryReviewAbsolutePaths" xml:space="preserve"><value>A origem dos EPUBs, o relatório de qualificação, a saída da revisão e a raiz do repositório devem usar caminhos absolutos.</value></data>
+  <data name="ErrorInventoryReviewRepositoryPath" xml:space="preserve"><value>Os EPUBs privados, o relatório de qualificação e a revisão visual devem permanecer fora do repositório.</value></data>
+  <data name="ErrorInventoryReviewUnsafeInput" xml:space="preserve"><value>O relatório de qualificação não existe, excede o limite permitido ou é um link inseguro do sistema de arquivos.</value></data>
+  <data name="ErrorInventoryReviewHashMismatch" xml:space="preserve"><value>O SHA-256 do relatório de qualificação não corresponde a --qualification-sha256; nenhum pacote de revisão foi gravado.</value></data>
+  <data name="ErrorInventoryReviewInputConflict" xml:space="preserve"><value>O relatório de qualificação deve permanecer fora das pastas de origem dos EPUBs e de saída da revisão visual.</value></data>
   <data name="ErrorImportOnlyEpub" xml:space="preserve"><value>O comando import aceita apenas arquivos .epub nesta versão.</value></data>
   <data name="ErrorJsonSourceConflict" xml:space="preserve"><value>O relatório JSON deve usar um caminho diferente do EPUB de origem.</value></data>
   <data name="ErrorOutputSourceConflict" xml:space="preserve"><value>A saída deve usar um caminho diferente do EPUB de origem.</value></data>
@@ -165,6 +173,9 @@
   <data name="LabelInventoryQualificationSummary" xml:space="preserve"><value>Qualificação: {0} no total, {1} elegíveis, {2} aprovados, {3} reprovados, {4} inconclusivos, {5} não determinísticos e {6} ignorados.</value></data>
   <data name="LabelInventoryMatrixReport" xml:space="preserve"><value>Matriz privada de diferenças dos EPUBs: {0}</value></data>
   <data name="LabelInventoryMatrixSummary" xml:space="preserve"><value>Matriz: {0} candidatos; {1} aprovados, {2} com aproximações, {3} com conteúdo não suportado, {4} com perda, {5} com referências quebradas na origem, {6} com erros do Flow e {7} que exigem revisão humana.</value></data>
+  <data name="LabelInventoryReviewDirectory" xml:space="preserve"><value>Diretório privado da revisão assistida: {0}</value></data>
+  <data name="LabelInventoryReviewIndex" xml:space="preserve"><value>Índice da revisão: {0}</value></data>
+  <data name="LabelInventoryReviewSummary" xml:space="preserve"><value>Revisão visual: {0} candidatos; {1} pacotes gerados, {2} origens ausentes, {3} ignorados pela qualificação e {4} falhas.</value></data>
   <data name="LabelCorpusReport" xml:space="preserve"><value>Relatório de qualificação do corpus: {0}</value></data>
   <data name="LabelCorpusTotal" xml:space="preserve"><value>Publicações do corpus: {0}</value></data>
   <data name="LabelCorpusSummary" xml:space="preserve"><value>Resultado do corpus: {0} aprovadas, {1} com falha, {2} ignoradas e {3} inconclusivas.</value></data>

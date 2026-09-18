@@ -329,7 +329,22 @@ dotnet run --project src/Flow.Cli -- `
 
 The matrix distinguishes approval, approximation, unsupported content, content loss, broken source references, Flow errors and cases that need human review. Automatic classification never completes the human-review field. Keep this file outside Git as well: it contains exact source and report hashes even though it omits editorial identity and book content.
 
-In the current private corpus, five candidates contain only automatic approximations and one still contains unsupported image-link associations. Embedded OTF/TTF resources use `EPUB074`, not the generic `EPUB009`: an installed font with the authored family name may be selected by the browser, otherwise the browser or reader uses its fallback. Flow does not inspect operating-system fonts during import because that would make evidence depend on the machine running the command.
+To prepare assisted visual review for every qualified candidate, pass the same qualification file and verified hash. The command rediscovers the EPUBs by SHA-256 and creates neutral candidate directories; it does not persist book names or source paths in `corpus-review.json`.
+
+```powershell
+dotnet run --project src/Flow.Cli -- `
+  --language pt-BR `
+  epub-inventory-review C:\books `
+  --qualification $qualification `
+  --qualification-sha256 $qualificationHash `
+  --output C:\flow-local\epub-visual-review `
+  --repository-root C:\src\FlowEngineNet `
+  --legal-use --drm-free --ui-language pt-BR
+```
+
+Open `index.html` in the output directory. Each candidate includes mobile and desktop books, beginning/middle/end samples and shortcuts for the TOC, images, linked figures, notes, tables, ruby, bidirectional text, SVG, MathML and the chapter associated with the largest diagnostic group when those features exist. The generated checklist remains inconclusive until a person records a decision.
+
+In the current private corpus, all six candidates contain explicit automatic approximations and none has measured content loss, unsupported content or a Flow error. Embedded OTF/TTF resources use `EPUB074`, not the generic `EPUB009`: an installed font with the authored family name may be selected by the browser, otherwise the browser or reader uses its fallback. Flow does not inspect operating-system fonts during import because that would make evidence depend on the machine running the command.
 
 Keep the EPUB, gate report and generated review package outside the repository:
 

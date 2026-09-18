@@ -46,6 +46,14 @@ Diagnostic occurrence counts now remain typed through import, corpus execution, 
 
 This closes the missing automatic-classification step. Neutral resource locations are still unavailable when the aggregate qualification report does not contain them, and the matrix is not a substitute for editorial, visual or accessibility review. Those boundaries remain in `known-limitations.md`.
 
+### Corpus-wide assisted visual review
+
+Before 21.5, review packages could be generated only by invoking `epub-review` for one known file at a time. `epub-inventory-review` now verifies a qualification report hash, rediscovers qualified private candidates by source SHA-256 and generates their review packages in one bounded run. One candidate failure no longer prevents the remaining candidates from receiving mobile and desktop packages.
+
+The path-free corpus report and neutral index expose beginning, middle and end samples plus shortcuts to relevant structures such as images, notes, tables, internationalized content, SVG, MathML and diagnostic concentration. Book content remains only in the private HTML packages outside Git. Human checklist decisions are never inferred or marked complete automatically.
+
+The first private run generated all six candidate packages without a missing source, skipped item or package failure. Repeating the run produced 718 files with no path-or-byte difference between the two output trees. The source EPUBs and both review directories remained outside the repository.
+
 ### Embedded-font resource triage
 
 The first private difference matrix classified five candidates as containing unsupported content because `EPUB009` covered every manifest resource not imported as reading content. Direct inspection showed that all 28 occurrences behind that result were OTF or TTF files referenced by publication CSS, not missing text or unknown reading-order content.

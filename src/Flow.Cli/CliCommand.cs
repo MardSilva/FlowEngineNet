@@ -41,6 +41,16 @@ public sealed record ClassifyEpubInventoryCommand(
     bool Force = false,
     bool Resume = false) : CliCommand;
 
+public sealed record ReviewEpubInventoryCommand(
+    string SourceDirectory,
+    string QualificationReportPath,
+    EpubCorpusSha256 ExpectedQualificationSha256,
+    string OutputDirectory,
+    string RepositoryRoot,
+    HtmlBookUiLanguage UiLanguage,
+    bool Force = false,
+    bool Resume = false) : CliCommand;
+
 public sealed record CorpusCommand(
     string ManifestPath,
     string RepositoryRoot,
