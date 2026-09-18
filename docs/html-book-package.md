@@ -85,7 +85,7 @@ These structural features and tested color pairs improve the baseline but are no
 - logical reading order with page kind, noncanonical `publicationRole`, and chapter `NodeId` where applicable;
 - every payload file, media type, byte length, and SHA-256 hash.
 
-The manifest does not hash itself because embedding its own digest would be recursively undefined. This is explicit through `manifestSelfHashExcluded: true`; every other package file is listed and verifiable. Package output and its manifest remain renderer artifacts and do not participate in `flow-c14n-0.1`.
+The manifest does not hash itself because embedding its own digest would be recursively undefined. This is explicit through `manifestSelfHashExcluded: true`; every other package file is listed and verifiable. Package output and its manifest remain renderer artifacts and do not participate in `flow-c14n-0.2`.
 
 ## CLI and safe replacement
 

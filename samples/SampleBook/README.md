@@ -115,11 +115,11 @@ Validation checks stable IDs, hierarchy, heading levels, figure assets, footnote
 dotnet run --project src/Flow.Cli -- hash samples/SampleBook/sample.flow.json
 ```
 
-Expected evidence for `0.1.0-rc.1`:
+Expected evidence for `0.2.0-alpha.1`:
 
 ```text
-Hash: SHA-256:F607E8E1EADF7EA07B91E5E25B8B99C9D6205DDBED47CAA4D34A2B66014B27CD
-Canonicalization: flow-c14n-0.1
+Hash: SHA-256:1190B819D30D2ACFFE6B1B97CB961BAAD280AE03845BBFAAED8ADF9A4CD08452
+Canonicalization: flow-c14n-0.2
 ```
 
 The hash covers identity, canonical metadata, semantic content, structure, asset references, and asset bytes. It does not cover viewport, resolved layout, reader theme, or renderer output.
@@ -134,7 +134,7 @@ Relevant output:
 
 ```text
 Document ID: urn:flow:sample:the-flow-experiment
-Hash: SHA-256:F607E8E1EADF7EA07B91E5E25B8B99C9D6205DDBED47CAA4D34A2B66014B27CD
+Hash: SHA-256:1190B819D30D2ACFFE6B1B97CB961BAAD280AE03845BBFAAED8ADF9A4CD08452
 Anchors: 44
 Viewport: 390x844 (Small)
 ```
@@ -151,7 +151,7 @@ Relevant output:
 
 ```text
 Document ID: urn:flow:sample:the-flow-experiment
-Hash: SHA-256:F607E8E1EADF7EA07B91E5E25B8B99C9D6205DDBED47CAA4D34A2B66014B27CD
+Hash: SHA-256:1190B819D30D2ACFFE6B1B97CB961BAAD280AE03845BBFAAED8ADF9A4CD08452
 Anchors: 44
 Viewport: 1600x1000 (Large)
 ```
@@ -200,8 +200,8 @@ The committed artifacts and integration tests confirm:
 
 ```text
 Document ID: urn:flow:sample:the-flow-experiment
-Canonical hash: F607E8E1EADF7EA07B91E5E25B8B99C9D6205DDBED47CAA4D34A2B66014B27CD
-Canonicalization: flow-c14n-0.1
+Canonical hash: 1190B819D30D2ACFFE6B1B97CB961BAAD280AE03845BBFAAED8ADF9A4CD08452
+Canonicalization: flow-c14n-0.2
 Semantic element IDs: 44 in each HTML file
 Internal links: 7 in each HTML file
 ```

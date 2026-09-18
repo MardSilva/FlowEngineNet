@@ -51,7 +51,7 @@
     {
       "source": "docs/epub-corpus.md",
       "translation": "docs/pt-BR/epub-corpus.md",
-      "sourceSha256": "BA8F2CD4DC47BBFF110FD29A889590EF4541EB7201D54DBDE41D87AC13021A4C"
+      "sourceSha256": "CAE697AA092AA1119DB6C7474B538BA20B003088AE45552EADD6FD6E0BA047A1"
     },
     {
       "source": "docs/epub-fidelity.md",
@@ -61,7 +61,7 @@
     {
       "source": "docs/epub-import.md",
       "translation": "docs/pt-BR/epub-import.md",
-      "sourceSha256": "4272ADB66D1171C8039299D5E0F6D2089C8153F7F1D4473CC07857955F802016"
+      "sourceSha256": "4A337EB3ABE8998FE6BD5321005D0760D6043A586A703E003F1E4238E28E4104"
     },
     {
       "source": "docs/epub-performance.md",
@@ -76,12 +76,12 @@
     {
       "source": "docs/html-book-package.md",
       "translation": "docs/pt-BR/html-book-package.md",
-      "sourceSha256": "A14A92DF61E15C28CF8824B8A95D53FE2AB7CC199C3D9D12FFE0A54A92376A65"
+      "sourceSha256": "67AE4C71826289A0CFF51C49946E4757E9731DB06ED449B5B30380560CA92C31"
     },
     {
       "source": "docs/html-renderer.md",
       "translation": "docs/pt-BR/html-renderer.md",
-      "sourceSha256": "3F1DA5605071D952649126F43236F6F76F3A99F2529C96040F9574756CB01EB4"
+      "sourceSha256": "77F5C98636CB64689D0A3D6F436E4D0FC79C2AC513B7CE22F5E12ADA8ABBA18E"
     },
     {
       "source": "docs/known-limitations.md",
@@ -96,7 +96,7 @@
     {
       "source": "docs/research-findings.md",
       "translation": "docs/pt-BR/research-findings.md",
-      "sourceSha256": "4D48D55DE2319765179C41CC47F7CE58CDE81CB842C18B5728C762D6A1BDF049"
+      "sourceSha256": "F44298C93631B84BBBD6DC37CFDA171C9C34ED69756C17153A2E99C15B03103D"
     },
     {
       "source": "docs/resolved-limitations.md",
@@ -121,7 +121,7 @@
     {
       "source": "samples/SampleBook/README.md",
       "translation": "samples/SampleBook/README.pt-BR.md",
-      "sourceSha256": "30722D5A44F0C56FB97A5A4C70C162C9523259D43551C38C5D3A718F1066989B"
+      "sourceSha256": "4D1C9F32C2AE01AFD515123AF8DA4FD411668F3DABDE75B0829751365C8D03B9"
     }
   ]
 }

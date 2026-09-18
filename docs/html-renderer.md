@@ -49,6 +49,6 @@ The renderer validates that:
 
 ## Determinism
 
-The writer uses explicit ordering, invariant numeric formatting, `\n` line endings, fixed CSS declaration order, and UTF-8 without a byte-order mark. The same document, layout, preferences, and renderer version therefore produce the same bytes. Renderer output is runtime presentation and does not participate in `flow-c14n-0.1` or `DocumentHash`.
+The writer uses explicit ordering, invariant numeric formatting, `\n` line endings, fixed CSS declaration order, and UTF-8 without a byte-order mark. The same document, layout, preferences, and renderer version therefore produce the same bytes. Renderer output is runtime presentation and does not participate in `flow-c14n-0.2` or `DocumentHash`.
 
 Optional per-node author typography is resolved by the layout cascade before rendering. The HTML adapter reconstructs safe inline declarations from `ResolvedTypographyStyle`; it never receives or copies EPUB CSS source text, selectors, URLs, or arbitrary declarations. Reader preferences and renderer safety constraints therefore retain precedence over imported author typography.

@@ -2,7 +2,7 @@
 
 English | [Português (Brasil)](pt-BR/epub-corpus.md)
 
-The `flow-epub-corpus-0.1` profile describes publications used for `Flow.Epub` interoperability tests. The catalog records evidence about an input; it is not part of the converted book. Catalog fields, diagnostics, and results stay outside `FlowDocument`, `.flow.json`, `flow-c14n-0.1` canonicalization, hashes, and signatures.
+The `flow-epub-corpus-0.1` profile describes publications used for `Flow.Epub` interoperability tests. The catalog records evidence about an input; it is not part of the converted book. Catalog fields, diagnostics, and results stay outside `FlowDocument`, `.flow.json`, the current `flow-c14n-0.2` canonicalization profile, hashes, and signatures.
 
 The catalog contract, local discovery API, end-to-end executor, reviewed baselines, repeated-run qualification, and optional EPUBCheck adapter are implemented.
 
