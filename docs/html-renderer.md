@@ -1,5 +1,7 @@
 # Standalone HTML renderer 0.1
 
+English | [Português (Brasil)](pt-BR/html-renderer.md)
+
 `HtmlDocumentRenderer` is the first adapter that consumes a validated `FlowDocument`, its matching `LayoutDocument`, and the active `UserReadingPreferences`. It produces deterministic UTF-8 HTML5 bytes or writes those same bytes to a `.html` file.
 
 `HtmlBookPackageRenderer` is a second, additive output in the same adapter. It preserves the standalone renderer and splits a book into `index.html`, a logical TOC page, one file per chapter, shared assets/CSS, and a deterministic integrity manifest. Its profile and content-placement rules are documented in [HTML book package](html-book-package.md).

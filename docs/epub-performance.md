@@ -1,6 +1,8 @@
 # EPUB performance, progress, and cancellation
 
-Increment 17 adds observation and cancellation contracts for large-publication experiments. These measurements are runtime evidence only: they are excluded from `FlowDocument`, `.flow.json`, canonical bytes, hashes, signatures, and deterministic HTML payloads.
+English | [Português (Brasil)](pt-BR/epub-performance.md)
+
+The large-publication pipeline exposes observation and cancellation contracts. These measurements are runtime evidence only: they are excluded from `FlowDocument`, `.flow.json`, canonical bytes, hashes, signatures, and deterministic HTML payloads.
 
 ## Typed observations
 
@@ -33,7 +35,7 @@ Cancellation is checked during archive copy, XML/resource processing, every spin
 
 CLI final outputs use temporary files/directories. Cancellation or failure removes the temporary target and preserves an existing valid final output. Library callers still own their destination streams and should use a transactional stream when partial bytes are unacceptable.
 
-## Memory changes in this increment
+## Memory behavior
 
 - `.flow.json` is written through an LF-normalizing stream rather than first retaining a complete JSON `MemoryStream` and then copying it;
 - generated HTML/CSS/manifest byte arrays enter immutable package files without a second full copy;
@@ -42,7 +44,7 @@ CLI final outputs use temporary files/directories. Cancellation or failure remov
 - corpus mobile and desktop packages are laid out, rendered, verified, summarized, and released sequentially;
 - HTML package verification retains path and ID indexes instead of every parsed XML tree at once.
 
-The EPUB ZIP is still buffered in memory to provide bounded, seekable `ZipArchive` processing. During one package phase, XML trees, the semantic document, standalone HTML used by package splitting, and that package's files can coexist temporarily. These are known remaining memory costs for the increment 19 measurement, not evidence of a universal supported book size.
+The EPUB ZIP is still buffered in memory to provide bounded, seekable `ZipArchive` processing. During one package phase, XML trees, the semantic document, standalone HTML used by package splitting, and that package's files can coexist temporarily. These are known remaining memory costs, not evidence of a universal supported book size.
 
 ## Recommended host limits
 

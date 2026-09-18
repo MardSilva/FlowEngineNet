@@ -1,5 +1,7 @@
 # Flow CLI 0.2
 
+English | [Português (Brasil)](pt-BR/cli.md)
+
 The `flow` executable is a deliberately small composition layer over the document serializer, validator, canonicalizer, layout engine, and HTML renderer. Command parsing is implemented independently from command operations and uses no external CLI framework.
 
 The help output identifies the CLI and `.flow.json` representation as experimental. Stable `FLOWCLI_*` prefixes distinguish command, option, value, and operation failures. Exit code `0` means the requested operation completed, `1` means command/input/I/O failure, `2` means semantic validation or automatic qualification failed, and `130` means cancellation.
@@ -42,6 +44,8 @@ flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.
 flow epub-inspect <book.epub> [--json <report.json>]
 flow epub-inventory <directory> --output <catalog.json> --repository-root <absolute-directory> [--force]
 flow epub-inventory-qualify <directory> --report <report.json> --repository-root <absolute-directory> --legal-use --drm-free [--force] [--resume]
+flow epub-inventory-matrix <qualification.json> --qualification-sha256 <hash> --output <matrix.json> --repository-root <absolute-directory> [--force] [--resume]
+flow epub-inventory-review <directory> --qualification <qualification.json> --qualification-sha256 <hash> --output <absolute-directory> --repository-root <absolute-directory> --legal-use --drm-free [--ui-language <auto|en|pt-PT|pt-BR>] [--force] [--resume]
 flow corpus <manifest.json> --repository-root <directory> --report <report.json> [--external-root <directory>] [--baseline <baseline.json>] [--force] [--resume]
 flow epub-qualify <book.epub> --candidate-id <id> --sha256 <hash> --report <report.json> --repository-root <absolute-directory> --legal-use --drm-free [--repetitions <n>] [--include-environment] [--force] [--resume]
 flow epub-review <book.epub> --candidate-id <id> --sha256 <hash> --output <absolute-directory> --repository-root <absolute-directory> --legal-use --drm-free [--ui-language <auto|en|pt-PT|pt-BR>] [--force] [--resume]
@@ -85,6 +89,10 @@ The source and catalog must remain outside the repository, and the catalog canno
 
 The command requires `--legal-use` and `--drm-free`. Its path-free `flow-epub-private-qualification-0.1` report contains only neutral candidate IDs, hashes, counts, completed phases and aggregated diagnostic codes. It excludes file names, physical paths, titles, authors, publisher identifiers, source text and asset bytes. A candidate with measured fidelity loss is failed even when the remaining phases complete. Exit code `0` requires every discovered candidate to be eligible, approved, lossless under the measured profile and deterministic; failed, inconclusive, nondeterministic or skipped entries produce exit code `2` while preserving the complete report.
 
+`epub-inventory-matrix` verifies the exact SHA-256 of a private qualification report and classifies its existing evidence without reopening any publication. The path-free matrix distinguishes approval, approximation, unsupported content, measured loss, broken source references, Flow errors, and cases requiring human review. Automatic classification never completes the human-review field.
+
+`epub-inventory-review` verifies the same report hash, rediscovers the source files by SHA-256, and creates one neutral assisted-review package per qualified candidate. A failure in one candidate does not prevent other packages. The corpus index and checklists omit editorial identity and begin with every human decision pending.
+
 `corpus` reads a `flow-epub-corpus-0.1` manifest, discovers only the permitted local inputs, runs the complete corpus pipeline twice and writes `flow-epub-corpus-qualification-0.1`. `--baseline` compares the observed evidence with an existing reviewed baseline; the command never creates or accepts a replacement baseline. The report excludes physical publication paths. Exit code `2` indicates a failed, skipped or inconclusive publication, non-deterministic repeated evidence, or baseline mismatch.
 
 `epub-qualify` runs the automatic large-publication gate at least twice. The neutral candidate ID, expected SHA-256, absolute repository root and the `--legal-use`/`--drm-free` declarations are mandatory. The source EPUB and report are rejected inside the repository tree. A technically successful run normally reports the overall status `inconclusive`, because human review remains separate; the command still returns `0` when every automatic check passed or passed with warnings. `--include-environment` adds approximate duration, managed-heap and working-set observations to a clearly non-deterministic report section. It is off by default.
@@ -93,7 +101,7 @@ The command requires `--legal-use` and `--drm-free`. Its path-free `flow-epub-pr
 
 ### Output replacement and interrupted runs
 
-`corpus`, `epub-inventory-qualify`, `epub-qualify`, and `epub-review` do not replace an existing final output by default. `--force` permits replacement, but the final file or directory remains untouched until the new result is complete and ready for its atomic commit. Existing review directories must still contain a recognized Flow review manifest; `--force` never authorizes deletion of an arbitrary directory.
+`corpus`, `epub-inventory-qualify`, `epub-inventory-matrix`, `epub-inventory-review`, `epub-qualify`, and `epub-review` do not replace an existing final output by default. `--force` permits replacement, but the final file or directory remains untouched until the new result is complete and ready for its atomic commit. Existing review directories must still contain a recognized Flow review manifest; `--force` never authorizes deletion of an arbitrary directory.
 
 Each command holds a hidden `.<destination>.flow-execution.lock` sidecar for its complete execution. The handle allows read-only status inspection but rejects another writer. The sidecar persists after release and records a random 128-bit execution ID, state, format and SHA-256 fingerprint of the normalized destination. It never contains the destination path, book content or source metadata, and it is excluded from Git, reports, canonicalization and hashes. The execution ID is printed for local log correlation but is intentionally nondeterministic.
 

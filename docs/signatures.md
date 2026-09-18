@@ -1,5 +1,7 @@
 # Experimental document signatures 0.1
 
+English | [Português (Brasil)](pt-BR/signatures.md)
+
 Flow `0.1.0-rc.1` includes a deliberately narrow local proof of concept for signing canonical document bytes. It demonstrates cryptographic integrity with caller-managed keys; it does not define identity, trust, certificates, or a public-key infrastructure.
 
 ## Signed bytes

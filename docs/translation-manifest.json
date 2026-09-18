@@ -1,0 +1,127 @@
+{
+  "format": "flow-documentation-translations-0.1",
+  "sourceLanguage": "en-US",
+  "targetLanguage": "pt-BR",
+  "documents": [
+    {
+      "source": "README.md",
+      "translation": "README.pt-BR.md",
+      "sourceSha256": "B1A94BD35A1EF8C38196D044397E79EBFEDB43A18F6064AD95DFFB63DBD0185A"
+    },
+    {
+      "source": "docs/0.1-release-review.md",
+      "translation": "docs/pt-BR/0.1-release-review.md",
+      "sourceSha256": "E3AA217CC463CDFBBD1E22FDEE83ACC066DDE03A0F40390F74B20712FAE0BAD5"
+    },
+    {
+      "source": "docs/0.2-epub-cycle-review.md",
+      "translation": "docs/pt-BR/0.2-epub-cycle-review.md",
+      "sourceSha256": "96E2809FD60822F47B785F0EE731128467CDF0367CAF132095DA0D0588618B9C"
+    },
+    {
+      "source": "docs/adaptive-layout.md",
+      "translation": "docs/pt-BR/adaptive-layout.md",
+      "sourceSha256": "DF352ABA03D5E289D797315E0AE54028C43148D367696A89CD68F6F53A802CAE"
+    },
+    {
+      "source": "docs/architecture.md",
+      "translation": "docs/pt-BR/architecture.md",
+      "sourceSha256": "FF3FA54A7A4E806CDD25DDFCAF732673ED27ECE530B95793856A8AD42A64F261"
+    },
+    {
+      "source": "docs/canonicalization.md",
+      "translation": "docs/pt-BR/canonicalization.md",
+      "sourceSha256": "543078A036CC5503C08C19210C13B34A84BA60E04B1A75D02717CD820B9976D0"
+    },
+    {
+      "source": "docs/cli.md",
+      "translation": "docs/pt-BR/cli.md",
+      "sourceSha256": "EBE2F8F67EA9BA6128F76D48F3C381DAD65122FF823655DAC0353DD9EE2007DC"
+    },
+    {
+      "source": "docs/conformance.md",
+      "translation": "docs/pt-BR/conformance.md",
+      "sourceSha256": "0006451A2A0C5C30729813F4143D3D406881A505737D4A652DFEAAE55F4ED516"
+    },
+    {
+      "source": "docs/epub-corpus-matrix.md",
+      "translation": "docs/pt-BR/epub-corpus-matrix.md",
+      "sourceSha256": "AC2A33C7EA3521191EDE85EAA70204A44EE4F9ABB5406DAC9CB314970C0A72BA"
+    },
+    {
+      "source": "docs/epub-corpus.md",
+      "translation": "docs/pt-BR/epub-corpus.md",
+      "sourceSha256": "BA8F2CD4DC47BBFF110FD29A889590EF4541EB7201D54DBDE41D87AC13021A4C"
+    },
+    {
+      "source": "docs/epub-fidelity.md",
+      "translation": "docs/pt-BR/epub-fidelity.md",
+      "sourceSha256": "B94776E4832052CC375A684748419154CFB814EF078B04083026D242F493E957"
+    },
+    {
+      "source": "docs/epub-import.md",
+      "translation": "docs/pt-BR/epub-import.md",
+      "sourceSha256": "4272ADB66D1171C8039299D5E0F6D2089C8153F7F1D4473CC07857955F802016"
+    },
+    {
+      "source": "docs/epub-performance.md",
+      "translation": "docs/pt-BR/epub-performance.md",
+      "sourceSha256": "F9561A53759A90E7B7DFC85C341DDE8CB921A8336C1A14F875A62CF8A1E841D0"
+    },
+    {
+      "source": "docs/flow-document-model.md",
+      "translation": "docs/pt-BR/flow-document-model.md",
+      "sourceSha256": "1F862E82EB20B40B0D5E8F67765B6F6806DAA47FA7C5958212EFD76B88CF9913"
+    },
+    {
+      "source": "docs/html-book-package.md",
+      "translation": "docs/pt-BR/html-book-package.md",
+      "sourceSha256": "A14A92DF61E15C28CF8824B8A95D53FE2AB7CC199C3D9D12FFE0A54A92376A65"
+    },
+    {
+      "source": "docs/html-renderer.md",
+      "translation": "docs/pt-BR/html-renderer.md",
+      "sourceSha256": "3F1DA5605071D952649126F43236F6F76F3A99F2529C96040F9574756CB01EB4"
+    },
+    {
+      "source": "docs/known-limitations.md",
+      "translation": "docs/pt-BR/known-limitations.md",
+      "sourceSha256": "3FBE9719A67C5B2EF851A453DBDA368B0BF41B59EBCE5D1CA03D67860808E2BC"
+    },
+    {
+      "source": "docs/release-artifacts.md",
+      "translation": "docs/pt-BR/release-artifacts.md",
+      "sourceSha256": "2D19F0070DF2BD2537915AE52B41377C1345FFDC7EEFE2CBC8D242CD0A63304B"
+    },
+    {
+      "source": "docs/research-findings.md",
+      "translation": "docs/pt-BR/research-findings.md",
+      "sourceSha256": "4D48D55DE2319765179C41CC47F7CE58CDE81CB842C18B5728C762D6A1BDF049"
+    },
+    {
+      "source": "docs/resolved-limitations.md",
+      "translation": "docs/pt-BR/resolved-limitations.md",
+      "sourceSha256": "FBD321DBD2898BE78B10A0F6879FB3BA7432312A323C251BFA101CB7A769F9CD"
+    },
+    {
+      "source": "docs/roadmap.md",
+      "translation": "docs/pt-BR/roadmap.md",
+      "sourceSha256": "0B0052BED723007CCB423FFF20A18F93A816BE1DEE050C623AE8739D462F1950"
+    },
+    {
+      "source": "docs/signatures.md",
+      "translation": "docs/pt-BR/signatures.md",
+      "sourceSha256": "C44779EF1D36BF9BAD3279E31C65EDCAEEEA40DE904CF049B507B9F4F3D188CB"
+    },
+    {
+      "source": "docs/translation-policy.md",
+      "translation": "docs/pt-BR/translation-policy.md",
+      "sourceSha256": "4E0413D98D79FDC65AB65012B5D2772C5E5BCA0D3AC5EE435077B9B0C965D439"
+    },
+    {
+      "source": "samples/SampleBook/README.md",
+      "translation": "samples/SampleBook/README.pt-BR.md",
+      "sourceSha256": "30722D5A44F0C56FB97A5A4C70C162C9523259D43551C38C5D3A718F1066989B"
+    }
+  ]
+}

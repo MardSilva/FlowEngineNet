@@ -1,5 +1,7 @@
 # Adaptive layout 0.1
 
+English | [Português (Brasil)](pt-BR/adaptive-layout.md)
+
 `AdaptiveLayoutEngine` is a pure, renderer-independent transformation from an immutable `FlowDocument` and a runtime `LayoutContext` to an immutable `LayoutDocument`. The result contains semantic-node references, resolved reading styles, responsive constraints, and layout intentions. It contains no markup, style-sheet strings, coordinates, measured boxes, pages, or renderer output.
 
 ## Reading mode

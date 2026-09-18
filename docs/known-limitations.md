@@ -1,5 +1,7 @@
 # Known limitations of Flow 0.2 alpha
 
+English | [Português (Brasil)](pt-BR/known-limitations.md)
+
 Flow 0.2 alpha is a research-grade reference implementation. This document lists only current boundaries; limitations removed or materially reduced by tested work move to [resolved limitations](resolved-limitations.md). The list defines the release boundary and is not a promise that every item belongs to the next milestone.
 
 Every pull request that changes behavior should classify the affected boundary as resolved, reduced, unchanged or newly introduced. Resolved entries leave this file. Reduced entries are rewritten to describe only the remaining restriction.

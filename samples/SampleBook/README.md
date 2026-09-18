@@ -1,5 +1,7 @@
 # The Flow Experiment
 
+[English](README.md) | [Português (Brasil)](README.pt-BR.md)
+
 “The Flow Experiment” is the first complete demonstration of the current Flow pipeline. It starts with one semantic document, validates and hashes it, creates layouts for two viewports, renders two standalone HTML files, and can generate a navigable multi-file HTML book.
 
 The interesting result is not simply that two HTML files exist. It is that both presentations preserve the same document identity, semantic nodes, anchors, links, and canonical hash while adapting to different reading surfaces.

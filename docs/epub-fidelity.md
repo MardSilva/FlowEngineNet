@@ -1,5 +1,7 @@
 # EPUB fidelity report
 
+English | [Português (Brasil)](pt-BR/epub-fidelity.md)
+
 `Flow.Epub` can produce an experimental, typed `EpubFidelityReport` after import. The report reconciles bounded source measurements, the destination `FlowDocument`, `EpubSourceMap`, package-processing decisions, and import diagnostics. It complements diagnostics; it does not replace them and is not an EPUB conformance, accessibility, rendering, or visual-equivalence claim.
 
 The report is deliberately external to `FlowDocument`. It is absent from `.flow.json`, every Flow canonical profile, document identity, integrity hashes, presentation, layout, and rendering. Calling `IEpubFidelityAnalyzer.Analyze` is pure with respect to the imported document.

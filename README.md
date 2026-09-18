@@ -1,5 +1,7 @@
 # Flow Engine .NET
 
+[English](README.md) | [Português (Brasil)](README.pt-BR.md)
+
 > **Experimental:** Flow 0.x is a research project, not a standardized file format. Do not use it yet for archival, legal, or production-critical documents.
 
 Flow Engine .NET explores a document model in which canonical identity and semantic content remain independent from viewport, typography, layout, pagination, and renderer technology.
@@ -189,18 +191,21 @@ The final clean-directory review passes 134 tests with zero build warnings; see 
 - [Experimental document signatures](docs/signatures.md)
 - [Experimental EPUB import](docs/epub-import.md)
 - [EPUB fidelity report](docs/epub-fidelity.md)
+- [EPUB performance, progress, and cancellation](docs/epub-performance.md)
 - [Experimental EPUB corpus catalog](docs/epub-corpus.md)
 - [Public EPUB corpus coverage matrix](docs/epub-corpus-matrix.md)
 - [0.1 conformance profile](docs/conformance.md)
 - [Known limitations](docs/known-limitations.md)
 - [Resolved and reduced limitations](docs/resolved-limitations.md)
 - [0.1 release review](docs/0.1-release-review.md)
+- [0.2 EPUB cycle review](docs/0.2-epub-cycle-review.md)
 - [Roadmap](docs/roadmap.md)
 - [Research findings](docs/research-findings.md)
+- [Documentation translation policy](docs/translation-policy.md)
 
 ## Roadmap direction
 
-The real EPUB cycle now follows these increments:
+The real EPUB cycle follows these stages:
 
 1. import EPUB through the CLI into a valid, deterministic `.flow.json`;
 2. expand accessibility metadata and media fallbacks (TOC navigation, notes, tables, ruby, inline languages, bidirectional semantics, MathML, and a safe typed CSS subset are now imported);
@@ -344,7 +349,7 @@ dotnet run --project src/Flow.Cli -- `
 
 Open `index.html` in the output directory. Each candidate includes mobile and desktop books, beginning/middle/end samples and shortcuts for the TOC, images, linked figures, notes, tables, ruby, bidirectional text, SVG, MathML and the chapter associated with the largest diagnostic group when those features exist. The generated checklist remains inconclusive until a person records a decision.
 
-In the current private corpus, all six candidates contain explicit automatic approximations and none has measured content loss, unsupported content or a Flow error. Embedded OTF/TTF resources use `EPUB074`, not the generic `EPUB009`: an installed font with the authored family name may be selected by the browser, otherwise the browser or reader uses its fallback. Flow does not inspect operating-system fonts during import because that would make evidence depend on the machine running the command.
+In the earlier six-candidate assisted-review batch, every candidate contained explicit automatic approximations and none had measured content loss, unsupported content or a Flow error. The expanded 15-input qualification is summarized above. Embedded OTF/TTF resources use `EPUB074`, not the generic `EPUB009`: an installed font with the authored family name may be selected by the browser, otherwise the browser or reader uses its fallback. Flow does not inspect operating-system fonts during import because that would make evidence depend on the machine running the command.
 
 Keep the EPUB, gate report and generated review package outside the repository:
 

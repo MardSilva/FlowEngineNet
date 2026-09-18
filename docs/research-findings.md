@@ -1,5 +1,7 @@
 # Research findings
 
+English | [Português (Brasil)](pt-BR/research-findings.md)
+
 This log records evidence reviewed for Flow 0.1 and distinguishes implemented observations from hypotheses. Specification links point to the authoritative publisher. Status matters: the HTML Standard is a WHATWG Living Standard; EPUB 3.3 and WCAG 2.2 are W3C Recommendations; several CSS modules cited below remain drafts.
 
 Review date: 2026-09-16.

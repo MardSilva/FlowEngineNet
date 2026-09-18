@@ -1,5 +1,7 @@
 # Canonicalization and document hash
 
+English | [Português (Brasil)](pt-BR/canonicalization.md)
+
 ## Status
 
 The current writer uses the experimental canonicalization profile `flow-c14n-0.2`. It is versioned independently from the human-readable interchange format `flow-json-0.2`.

@@ -1,5 +1,7 @@
 # Public EPUB corpus coverage
 
+English | [Português (Brasil)](pt-BR/epub-corpus-matrix.md)
+
 This matrix lists the cases exercised by the small public corpus in the normal test suite. All three EPUB files are generated from project-owned source during the test run. The repository stores the manifest and reviewed baseline, not EPUB binaries.
 
 | Publication ID | EPUB profile | Navigation | Reading structure | Semantic and safety coverage |

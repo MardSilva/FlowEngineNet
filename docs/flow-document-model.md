@@ -1,5 +1,7 @@
 # Flow document model
 
+English | [Português (Brasil)](pt-BR/flow-document-model.md)
+
 ## Status
 
 The first Flow 0.1 semantic model, stable anchors, document index, and structural validator are implemented. They represent and validate content without depending on layout or rendering technology.

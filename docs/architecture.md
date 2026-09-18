@@ -1,5 +1,7 @@
 # Architecture
 
+English | [Português (Brasil)](pt-BR/architecture.md)
+
 ## Guiding invariant
 
 `Document != Layout`. Canonical identity and semantic content must not depend on viewport dimensions, pagination, typography selected by a reader, operating system, or renderer technology.

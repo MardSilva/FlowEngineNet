@@ -1,5 +1,7 @@
 # HTML book package
 
+English | [Português (Brasil)](pt-BR/html-book-package.md)
+
 `HtmlBookPackageRenderer` is an additional output of `Flow.Rendering.Html`; it does not replace `HtmlDocumentRenderer`. It converts one validated `FlowDocument` and matching `LayoutDocument` into a deterministic, script-free directory that can be opened through `file://` without a server.
 
 ```text

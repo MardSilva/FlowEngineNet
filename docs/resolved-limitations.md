@@ -1,12 +1,14 @@
 # Resolved and reduced limitations
 
+English | [Português (Brasil)](pt-BR/resolved-limitations.md)
+
 This file records boundaries that left `known-limitations.md` after a tested implementation changed the project. It is an engineering history, not a claim that Flow supports every EPUB or is production-ready. A limitation appears here only with the narrower boundary that still remains documented.
 
 ## Flow 0.2 alpha
 
 ### Private EPUB inventory
 
-Before 21.1, Flow had no single operation for discovering and classifying a private EPUB directory without exposing editorial identity. The new `epub-inventory` command now:
+Flow originally had no single operation for discovering and classifying a private EPUB directory without exposing editorial identity. The `epub-inventory` command now:
 
 - discovers `.epub` files recursively under explicit file-count and depth limits;
 - opens source files read-only and skips symbolic links and reparse points;
@@ -16,11 +18,11 @@ Before 21.1, Flow had no single operation for discovering and classifying a priv
 - recognizes supported font-obfuscation algorithms only when they target a manifest-declared font;
 - writes deterministic JSON without physical paths, file names, titles, authors, publisher identifiers or content.
 
-The first private run inventoried six distinct EPUB 3 payloads twice with identical catalog bytes and no source-file metadata changes. All six were structurally readable and unprotected by unsupported encryption. The later 21.2 run qualified the same neutral candidates without adding their bytes or identities to Git.
+The first private run inventoried six distinct EPUB 3 payloads twice with identical catalog bytes and no source-file metadata changes. All six were structurally readable and unprotected by unsupported encryption. A later qualification used the same neutral candidates without adding their bytes or identities to Git.
 
 ### Private batch qualification
 
-Before 21.2, inventory could classify a directory, but semantic qualification still required a hand-written corpus manifest or one command per publication. `epub-inventory-qualify` now rediscovers eligible candidates by SHA-256 and runs the existing corpus pipeline twice for every candidate. The path-free report records deterministic evidence, completed phases, semantic counts, fidelity loss and diagnostic-code counts. Protected, corrupt and unsuitable entries remain visible as skipped outcomes.
+Inventory could classify a directory, but semantic qualification still required a hand-written corpus manifest or one command per publication. `epub-inventory-qualify` now rediscovers eligible candidates by SHA-256 and runs the existing corpus pipeline twice for every candidate. The path-free report records deterministic evidence, completed phases, semantic counts, fidelity loss and diagnostic-code counts. Protected, corrupt and unsuitable entries remain visible as skipped outcomes.
 
 This resolves the missing automatic batch qualification. It does not persist converted books, generate review packages for every candidate or replace the assisted human review used by the large-publication gate. Those narrower limits remain in `known-limitations.md`.
 
@@ -56,7 +58,7 @@ One private EPUB 2 publication declares `application/oebps-page-map+xml` as an a
 
 The inspector and importer now recognize only that exact media type and emit `EPUB076`. The page-map XML is not opened, its source-edition page labels are not turned into a TOC, and its destinations do not enter `FlowDocument`, canonical bytes or hashes. Fidelity and the private difference matrix classify the result as a reference approximation. Similar vendor media types remain unsupported.
 
-Two complete private qualifications produced byte-identical reports with SHA-256 `83B3DD8F8AD0C2492B615F31F57ED2F91AEC11E21AE980AF761F3770405649A0`. Two phase-level findings moved from `EPUB009` to `EPUB076`, while all 14 eligible publications retained the same canonical hashes as 21.6.4. The four measured lost units and three unrelated `EPUB009` findings remain explicit. Flow still has no page-list or source-page navigation model; that narrower boundary remains in `known-limitations.md`.
+Two complete private qualifications produced byte-identical reports with SHA-256 `83B3DD8F8AD0C2492B615F31F57ED2F91AEC11E21AE980AF761F3770405649A0`. Two phase-level findings moved from `EPUB009` to `EPUB076`, while all 14 eligible publications retained their preceding canonical hashes. The four measured lost units and three unrelated `EPUB009` findings remained explicit. Flow still has no page-list or source-page navigation model; that narrower boundary remains in `known-limitations.md`.
 
 ### Final four private fidelity losses
 
@@ -80,7 +82,7 @@ The remaining five units came from one safely representable percent-encoded `mai
 
 ### Private difference classification
 
-Before 21.3, private qualification could report pass, loss and diagnostic counts, but it did not distinguish unsupported source features, source defects, Flow errors, approximations and pending human decisions in one typed result. `epub-inventory-matrix` now verifies the exact qualification-report hash and classifies its existing evidence without reopening the publications. The deterministic matrix excludes editorial identity and book content, rejects malformed or inconsistent input and keeps human review pending.
+Private qualification could report pass, loss and diagnostic counts, but it did not distinguish unsupported source features, source defects, Flow errors, approximations and pending human decisions in one typed result. `epub-inventory-matrix` now verifies the exact qualification-report hash and classifies its existing evidence without reopening the publications. The deterministic matrix excludes editorial identity and book content, rejects malformed or inconsistent input and keeps human review pending.
 
 Diagnostic occurrence counts now remain typed through import, corpus execution, qualification, fidelity evidence and diagnostic JSON. This preserves aggregated findings such as repeated unsupported associations instead of reducing each diagnostic row to one occurrence. The first private matrix retained all four `EPUB073` occurrences and classified unsupported evidence separately from loss and approval.
 
@@ -88,7 +90,7 @@ This closes the missing automatic-classification step. Neutral resource location
 
 ### Corpus-wide assisted visual review
 
-Before 21.5, review packages could be generated only by invoking `epub-review` for one known file at a time. `epub-inventory-review` now verifies a qualification report hash, rediscovers qualified private candidates by source SHA-256 and generates their review packages in one bounded run. One candidate failure no longer prevents the remaining candidates from receiving mobile and desktop packages.
+Review packages could once be generated only by invoking `epub-review` for one known file at a time. `epub-inventory-review` now verifies a qualification report hash, rediscovers qualified private candidates by source SHA-256 and generates their review packages in one bounded run. One candidate failure no longer prevents the remaining candidates from receiving mobile and desktop packages.
 
 The path-free corpus report and neutral index expose beginning, middle and end samples plus shortcuts to relevant structures such as images, notes, tables, internationalized content, SVG, MathML and diagnostic concentration. Book content remains only in the private HTML packages outside Git. Human checklist decisions are never inferred or marked complete automatically.
 
@@ -168,7 +170,7 @@ An explicitly empty `alt` still means decorative content and takes precedence ov
 
 The private corpus contained 24 `EPUB058` findings across four candidates. All came from valid XHTML `colgroup` elements containing only one or more `col` children; none was a malformed table recovery. The importer now recognizes that shape, leaves the real rows and cells untouched, and emits `EPUB080` for the column metadata that the Flow model does not represent. A malformed `colgroup` with visible text or another child still follows the `EPUB058` recovery path.
 
-Two complete 21.8 qualifications were byte-identical with SHA-256 `29EFF347B578C901594692B08F8F592D9CB991A5C3241205DEF2547EB4B00C11`. All 14 eligible publications passed, the 24 findings moved from `EPUB058` to `EPUB080`, and no canonical document hash changed. The resulting matrix has 13 candidates with approximations, one source-accessibility case requiring human review, and one corrupt source; it has no measured loss, unsupported content, or Flow error.
+Two complete qualifications after the table correction were byte-identical with SHA-256 `29EFF347B578C901594692B08F8F592D9CB991A5C3241205DEF2547EB4B00C11`. All 14 eligible publications passed, the 24 findings moved from `EPUB058` to `EPUB080`, and no canonical document hash changed. The resulting matrix has 13 candidates with approximations, one source-accessibility case requiring human review, and one corrupt source; it has no measured loss, unsupported content, or Flow error.
 
 ## Flow 0.1 foundation
 
