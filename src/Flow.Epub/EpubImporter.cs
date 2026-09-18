@@ -765,7 +765,8 @@ public sealed class EpubImporter : IEpubImporter
                                                     StringComparison.Ordinal))
                     ? EpubFidelityStatus.Unsupported
                     : diagnostics.Any(diagnostic =>
-                        diagnostic.Code == EpubDiagnosticCodes.EmbeddedFontBytesNotPreserved
+                        diagnostic.Code is EpubDiagnosticCodes.EmbeddedFontBytesNotPreserved
+                            or EpubDiagnosticCodes.LegacyPageMapNotImported
                         && string.Equals(diagnostic.Resource, manifest.Path, StringComparison.Ordinal))
                         ? EpubFidelityStatus.Approximated
                     : (EpubFidelityStatus?)null;
@@ -1128,6 +1129,15 @@ public sealed class EpubImporter : IEpubImporter
                 diagnostics.Add(Warning(
                     EpubDiagnosticCodes.EmbeddedFontBytesNotPreserved,
                     $"Embedded font resource '{item.Id}' ({item.MediaType}) is recognized, but its bytes are not retained by Flow; rendering may use an installed font family or a renderer fallback.",
+                    item.Path));
+                continue;
+            }
+
+            if (EpubMediaTypeClassifier.IsLegacyPageMap(item.MediaType))
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.LegacyPageMapNotImported,
+                    $"Legacy EPUB 2 page-map resource '{item.Id}' is recognized, but its source-page labels and destinations are not inspected or imported by Flow.",
                     item.Path));
                 continue;
             }

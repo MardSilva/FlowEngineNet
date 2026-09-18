@@ -318,6 +318,7 @@
   <data name="Diagnostic_EPUB073" xml:space="preserve"><value>A link attached only to an image cannot be represented by the current Flow model.</value></data>
   <data name="Diagnostic_EPUB074" xml:space="preserve"><value>An embedded font is recognized, but its bytes are not retained; rendering may use the installed family or a fallback.</value></data>
   <data name="Diagnostic_EPUB075" xml:space="preserve"><value>A neutral XHTML container was flattened while preserving its child content and reading order.</value></data>
+  <data name="Diagnostic_EPUB076" xml:space="preserve"><value>A legacy EPUB 2 page map is recognized, but its source-page navigation is not imported.</value></data>
   <data name="Diagnostic_EPC001" xml:space="preserve"><value>The corpus manifest JSON is invalid.</value></data>
   <data name="Diagnostic_EPC002" xml:space="preserve"><value>The corpus manifest encoding is invalid.</value></data>
   <data name="Diagnostic_EPC003" xml:space="preserve"><value>The corpus manifest format is unsupported.</value></data>

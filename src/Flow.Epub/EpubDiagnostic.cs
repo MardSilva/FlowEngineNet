@@ -87,6 +87,7 @@ public static class EpubDiagnosticCodes
     public const string LinkedImageTargetNotRepresentable = "EPUB073";
     public const string EmbeddedFontBytesNotPreserved = "EPUB074";
     public const string TransparentContainerTransformed = "EPUB075";
+    public const string LegacyPageMapNotImported = "EPUB076";
     public const string InvalidCssValue = "EPUB050";
     public const string ExternalStylesheetBlocked = "EPUB051";
     public const string CssTargetNotRepresentable = "EPUB052";

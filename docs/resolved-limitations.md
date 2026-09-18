@@ -50,6 +50,14 @@ Two private publications declared 14 TTF resources as `application/x-font-truety
 
 The shared font classifier now recognizes that exact legacy alias. Inspector, importer, private inventory, font-obfuscation review and large-publication preflight all use the same case-insensitive rule. Unknown aliases remain unsupported. In the repeated private qualification, 28 phase-level occurrences moved from `EPUB009` to `EPUB074`; the former fell from 33 to 5 and the latter rose from 88 to 116. Two consecutive reports were byte-identical with SHA-256 `1D804E43564BE0194B15226F65CC8F3C164D2BB942FFEBAF7B622AFB8D53899B`. Document hashes and the four pre-existing lost units did not change.
 
+### Legacy EPUB 2 page map triage
+
+One private EPUB 2 publication declares `application/oebps-page-map+xml` as an auxiliary resource. Flow previously grouped that known legacy media type with arbitrary unsupported manifest content.
+
+The inspector and importer now recognize only that exact media type and emit `EPUB076`. The page-map XML is not opened, its source-edition page labels are not turned into a TOC, and its destinations do not enter `FlowDocument`, canonical bytes or hashes. Fidelity and the private difference matrix classify the result as a reference approximation. Similar vendor media types remain unsupported.
+
+Two complete private qualifications produced byte-identical reports with SHA-256 `83B3DD8F8AD0C2492B615F31F57ED2F91AEC11E21AE980AF761F3770405649A0`. Two phase-level findings moved from `EPUB009` to `EPUB076`, while all 14 eligible publications retained the same canonical hashes as 21.6.4. The four measured lost units and three unrelated `EPUB009` findings remain explicit. Flow still has no page-list or source-page navigation model; that narrower boundary remains in `known-limitations.md`.
+
 ### EPUB heading-level repair
 
 One private candidate originally stopped before layout because its XHTML repeatedly jumped from `h1` to `h3`. The importer now applies the smallest deterministic repair within each XHTML resource, keeps the first heading of every new chapter independent and emits `EPUB071` for every aggregated source pattern it changes. Manually created Flow documents remain subject to strict heading validation.
