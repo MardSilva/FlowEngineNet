@@ -62,6 +62,21 @@ public sealed class EpubLargePublicationPreflightTests
     }
 
     [Fact]
+    public async Task EvaluateAsync_CountsLegacyTrueTypeMediaTypeAsFont()
+    {
+        using var workspace = new PreflightWorkspace();
+        var candidate = workspace.AddEpub("legacy-font", CreateLongEpub(20, includeLegacyFont: true));
+
+        var report = await new EpubLargePublicationPreflightService().EvaluateAsync(
+            [candidate],
+            workspace.RepositoryRoot);
+
+        var result = Assert.Single(report.Candidates);
+        Assert.Equal(1, result.Resources.Fonts);
+        Assert.Equal(0, result.Resources.Other);
+    }
+
+    [Fact]
     public async Task EvaluateAsync_RejectsUndeclaredUseRepositoryInputSymlinkAndLimitViolation()
     {
         using var workspace = new PreflightWorkspace();
@@ -171,7 +186,10 @@ public sealed class EpubLargePublicationPreflightTests
                 cancellationToken: cancellation.Token));
     }
 
-    private static byte[] CreateLongEpub(int chapterCount, string title = "Synthetic long fixture")
+    private static byte[] CreateLongEpub(
+        int chapterCount,
+        string title = "Synthetic long fixture",
+        bool includeLegacyFont = false)
     {
         var manifest = new StringBuilder();
         var spine = new StringBuilder();
@@ -188,6 +206,11 @@ public sealed class EpubLargePublicationPreflightTests
 
         manifest.Append("<item id=\"nav\" href=\"nav.xhtml\" media-type=\"application/xhtml+xml\" properties=\"nav\"/>");
         manifest.Append("<item id=\"image\" href=\"images/flow.png\" media-type=\"image/png\"/>");
+        if (includeLegacyFont)
+        {
+            manifest.Append("<item id=\"font\" href=\"fonts/book.ttf\" media-type=\"application/x-font-truetype\"/>");
+        }
+
         additional["EPUB/nav.xhtml"] = """
             <?xml version="1.0" encoding="utf-8"?>
             <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><head><title>Navigation</title></head><body><nav epub:type="toc"><ol><li><a href="text/chapter-1.xhtml">Start</a></li></ol></nav></body></html>
@@ -209,7 +232,10 @@ public sealed class EpubLargePublicationPreflightTests
             package: package,
             chapterOne: Chapter(1),
             includeSecondChapter: false,
-            additionalTextEntries: additional);
+            additionalTextEntries: additional,
+            additionalBinaryEntries: includeLegacyFont
+                ? new Dictionary<string, byte[]> { ["EPUB/fonts/book.ttf"] = [0x00, 0x01, 0x02] }
+                : null);
         return epub.ToArray();
     }
 

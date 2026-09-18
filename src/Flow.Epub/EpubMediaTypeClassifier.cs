@@ -9,5 +9,6 @@ internal static class EpubMediaTypeClassifier
         || mediaType.Equals("font/woff", StringComparison.OrdinalIgnoreCase)
         || mediaType.Equals("font/woff2", StringComparison.OrdinalIgnoreCase)
         || mediaType.Equals("application/vnd.ms-opentype", StringComparison.OrdinalIgnoreCase)
-        || mediaType.Equals("application/font-woff", StringComparison.OrdinalIgnoreCase);
+        || mediaType.Equals("application/font-woff", StringComparison.OrdinalIgnoreCase)
+        || mediaType.Equals("application/x-font-truetype", StringComparison.OrdinalIgnoreCase);
 }

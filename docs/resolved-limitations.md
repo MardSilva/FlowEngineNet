@@ -44,6 +44,12 @@ The fidelity analyzer previously placed every `div` and `span` in the same appro
 
 The source snapshot now marks neutral `div`/`span` units as transformations, while `aside`, `details`, specialized inline semantics, and unknown elements remain approximations. Aggregated informational `EPUB075` evidence records each neutral transformation by resource and container kind. The expanded private run recorded 22,598 such transformations across 14 eligible publications. Two consecutive reports were byte-identical with SHA-256 `6347C7BD1A239E33EBC5036674E2D684049A14E0D1B99B3D503567F708C0BCA9`; all candidates were stable, and no Flow error was reported. The correction changes neither `FlowDocument` nor canonical bytes, hashes, layout, or HTML output. Four publications still have one measured lost unit each from separate causes, which remain open instead of being reclassified by this change.
 
+### Legacy TrueType media type
+
+Two private publications declared 14 TTF resources as `application/x-font-truetype`. The importer previously treated them as generic unsupported resources even though the same font policy already covered their current MIME equivalent.
+
+The shared font classifier now recognizes that exact legacy alias. Inspector, importer, private inventory, font-obfuscation review and large-publication preflight all use the same case-insensitive rule. Unknown aliases remain unsupported. In the repeated private qualification, 28 phase-level occurrences moved from `EPUB009` to `EPUB074`; the former fell from 33 to 5 and the latter rose from 88 to 116. Two consecutive reports were byte-identical with SHA-256 `1D804E43564BE0194B15226F65CC8F3C164D2BB942FFEBAF7B622AFB8D53899B`. Document hashes and the four pre-existing lost units did not change.
+
 ### EPUB heading-level repair
 
 One private candidate originally stopped before layout because its XHTML repeatedly jumped from `h1` to `h3`. The importer now applies the smallest deterministic repair within each XHTML resource, keeps the first heading of every new chapter independent and emits `EPUB071` for every aggregated source pattern it changes. Manually created Flow documents remain subject to strict heading validation.

@@ -320,7 +320,7 @@ public sealed class EpubPrivateInventoryService : IEpubPrivateInventoryService
         var obfuscated = 0;
         var unsupported = 0;
         var fontPaths = manifest
-            .Where(static item => IsFontMediaType(item.MediaType))
+            .Where(static item => EpubMediaTypeClassifier.IsEmbeddedFont(item.MediaType))
             .Select(static item => item.Path)
             .ToHashSet(StringComparer.Ordinal);
         if (encryptionEntries.Length == 1)
@@ -477,6 +477,12 @@ public sealed class EpubPrivateInventoryService : IEpubPrivateInventoryService
         var other = 0;
         foreach (var item in inspection.Manifest)
         {
+            if (EpubMediaTypeClassifier.IsEmbeddedFont(item.MediaType))
+            {
+                fonts++;
+                continue;
+            }
+
             switch (item.MediaType)
             {
                 case XhtmlMediaType:
@@ -490,10 +496,6 @@ public sealed class EpubPrivateInventoryService : IEpubPrivateInventoryService
                     break;
                 case "image/svg+xml":
                     svg++;
-                    break;
-                case "font/otf" or "font/ttf" or "font/woff" or "font/woff2"
-                    or "application/vnd.ms-opentype" or "application/font-woff":
-                    fonts++;
                     break;
                 default:
                     if (item.MediaType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase))
@@ -528,10 +530,6 @@ public sealed class EpubPrivateInventoryService : IEpubPrivateInventoryService
         FileShare.Read,
         64 * 1024,
         FileOptions.Asynchronous | FileOptions.SequentialScan);
-
-    private static bool IsFontMediaType(string mediaType) => mediaType is
-        "font/otf" or "font/ttf" or "font/woff" or "font/woff2"
-        or "application/vnd.ms-opentype" or "application/font-woff";
 
     private static EpubPrivateInventoryDiagnostic Diagnostic(
         string code,

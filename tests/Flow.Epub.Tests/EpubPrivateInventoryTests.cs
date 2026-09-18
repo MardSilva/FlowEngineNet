@@ -190,6 +190,50 @@ public sealed class EpubPrivateInventoryTests
     }
 
     [Fact]
+    public async Task Inventory_CountsAndRecognizesObfuscatedLegacyTrueTypeMediaType()
+    {
+        using var workspace = new InventoryWorkspace();
+        const string package = """
+            <?xml version="1.0" encoding="utf-8"?>
+            <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="book-id">
+              <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+                <dc:identifier id="book-id">legacy-font-test</dc:identifier>
+                <dc:title>Legacy font test</dc:title>
+                <dc:language>en</dc:language>
+              </metadata>
+              <manifest>
+                <item id="chapter-one" href="text/chapter-1.xhtml" media-type="application/xhtml+xml" />
+                <item id="font" href="fonts/book.ttf" media-type="application/x-font-truetype" />
+              </manifest>
+              <spine><itemref idref="chapter-one" /></spine>
+            </package>
+            """;
+        using var epub = MinimalEpubFactory.Create(
+            package: package,
+            includeSecondChapter: false,
+            includeImage: false,
+            additionalTextEntries: new Dictionary<string, string>
+            {
+                ["META-INF/encryption.xml"] = Encryption(
+                    "http://www.idpf.org/2008/embedding",
+                    "EPUB/fonts/book.ttf"),
+            },
+            additionalBinaryEntries: new Dictionary<string, byte[]>
+            {
+                ["EPUB/fonts/book.ttf"] = [0x00, 0x01, 0x02],
+            });
+        workspace.Write("legacy-font-obfuscation.epub", epub.ToArray());
+
+        var report = await new EpubPrivateInventoryService().InventoryAsync(workspace.Root);
+
+        var publication = Assert.Single(report.Publications);
+        Assert.Equal(EpubPrivateInventoryStatus.ReviewRequired, publication.Status);
+        Assert.Equal(EpubPrivateInventoryProtectionStatus.FontObfuscationOnly, publication.Protection);
+        Assert.Equal(1, publication.Resources.Fonts);
+        Assert.Equal(0, publication.Resources.Other);
+    }
+
+    [Fact]
     public async Task Inventory_RecordsRightsMetadataAsReviewWithoutCallingItDrm()
     {
         using var workspace = new InventoryWorkspace();
@@ -251,13 +295,13 @@ public sealed class EpubPrivateInventoryTests
         Assert.Equal(EpubPrivateInventoryReport.CurrentFormat, document.RootElement.GetProperty("format").GetString());
     }
 
-    private static string Encryption(string algorithm) => $$"""
+    private static string Encryption(string algorithm, string path = "EPUB/fonts/book.otf") => $$"""
         <?xml version="1.0" encoding="utf-8"?>
         <encryption xmlns="urn:oasis:names:tc:opendocument:xmlns:container"
                     xmlns:enc="http://www.w3.org/2001/04/xmlenc#">
           <enc:EncryptedData>
             <enc:EncryptionMethod Algorithm="{{algorithm}}" />
-            <enc:CipherData><enc:CipherReference URI="EPUB/fonts/book.otf" /></enc:CipherData>
+            <enc:CipherData><enc:CipherReference URI="{{path}}" /></enc:CipherData>
           </enc:EncryptedData>
         </encryption>
         """;

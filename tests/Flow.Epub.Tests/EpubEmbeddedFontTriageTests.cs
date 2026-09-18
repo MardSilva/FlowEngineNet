@@ -100,6 +100,49 @@ public sealed class EpubEmbeddedFontTriageTests
     }
 
     [Fact]
+    public async Task LegacyTrueTypeMediaType_IsAFontApproximationRatherThanUnsupportedContent()
+    {
+        var package = Package.Replace(
+            "media-type=\"font/ttf\"",
+            "media-type=\"application/x-font-truetype\"",
+            StringComparison.Ordinal);
+        var bytes = CreateEpub([0x00, 0x01, 0x02], package).ToArray();
+
+        var inspection = await new EpubPublicationInspector().InspectAsync(new MemoryStream(bytes, writable: false));
+        var import = await new EpubImporter().ImportAsync(new MemoryStream(bytes, writable: false));
+
+        var font = inspection.Manifest.Single(static item => item.Id == "font");
+        Assert.True(font.IsSupported);
+        Assert.Equal("application/x-font-truetype", font.MediaType);
+        Assert.Equal(0, inspection.Resources.UnsupportedManifestItemCount);
+        Assert.Contains(inspection.Diagnostics, IsEmbeddedFontApproximation);
+        Assert.DoesNotContain(inspection.Diagnostics, IsFontReportedAsUnsupported);
+        Assert.True(import.IsSuccess, string.Join(Environment.NewLine, import.Diagnostics));
+        Assert.Contains(import.Diagnostics, IsEmbeddedFontApproximation);
+        Assert.DoesNotContain(import.Diagnostics, IsFontReportedAsUnsupported);
+        var fidelity = new EpubFidelityAnalyzer().Analyze(import);
+        Assert.Equal(0, fidelity.Summary.UnsupportedCount);
+        Assert.Contains(fidelity.Findings, static item =>
+            item.RelatedDiagnosticCode == EpubDiagnosticCodes.EmbeddedFontBytesNotPreserved
+            && item.Status == EpubFidelityStatus.Approximated);
+    }
+
+    [Theory]
+    [InlineData("font/otf", true)]
+    [InlineData("font/ttf", true)]
+    [InlineData("font/woff", true)]
+    [InlineData("font/woff2", true)]
+    [InlineData("application/vnd.ms-opentype", true)]
+    [InlineData("application/font-woff", true)]
+    [InlineData("application/x-font-truetype", true)]
+    [InlineData("APPLICATION/X-FONT-TRUETYPE", true)]
+    [InlineData("application/x-font-unknown", false)]
+    [InlineData("application/octet-stream", false)]
+    public void EmbeddedFontMediaTypeClassification_IsExplicitAndCaseInsensitive(
+        string mediaType,
+        bool expected) => Assert.Equal(expected, EpubMediaTypeClassifier.IsEmbeddedFont(mediaType));
+
+    [Fact]
     public async Task UnknownBinaryResource_RemainsUnsupported()
     {
         var package = Package.Replace(
@@ -122,8 +165,8 @@ public sealed class EpubEmbeddedFontTriageTests
         Assert.DoesNotContain(result.Diagnostics, IsEmbeddedFontApproximation);
     }
 
-    private static MemoryStream CreateEpub(byte[] fontBytes) => MinimalEpubFactory.Create(
-        package: Package,
+    private static MemoryStream CreateEpub(byte[] fontBytes, string package = Package) => MinimalEpubFactory.Create(
+        package: package,
         chapterOne: Chapter,
         includeSecondChapter: false,
         includeImage: false,
