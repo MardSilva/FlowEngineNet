@@ -117,6 +117,30 @@ public sealed class EpubPrivateDifferenceMatrixTests
     }
 
     [Fact]
+    public void Create_ClassifiesTransparentContainerTransformationAsApprovedEvidence()
+    {
+        var report = new EpubPrivateQualificationReport(true,
+        [
+            Publication("transformed",
+            [
+                Diagnostic(
+                    EpubDiagnosticCodes.TransparentContainerTransformed,
+                    EpubCorpusExecutionDiagnosticSeverity.Information,
+                    count: 12),
+            ]),
+        ]);
+
+        var matrix = new EpubPrivateDifferenceMatrixService().Create(report, Hash('F'));
+
+        var candidate = Assert.Single(matrix.Candidates);
+        var difference = Assert.Single(candidate.Differences);
+        Assert.Equal(EpubPrivateDifferenceCategory.Approved, candidate.OverallCategory);
+        Assert.Equal(EpubPrivateDifferenceCategory.Approved, difference.Category);
+        Assert.Equal(EpubPrivateDifferenceCause.NoAutomaticDifference, difference.Cause);
+        Assert.Equal(12, difference.Count);
+    }
+
+    [Fact]
     public async Task AtomicWrite_CancellationPreservesExistingDestinationAndLeavesNoTemporaryFile()
     {
         var directory = Directory.CreateDirectory(Path.Combine(

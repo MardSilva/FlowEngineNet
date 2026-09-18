@@ -196,8 +196,15 @@ public sealed class EpubImporter : IEpubImporter
         ZipArchiveEntry entry,
         string resource,
         List<EpubDiagnostic> diagnostics,
-        CancellationToken cancellationToken) =>
-        EpubArchiveUtilities.LoadXmlAsync(entry, resource, limits, diagnostics, cancellationToken);
+        CancellationToken cancellationToken,
+        EpubXmlDoctypeProfile doctypeProfile = EpubXmlDoctypeProfile.None) =>
+        EpubArchiveUtilities.LoadXmlAsync(
+            entry,
+            resource,
+            limits,
+            diagnostics,
+            cancellationToken,
+            doctypeProfile);
 
     private static string? ReadPackagePath(XDocument? container, List<EpubDiagnostic> diagnostics)
     {
@@ -564,7 +571,12 @@ public sealed class EpubImporter : IEpubImporter
                     continue;
                 }
 
-                var xhtml = await LoadXmlAsync(entry, selected.Path, diagnostics, cancellationToken)
+                var xhtml = await LoadXmlAsync(
+                        entry,
+                        selected.Path,
+                        diagnostics,
+                        cancellationToken,
+                        EpubXmlDoctypeProfile.Xhtml)
                     .ConfigureAwait(false);
                 if (xhtml?.Root?.Name != XhtmlNamespace + "html"
                     || xhtml.Root.Element(XhtmlNamespace + "body") is null)
@@ -799,7 +811,13 @@ public sealed class EpubImporter : IEpubImporter
             Add(
                 EpubFidelityMetric.UnknownOrUnrepresentableElements,
                 xhtml.Item.Path,
+                elements.LongCount(IsTransparentXhtmlContainer),
+                EpubFidelityStatus.Transformed);
+            Add(
+                EpubFidelityMetric.UnknownOrUnrepresentableElements,
+                xhtml.Item.Path,
                 elements.LongCount(static element => element.Name.Namespace == XhtmlNamespace
+                                                    && !IsTransparentXhtmlContainer(element)
                                                     && (!SupportedXhtmlElements.Contains(element.Name.LocalName)
                                                         || KnownUnrepresentableXhtmlElements.Contains(
                                                             element.Name.LocalName))),
@@ -855,6 +873,12 @@ public sealed class EpubImporter : IEpubImporter
 
     private static bool IsXhtml(XElement element, string localName) =>
         element.Name == XhtmlNamespace + localName;
+
+    private static bool IsTransparentXhtmlContainer(XElement element) =>
+        element.Name.Namespace == XhtmlNamespace
+        && TransparentXhtmlContainers.Contains(element.Name.LocalName)
+        && !element.Ancestors().Any(static ancestor =>
+            ancestor.Name == XhtmlNamespace + "script" || ancestor.Name == XhtmlNamespace + "style");
 
     private static bool IsHeading(XElement element) =>
         element.Name.Namespace == XhtmlNamespace
@@ -928,6 +952,11 @@ public sealed class EpubImporter : IEpubImporter
     {
         "abbr", "address", "article", "aside", "cite", "dd", "details", "div", "dl", "dt", "footer",
         "header", "main", "mark", "q", "small", "span", "sub", "summary", "sup", "time",
+    };
+
+    private static readonly HashSet<string> TransparentXhtmlContainers = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "div", "span",
     };
 
     private static SpineResolution ResolveSpineItem(
@@ -1042,7 +1071,15 @@ public sealed class EpubImporter : IEpubImporter
             }
             else if (entries.TryGetValue(item.Path, out var entry))
             {
-                document = await LoadXmlAsync(entry, item.Path, diagnostics, cancellationToken).ConfigureAwait(false);
+                document = await LoadXmlAsync(
+                        entry,
+                        item.Path,
+                        diagnostics,
+                        cancellationToken,
+                        item.Properties.Contains("nav")
+                            ? EpubXmlDoctypeProfile.Xhtml
+                            : EpubXmlDoctypeProfile.Ncx)
+                    .ConfigureAwait(false);
             }
             else
             {
@@ -1234,6 +1271,7 @@ public sealed class EpubImporter : IEpubImporter
         private readonly List<EpubSourceLocation> sourceLocations = [];
         private readonly Dictionary<SourceLocationKey, int> sourceOccurrences = [];
         private readonly Dictionary<UnsupportedElementKey, int> unsupportedElements = [];
+        private readonly Dictionary<UnsupportedElementKey, int> transformedContainers = [];
         private readonly Dictionary<string, int> approximatedAnchors = new(StringComparer.Ordinal);
         private readonly Dictionary<UnsupportedElementKey, int> mathLosses = [];
         private readonly Dictionary<SvgImageIssueKey, int> svgImageIssues = [];
@@ -1333,6 +1371,20 @@ public sealed class EpubImporter : IEpubImporter
 
         internal void FlushUnsupportedDiagnostics()
         {
+            foreach (var (key, count) in transformedContainers
+                         .OrderBy(static item => item.Key.ResourcePath, StringComparer.Ordinal)
+                         .ThenBy(static item => item.Key.ElementName, StringComparer.Ordinal)
+                         .ThenBy(static item => item.Key.Description, StringComparer.Ordinal))
+            {
+                var occurrenceText = count == 1 ? "once" : $"{count} times";
+                diagnostics.Add(new EpubDiagnostic(
+                    EpubDiagnosticCodes.TransparentContainerTransformed,
+                    EpubDiagnosticSeverity.Information,
+                    $"{key.Description} was flattened {occurrenceText}; child content and reading order were preserved.",
+                    key.ResourcePath,
+                    count));
+            }
+
             foreach (var (key, count) in unsupportedElements)
             {
                 var occurrenceText = count == 1 ? "once" : $"{count} times";
@@ -1417,6 +1469,14 @@ public sealed class EpubImporter : IEpubImporter
                 var sourceIds = new HashSet<string>(StringComparer.Ordinal);
                 foreach (var element in body.Descendants())
                 {
+                    if (IsTransparentXhtmlContainer(element))
+                    {
+                        ReportContainerTransformation(
+                            element,
+                            xhtml.Item.Path,
+                            $"Neutral XHTML container <{element.Name.LocalName.ToLowerInvariant()}>");
+                    }
+
                     var htmlId = (string?)element.Attribute("id");
                     if (string.IsNullOrWhiteSpace(htmlId))
                     {
@@ -2249,7 +2309,12 @@ public sealed class EpubImporter : IEpubImporter
                 case "h6":
                     var sourceLevel = name[1] - '0';
                     var normalizedLevel = NormalizeHeadingLevel(sourceLevel, resourcePath);
-                    return [new Heading(IdFor(element, "heading"), normalizedLevel, ConvertInlineContent(element, resourcePath))];
+                    return await ConvertHeadingAsync(
+                            element,
+                            normalizedLevel,
+                            resourcePath,
+                            cancellationToken)
+                        .ConfigureAwait(false);
                 case "p":
                     return await ConvertParagraphAsync(element, resourcePath, cancellationToken).ConfigureAwait(false);
                 case "ol":
@@ -2290,7 +2355,6 @@ public sealed class EpubImporter : IEpubImporter
                     ReportUnsupported(element, resourcePath);
                     return await ConvertChildrenAsync(element, resourcePath, cancellationToken).ConfigureAwait(false);
                 case "div":
-                    ReportUnsupported(element, resourcePath, "Generic container <div>");
                     return await ConvertChildrenAsync(element, resourcePath, cancellationToken).ConfigureAwait(false);
                 case "pre":
                     return [new CodeBlock(IdFor(element, "code"), element.Value)];
@@ -2421,6 +2485,89 @@ public sealed class EpubImporter : IEpubImporter
 
             return result;
         }
+
+        private async Task<IReadOnlyList<DocumentNode>> ConvertHeadingAsync(
+            XElement heading,
+            int level,
+            string resourcePath,
+            CancellationToken cancellationToken)
+        {
+            var parts = SplitInlineContent(heading.Nodes());
+            if (parts.All(static part => part.Image is null))
+            {
+                return [new Heading(IdFor(heading, "heading"), level, ConvertInlineContent(heading, resourcePath))];
+            }
+
+            var converted = new List<ConvertedInlinePart>(parts.Count);
+            foreach (var part in parts)
+            {
+                if (part.Image is not null)
+                {
+                    converted.Add(new ConvertedInlinePart([], part.Image));
+                    continue;
+                }
+
+                var inline = ApplyInternationalization(
+                    heading,
+                    ConvertInline(part.Nodes, resourcePath),
+                    resourcePath,
+                    inherit: true);
+                if (HasVisibleText(inline))
+                {
+                    converted.Add(new ConvertedInlinePart(inline, null));
+                }
+            }
+
+            var result = new List<DocumentNode>(converted.Count);
+            var headingIdUsed = false;
+            if (!converted.Any(static part => !part.Inline.IsEmpty))
+            {
+                var alternativeText = converted
+                    .Where(static part => part.Image is not null)
+                    .Select(static part => ReadHeadingImageAlternative(part.Image!))
+                    .Where(static value => !string.IsNullOrWhiteSpace(value));
+                var label = string.Join(' ', alternativeText);
+                result.Add(new Heading(
+                    IdFor(heading, "heading"),
+                    level,
+                    label.Length == 0 ? [] : [new Text(label)]));
+                headingIdUsed = true;
+            }
+
+            foreach (var part in converted)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!part.Inline.IsEmpty)
+                {
+                    var id = headingIdUsed
+                        ? GeneratedIdFor(heading, "heading-continuation")
+                        : IdFor(heading, "heading");
+                    result.Add(new Heading(id, level, part.Inline));
+                    headingIdUsed = true;
+                    continue;
+                }
+
+                var image = part.Image!;
+                ReportUnsupported(
+                    image,
+                    resourcePath,
+                    "Image inside a heading promoted to an ordered Flow Figure; heading semantics and alternative text were retained separately");
+                result.AddRange(await ConvertInlineImageAsync(
+                    image,
+                    image,
+                    resourcePath,
+                    cancellationToken).ConfigureAwait(false));
+            }
+
+            return result;
+        }
+
+        private static string? ReadHeadingImageAlternative(XElement image) =>
+            image.Name == XhtmlNamespace + "picture"
+                ? NormalizeAlternative((string?)image.Elements(XhtmlNamespace + "img").LastOrDefault()?.Attribute("alt"))
+                : image.Name == XhtmlNamespace + "img"
+                    ? NormalizeAlternative((string?)image.Attribute("alt"))
+                    : ReadSvgAlternativeText(image, fallbackImage: null, coverTitle: null);
 
         private async Task<IEnumerable<DocumentNode>> ConvertInlineImageAsync(
             XElement image,
@@ -3872,6 +4019,7 @@ public sealed class EpubImporter : IEpubImporter
                         converted.AddRange(children);
                         break;
                     case "span":
+                    case "div":
                         converted.AddRange(children);
                         break;
                     case "small":
@@ -4157,6 +4305,19 @@ public sealed class EpubImporter : IEpubImporter
             var href = (string?)element.Attribute("href");
             if (string.IsNullOrWhiteSpace(href))
             {
+                var isNamedMarker = element.Attribute("href") is null
+                    && (element.Attribute("id") is not null
+                        || !string.IsNullOrWhiteSpace((string?)element.Attribute("name")));
+                if (isNamedMarker)
+                {
+                    foreach (var child in children)
+                    {
+                        result.Add(child);
+                    }
+
+                    return;
+                }
+
                 diagnostics.Add(Warning(EpubDiagnosticCodes.InvalidReference, "A link has no href; its label was preserved.", resourcePath));
                 foreach (var child in children)
                 {
@@ -4232,6 +4393,12 @@ public sealed class EpubImporter : IEpubImporter
                 element.Name.ToString(),
                 description ?? $"Element <{element.Name.LocalName}>");
             unsupportedElements[key] = unsupportedElements.TryGetValue(key, out var count) ? count + 1 : 1;
+        }
+
+        private void ReportContainerTransformation(XElement element, string resourcePath, string description)
+        {
+            var key = new UnsupportedElementKey(resourcePath, element.Name.ToString(), description);
+            transformedContainers[key] = transformedContainers.TryGetValue(key, out var count) ? count + 1 : 1;
         }
 
         private NodeId IdFor(XElement? element, string kind)

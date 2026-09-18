@@ -26,6 +26,24 @@ This resolves the missing automatic batch qualification. It does not persist con
 
 The first private batch was repeated with byte-identical report hashes and unchanged source snapshots. All six candidates were eligible and deterministic. Four passed without measured fidelity loss; two failed deterministically because loss was measured. Those losses remain current importer limitations rather than being counted as successful coverage.
 
+### Legacy XHTML doctypes
+
+Some older reflowable EPUBs declare the HTML doctype, a public W3C XHTML 1.0/1.1 doctype, or the public NISO NCX 2005-1 doctype even though the importer does not need the external DTD. The shared XML reader previously rejected those spine or navigation documents before semantic conversion.
+
+XHTML and NCX loading now use separate, small allowlists and ignore accepted declarations without resolving or parsing DTD content. Container, OPF, SVG and every other XML input keep the stricter DTD prohibition. Unknown declarations, mismatched public/system identifiers, internal subsets and entity declarations remain errors. This resolves the three declaration patterns found during the expanded private-corpus run without weakening the existing XXE boundary.
+
+### Images in headings and legacy anchor markers
+
+Images nested in headings were previously reduced to their alternative text. The importer now retains their validated asset as a `Figure`, keeps heading text and level, and records the unavoidable block-level approximation through `EPUB010`. For an image-only heading, the alternative text supplies a semantic `Heading` label so TOC targets remain valid. Repeated import, source mapping, JSON round trip, canonical hash, layout and HTML rendering are covered by regression tests.
+
+Two new private candidates also produced 151 `EPUB011` warnings for `<a>` elements that had no `href` because they were destination markers, not links. Markers with `id` or nonempty `name` are now transparent and preserve their children and source locations. Genuinely malformed anchors still receive `EPUB011`. The two candidates now retain the same content without those false positives, and the candidate with 53 heading images imports successfully with 104 figures and no semantic validation error.
+
+### Neutral XHTML container fidelity
+
+The fidelity analyzer previously placed every `div` and `span` in the same approximation bucket as semantic wrappers and unknown elements. That overstated loss: these neutral containers are intentionally flattened while their children and reading order remain available.
+
+The source snapshot now marks neutral `div`/`span` units as transformations, while `aside`, `details`, specialized inline semantics, and unknown elements remain approximations. Aggregated informational `EPUB075` evidence records each neutral transformation by resource and container kind. The expanded private run recorded 22,598 such transformations across 14 eligible publications. Two consecutive reports were byte-identical with SHA-256 `6347C7BD1A239E33EBC5036674E2D684049A14E0D1B99B3D503567F708C0BCA9`; all candidates were stable, and no Flow error was reported. The correction changes neither `FlowDocument` nor canonical bytes, hashes, layout, or HTML output. Four publications still have one measured lost unit each from separate causes, which remain open instead of being reclassified by this change.
+
 ### EPUB heading-level repair
 
 One private candidate originally stopped before layout because its XHTML repeatedly jumped from `h1` to `h3`. The importer now applies the smallest deterministic repair within each XHTML resource, keeps the first heading of every new chapter independent and emits `EPUB071` for every aggregated source pattern it changes. Manually created Flow documents remain subject to strict heading validation.

@@ -20,6 +20,8 @@ Findings independently record impact as `Informational`, `Minor`, `Moderate`, `M
 
 The analyzer measures linear and non-linear spine positions, significant characters, headings, paragraphs, internal/external links, images/covers, notes/references, tables/rows/cells, TOC entries, manifest resources, and unknown or currently unrepresentable XHTML elements. TOC links and note calls belong only to their dedicated metrics rather than being double-counted as ordinary internal links. Source resource paths are retained in noncanonical import evidence only long enough to create localized findings.
 
+Neutral XHTML `div` and `span` containers belong to the last metric because Flow does not retain their source wrapper. They are classified as `Transformed`, not `Approximated`: their child content, typed language/direction where applicable, and reading order survive while the neutral wrapper is flattened. Aggregated `EPUB075` findings make that transformation visible. Semantic wrappers such as `aside` and `details`, specialized inline elements, and unknown elements remain `Approximated` through `EPUB010` when Flow cannot preserve their distinct meaning.
+
 “Significant characters” means Unicode scalar values for which `Rune.IsWhiteSpace` is false. It is not a byte count, UTF-16 code-unit count, word count, or typography measurement. Destination counts are semantic Flow occurrences; asset byte deduplication therefore permits several image occurrences to point to one `FlowAsset` without being reported as loss.
 
 For each metric, status counts partition the source count:
@@ -47,6 +49,8 @@ dotnet run --project src/Flow.Cli -- import book.epub `
 ```
 
 `fidelity.json` uses format identifier `flow-epub-fidelity-0.1`, deterministic property/array ordering, UTF-8 without BOM, LF line endings, invariant numbers, and atomic replacement. A failed import still writes a partial report when the requested report path is valid. A partial report keeps unknown denominators as `null` rather than claiming completeness. The source EPUB, Flow document, diagnostics report, and fidelity report must all use distinct paths.
+
+The container-classification correction does not change this JSON schema. It changes only the status assigned to a measured source unit that was already present in the report. Fidelity evidence is noncanonical and does not affect `.flow.json`, canonical bytes, document hashes, layout, or rendering.
 
 ## Current limits
 

@@ -305,6 +305,12 @@ public sealed class EpubPrivateDifferenceMatrixService
         string code,
         EpubCorpusExecutionDiagnosticSeverity severity)
     {
+        if (code == EpubDiagnosticCodes.TransparentContainerTransformed)
+        {
+            return (EpubPrivateDifferenceCategory.Approved,
+                EpubPrivateDifferenceCause.NoAutomaticDifference);
+        }
+
         if (code is EpubDiagnosticCodes.UnsupportedElement
             or EpubDiagnosticCodes.UnsupportedManifestProperty
             or EpubDiagnosticCodes.HeadingLevelNormalized

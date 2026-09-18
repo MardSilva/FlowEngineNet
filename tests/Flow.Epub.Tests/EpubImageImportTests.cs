@@ -141,6 +141,92 @@ public sealed class EpubImageImportTests
         Assert.Contains("data:image/png;base64,", html, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task ImportAsync_PreservesImagesInsideHeadingsInSourceOrder()
+    {
+        var package = Package("<item id=\"heading-image\" href=\"images/heading.png\" media-type=\"image/png\" />");
+        const string body = """
+            <h1 id="visual"><img id="leading-image" src="../images/heading.png" alt="Chapter artwork"/><span>Chapter one</span></h1>
+            <h2 id="linked-visual"><a href="https://example.invalid/catalog"><img src="../images/heading.png" alt="Catalog artwork"/></a></h2>
+            """;
+
+        var imageAssets = new Dictionary<string, byte[]> { ["EPUB/images/heading.png"] = Png };
+        var result = await ImportAsync(package, body, imageAssets);
+        var repeated = await ImportAsync(package, body, imageAssets);
+
+        Assert.True(result.IsSuccess, string.Join(Environment.NewLine, result.Diagnostics));
+        var document = Assert.IsType<FlowDocument>(result.Document);
+        var repeatedDocument = Assert.IsType<FlowDocument>(repeated.Document);
+        var chapter = Assert.IsType<Chapter>(Assert.Single(document.Content.Children));
+        var repeatedChapter = Assert.IsType<Chapter>(Assert.Single(repeatedDocument.Content.Children));
+        Assert.Equal(
+            chapter.Children.Select(static node => node.Id),
+            repeatedChapter.Children.Select(static node => node.Id));
+        Assert.Collection(
+            chapter.Children,
+            first => Assert.Equal("Chapter artwork", Assert.IsType<Figure>(first).AlternativeText),
+            second =>
+            {
+                var heading = Assert.IsType<Heading>(second);
+                Assert.Equal(1, heading.Level);
+                Assert.Equal("Chapter one", InlineText(heading.Content));
+            },
+            third =>
+            {
+                var heading = Assert.IsType<Heading>(third);
+                Assert.Equal(2, heading.Level);
+                Assert.Equal("Catalog artwork", InlineText(heading.Content));
+            },
+            fourth =>
+            {
+                var figure = Assert.IsType<Figure>(fourth);
+                Assert.Equal("Catalog artwork", figure.AlternativeText);
+                Assert.Equal("https://example.invalid/catalog", figure.Link?.ExternalUri);
+            });
+        Assert.Single(document.Assets);
+        Assert.True(new DocumentValidator().Validate(document).IsValid);
+        Assert.True(result.SourceMap!.TryResolve("EPUB/text/chapter-1.xhtml", "visual", out var visualId));
+        Assert.Equal(chapter.Children[1].Id, visualId);
+        Assert.True(result.SourceMap.TryResolve(
+            "EPUB/text/chapter-1.xhtml",
+            "leading-image",
+            out var imageId));
+        Assert.Equal(chapter.Children[0].Id, imageId);
+
+        var imageApproximation = Assert.Single(result.Diagnostics, static item =>
+            item.Code == EpubDiagnosticCodes.UnsupportedElement
+            && item.Message.Contains("inside a heading", StringComparison.Ordinal));
+        Assert.Contains("2 times", imageApproximation.Message, StringComparison.Ordinal);
+
+        var fidelity = new EpubFidelityAnalyzer().Analyze(result);
+        var images = Assert.Single(fidelity.Measurements, static item =>
+            item.Metric == EpubFidelityMetric.Images);
+        Assert.Equal(2, images.SourceCount);
+        Assert.Equal(2, images.DestinationCount);
+        Assert.Equal(0, images.LostCount);
+
+        var serializer = new FlowJsonDocumentSerializer();
+        var integrity = new Sha256DocumentIntegrityService(new FlowDocumentCanonicalizer());
+        var hash = integrity.ComputeHash(document);
+        Assert.Equal(hash, integrity.ComputeHash(repeatedDocument));
+        await using var json = new MemoryStream();
+        await serializer.SerializeAsync(document, json);
+        json.Position = 0;
+        var restored = await serializer.DeserializeAsync(json);
+        Assert.Equal(hash, integrity.ComputeHash(restored));
+
+        var preferences = new UserReadingPreferences();
+        var layout = new AdaptiveLayoutEngine().Layout(
+            restored,
+            new LayoutContext(390, 844, DeviceClass.Phone, userPreferences: preferences));
+        var html = new HtmlDocumentRenderer().RenderToString(restored, layout, preferences);
+        Assert.Equal(2, CountOccurrences(html, "<figure"));
+        Assert.Contains("href=\"https://example.invalid/catalog\"", html, StringComparison.Ordinal);
+        Assert.True(
+            html.IndexOf($"id=\"{chapter.Children[0].Id.Value}\"", StringComparison.Ordinal)
+            < html.IndexOf($"id=\"{chapter.Children[1].Id.Value}\"", StringComparison.Ordinal));
+    }
+
     [Theory]
     [InlineData(true, false, "image/png", "cover.png")]
     [InlineData(false, true, "image/jpeg", "cover.jpg")]
@@ -596,6 +682,19 @@ public sealed class EpubImageImportTests
             """;
 
     private static string NodeText(Paragraph paragraph) => InlineText(paragraph.Content);
+
+    private static int CountOccurrences(string value, string pattern)
+    {
+        var count = 0;
+        var offset = 0;
+        while ((offset = value.IndexOf(pattern, offset, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            offset += pattern.Length;
+        }
+
+        return count;
+    }
 
     private static string InlineText(IEnumerable<InlineNode> nodes) => string.Concat(nodes.Select(static node => node switch
     {

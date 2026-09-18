@@ -9,6 +9,40 @@ namespace Flow.Epub.Tests;
 public sealed class EpubRealWorldHardeningTests
 {
     [Fact]
+    public async Task NamedAnchorMarkersWithoutHref_AreTransparentAndDoNotProduceInvalidLinkDiagnostics()
+    {
+        const string chapter = """
+            <html xmlns="http://www.w3.org/1999/xhtml"><body>
+              <p id="paragraph"><a id="empty-marker"></a>Before <a id="legacy-marker" name="legacy-marker"><em>visible marker text</em></a>.</p>
+              <p><a>Malformed link label</a></p>
+            </body></html>
+            """;
+        await using var epub = MinimalEpubFactory.Create(chapterOne: chapter);
+
+        var result = await new EpubImporter().ImportAsync(epub);
+
+        Assert.True(result.IsSuccess, string.Join(Environment.NewLine, result.Diagnostics));
+        var invalidReference = Assert.Single(result.Diagnostics, static item =>
+            item.Code == EpubDiagnosticCodes.InvalidReference);
+        Assert.Contains("has no href", invalidReference.Message, StringComparison.Ordinal);
+        var paragraph = Assert.IsType<FlowDocument>(result.Document).Index.Locations
+            .Select(static location => location.Node)
+            .OfType<Paragraph>()
+            .First();
+        Assert.Equal("Before visible marker text.", InlineText(paragraph.Content));
+        Assert.True(result.SourceMap!.TryResolve(
+            "EPUB/text/chapter-1.xhtml",
+            "empty-marker",
+            out var emptyMarker));
+        Assert.True(result.SourceMap.TryResolve(
+            "EPUB/text/chapter-1.xhtml",
+            "legacy-marker",
+            out var legacyMarker));
+        Assert.Equal(paragraph.Id, emptyMarker);
+        Assert.Equal(paragraph.Id, legacyMarker);
+    }
+
+    [Fact]
     public async Task InlineAnchorApproximations_AreAggregatedPerResourceWithoutLosingSourceMapEntries()
     {
         const string chapter = """
@@ -211,4 +245,12 @@ public sealed class EpubRealWorldHardeningTests
         Assert.Contains("href=\"#chapter-chapter-two-end\"", html, StringComparison.Ordinal);
         Assert.DoesNotContain("javascript:", html, StringComparison.OrdinalIgnoreCase);
     }
+
+    private static string InlineText(IEnumerable<InlineNode> nodes) => string.Concat(nodes.Select(static node => node switch
+    {
+        Text text => text.Value,
+        InlineContainerNode container => InlineText(container.Children),
+        InlineCode code => code.Code,
+        _ => string.Empty,
+    }));
 }
