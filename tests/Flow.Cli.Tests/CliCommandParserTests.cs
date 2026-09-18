@@ -59,6 +59,15 @@ public sealed class CliCommandParserTests
         Assert.Equal("qualification.json", inventoryQualification.ReportPath);
         Assert.True(inventoryQualification.Force);
         Assert.True(inventoryQualification.Resume);
+        var matrix = Assert.IsType<ClassifyEpubInventoryCommand>(_parser.Parse(
+        [
+            "epub-inventory-matrix", "qualification.json", "--qualification-sha256", new string('A', 64),
+            "--output", "matrix.json", "--repository-root", "repository", "--force", "--resume",
+        ]).Command);
+        Assert.Equal("qualification.json", matrix.QualificationReportPath);
+        Assert.Equal("matrix.json", matrix.OutputPath);
+        Assert.True(matrix.Force);
+        Assert.True(matrix.Resume);
         Assert.IsType<InspectCommand>(_parser.Parse(["inspect", "book.flow.json"]).Command);
         Assert.IsType<ValidateCommand>(_parser.Parse(["validate", "book.flow.json"]).Command);
         Assert.IsType<HashCommand>(_parser.Parse(["hash", "book.flow.json"]).Command);
@@ -203,6 +212,14 @@ public sealed class CliCommandParserTests
             [
                 "epub-inventory-qualify", "books", "--report", "qualification.json",
                 "--repository-root", "repository",
+            ]).Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_INVALID_VALUE:",
+            _parser.Parse(
+            [
+                "epub-inventory-matrix", "qualification.json", "--qualification-sha256", "invalid",
+                "--output", "matrix.json", "--repository-root", "repository",
             ]).Error,
             StringComparison.Ordinal);
         Assert.StartsWith(

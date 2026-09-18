@@ -329,6 +329,13 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
                     $"Manifest resource type '{mediaType}' is not structurally supported.",
                     resourcePath));
             }
+            else if (exists && EpubMediaTypeClassifier.IsEmbeddedFont(mediaType))
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.EmbeddedFontBytesNotPreserved,
+                    $"Embedded font resource '{resourcePath}' is recognized, but its bytes are not retained by Flow; rendering may use an installed font family or a renderer fallback.",
+                    resourcePath));
+            }
 
             if (item.MediaOverlayId is not null)
             {
@@ -560,7 +567,8 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
         isNavigation
         || string.Equals(mediaType, "application/xhtml+xml", StringComparison.OrdinalIgnoreCase)
         || string.Equals(mediaType, "text/css", StringComparison.OrdinalIgnoreCase)
-        || mediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase);
+        || mediaType.StartsWith("image/", StringComparison.OrdinalIgnoreCase)
+        || EpubMediaTypeClassifier.IsEmbeddedFont(mediaType);
 
     private static string? FirstMetadataValue(XElement? metadata, XName name) =>
         metadata?.Elements(name)

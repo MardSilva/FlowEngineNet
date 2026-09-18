@@ -236,7 +236,7 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
                 classification.Status,
                 classification.Impact,
                 group.Key.Message,
-                group.Count(),
+                group.Sum(static diagnostic => diagnostic.Count),
                 group.Key.Resource,
                 location?.Fragment,
                 location?.NodeId,
@@ -257,7 +257,8 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
             or EpubDiagnosticCodes.UnsupportedCssSelector
             or EpubDiagnosticCodes.CssTargetNotRepresentable
             or EpubDiagnosticCodes.SvgImageSemanticLoss
-            or EpubDiagnosticCodes.MathSemanticLoss)
+            or EpubDiagnosticCodes.MathSemanticLoss
+            or EpubDiagnosticCodes.EmbeddedFontBytesNotPreserved)
         {
             return (EpubFidelityStatus.Approximated, EpubFidelityImpact.Minor);
         }

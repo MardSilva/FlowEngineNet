@@ -311,7 +311,25 @@ dotnet run --project src/Flow.Cli -- `
   --drm-free
 ```
 
-The qualification report contains neutral IDs, source and canonical hashes, phase and semantic counts, aggregated diagnostic codes and the repeated-run result. It omits physical paths, file names, editorial metadata and publication text. Protected, corrupt or structurally unsuitable candidates appear as explicitly skipped entries. The current private run covered six eligible publications twice: all completed the 12 automatic phases with stable evidence and no measured lost units, while an unsupported image-only link association remained explicit rather than being counted as preserved. This automatic batch is regression evidence, not human review or EPUB conformance certification.
+The qualification report contains neutral IDs, source and canonical hashes, phase and semantic counts, aggregated diagnostic codes and the repeated-run result. It omits physical paths, file names, editorial metadata and publication text. Protected, corrupt or structurally unsuitable candidates appear as explicitly skipped entries. The current private run covered six eligible publications twice: all completed the 12 automatic phases with stable evidence and no measured lost units. Embedded fonts are recorded as typography approximations because Flow retains the authored family name but not the font bytes. An unsupported image-only link association also remains explicit rather than being counted as preserved. This automatic batch is regression evidence, not human review or EPUB conformance certification.
+
+The qualification report can then be classified without opening the EPUB files again. The command requires the exact SHA-256 of the input report and writes a separate private matrix:
+
+```powershell
+$qualification = 'C:\flow-local\epub-qualification.json'
+$qualificationHash = (Get-FileHash $qualification -Algorithm SHA256).Hash
+
+dotnet run --project src/Flow.Cli -- `
+  --language pt-BR `
+  epub-inventory-matrix $qualification `
+  --qualification-sha256 $qualificationHash `
+  --output C:\flow-local\epub-difference-matrix.json `
+  --repository-root C:\src\FlowEngineNet
+```
+
+The matrix distinguishes approval, approximation, unsupported content, content loss, broken source references, Flow errors and cases that need human review. Automatic classification never completes the human-review field. Keep this file outside Git as well: it contains exact source and report hashes even though it omits editorial identity and book content.
+
+In the current private corpus, five candidates contain only automatic approximations and one still contains unsupported image-link associations. Embedded OTF/TTF resources use `EPUB074`, not the generic `EPUB009`: an installed font with the authored family name may be selected by the browser, otherwise the browser or reader uses its fallback. Flow does not inspect operating-system fonts during import because that would make evidence depend on the machine running the command.
 
 Keep the EPUB, gate report and generated review package outside the repository:
 

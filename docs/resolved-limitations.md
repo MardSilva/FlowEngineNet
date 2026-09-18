@@ -38,6 +38,22 @@ The first private batch left 24 source units classified as lost. Nineteen were n
 
 The remaining five units came from one safely representable percent-encoded `mailto` link and four image-only external links. Safe encoded mail is now retained and checked consistently by import, HTML rendering and package verification. The four images were already preserved; their link destinations are now reported as unsupported through `EPUB073` instead of appearing as unexplained loss. Two complete runs qualified all six candidates through all 12 phases with zero lost units, identical report SHA-256 and unchanged source hashes. The unsupported figure-link association remains in `known-limitations.md`.
 
+### Private difference classification
+
+Before 21.3, private qualification could report pass, loss and diagnostic counts, but it did not distinguish unsupported source features, source defects, Flow errors, approximations and pending human decisions in one typed result. `epub-inventory-matrix` now verifies the exact qualification-report hash and classifies its existing evidence without reopening the publications. The deterministic matrix excludes editorial identity and book content, rejects malformed or inconsistent input and keeps human review pending.
+
+Diagnostic occurrence counts now remain typed through import, corpus execution, qualification, fidelity evidence and diagnostic JSON. This preserves aggregated findings such as repeated unsupported associations instead of reducing each diagnostic row to one occurrence. The first private matrix retained all four `EPUB073` occurrences and classified unsupported evidence separately from loss and approval.
+
+This closes the missing automatic-classification step. Neutral resource locations are still unavailable when the aggregate qualification report does not contain them, and the matrix is not a substitute for editorial, visual or accessibility review. Those boundaries remain in `known-limitations.md`.
+
+### Embedded-font resource triage
+
+The first private difference matrix classified five candidates as containing unsupported content because `EPUB009` covered every manifest resource not imported as reading content. Direct inspection showed that all 28 occurrences behind that result were OTF or TTF files referenced by publication CSS, not missing text or unknown reading-order content.
+
+The inspector now recognizes EPUB font media types structurally. Import keeps the typed `font-family` intent, excludes the font bytes and emits `EPUB074`; fidelity and the private matrix classify that evidence as a typography approximation with cause `EmbeddedFontSubstitution`. A host may use an installed matching family, but import does not depend on host font discovery. Unknown binary resources and unsupported spine content continue to use `EPUB009`.
+
+Two private qualifications and two matrix generations produced identical bytes within each pair. The current matrix contains five candidates with approximations and one with unsupported image-link associations, with no measured content loss or Flow errors. This reduces the generic-resource false positive without claiming exact visual fidelity or permission to redistribute embedded fonts.
+
 ### Real large-publication gate
 
 The earlier absence of a complete large-publication run was resolved for one verified, legally obtained and DRM-free private input. Two final automatic executions produced identical stable evidence. Import, validation, JSON round-trip, canonical integrity, layout, HTML-package verification and structural/reference auditing completed, followed by assisted review at exact mobile and desktop viewports.

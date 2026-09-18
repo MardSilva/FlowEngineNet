@@ -13,7 +13,13 @@ public sealed record EpubDiagnostic(
     string Code,
     EpubDiagnosticSeverity Severity,
     string Message,
-    string? Resource = null);
+    string? Resource = null,
+    int Count = 1)
+{
+    public int Count { get; init; } = Count > 0
+        ? Count
+        : throw new ArgumentOutOfRangeException(nameof(Count), "A diagnostic count must be positive.");
+}
 
 /// <summary>Defines stable diagnostic codes emitted by the EPUB import prototype.</summary>
 public static class EpubDiagnosticCodes
@@ -79,6 +85,7 @@ public static class EpubDiagnosticCodes
     public const string HeadingLevelNormalized = "EPUB071";
     public const string NoteResourceFallbackUsed = "EPUB072";
     public const string LinkedImageTargetNotRepresentable = "EPUB073";
+    public const string EmbeddedFontBytesNotPreserved = "EPUB074";
     public const string InvalidCssValue = "EPUB050";
     public const string ExternalStylesheetBlocked = "EPUB051";
     public const string CssTargetNotRepresentable = "EPUB052";

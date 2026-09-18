@@ -132,6 +132,7 @@ public static class EpubCorpusExecutionReportJsonSerializer
             writer.WriteString("severity", ToToken(diagnostic.Severity));
             writer.WriteString("phase", ToToken(diagnostic.Phase));
             writer.WriteString("message", diagnostic.Message);
+            writer.WriteNumber("count", diagnostic.Count);
             WriteOptionalString(writer, "sourceCode", diagnostic.SourceCode);
             WriteOptionalString(writer, "resource", diagnostic.Resource);
             writer.WriteEndObject();

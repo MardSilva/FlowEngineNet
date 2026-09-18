@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using System.Globalization;
+using System.Security.Cryptography;
 using System.Text.Json;
 using Flow.Documents;
 using Flow.Epub;
@@ -28,6 +29,7 @@ public sealed class CliOperations
     private readonly IEpubLargePublicationReviewPackageGenerator _reviewPackageGenerator;
     private readonly IEpubPrivateInventoryService _privateInventoryService;
     private readonly IEpubPrivateQualificationService _privateQualificationService;
+    private readonly EpubPrivateDifferenceMatrixService _privateDifferenceMatrixService;
 
     public CliOperations(
         IFlowDocumentSerializer serializer,
@@ -43,7 +45,8 @@ public sealed class CliOperations
         IEpubLargePublicationGate? largePublicationGate = null,
         IEpubLargePublicationReviewPackageGenerator? reviewPackageGenerator = null,
         IEpubPrivateInventoryService? privateInventoryService = null,
-        IEpubPrivateQualificationService? privateQualificationService = null)
+        IEpubPrivateQualificationService? privateQualificationService = null,
+        EpubPrivateDifferenceMatrixService? privateDifferenceMatrixService = null)
     {
         ArgumentNullException.ThrowIfNull(serializer);
         ArgumentNullException.ThrowIfNull(epubImporter);
@@ -67,6 +70,7 @@ public sealed class CliOperations
         _reviewPackageGenerator = reviewPackageGenerator ?? new EpubLargePublicationReviewPackageGenerator();
         _privateInventoryService = privateInventoryService ?? new EpubPrivateInventoryService();
         _privateQualificationService = privateQualificationService ?? new EpubPrivateQualificationService();
+        _privateDifferenceMatrixService = privateDifferenceMatrixService ?? new EpubPrivateDifferenceMatrixService();
     }
 
     /// <summary>Executes a parsed command and writes its normal output.</summary>
@@ -105,6 +109,13 @@ public sealed class CliOperations
                     output,
                     error,
                     text,
+                cancellationToken)
+                .ConfigureAwait(false),
+            ClassifyEpubInventoryCommand matrix => await ClassifyEpubInventoryAsync(
+                    matrix,
+                    output,
+                    error,
+                    text,
                     cancellationToken)
                 .ConfigureAwait(false),
             CorpusCommand corpus => await ExecuteCorpusAsync(corpus, output, error, text, cancellationToken)
@@ -134,6 +145,7 @@ public sealed class CliOperations
                      "HelpCommands", "HelpSample", "HelpImport1", "HelpImport2", "HelpImport3", "HelpEpubInspect",
                      "HelpEpubInventory1", "HelpEpubInventory2",
                      "HelpEpubInventoryQualify1", "HelpEpubInventoryQualify2",
+                     "HelpEpubInventoryMatrix1", "HelpEpubInventoryMatrix2",
                      "HelpCorpus1", "HelpCorpus2", "HelpEpubQualify1", "HelpEpubQualify2", "HelpEpubQualify3",
                      "HelpEpubReview1", "HelpEpubReview2", "HelpEpubReview3", "HelpOutputPolicy",
                      "HelpExecutionStatus", "HelpExecutionClean",
@@ -807,6 +819,121 @@ public sealed class CliOperations
                && report.Summary.Skipped == 0
             ? 0
             : 2;
+    }
+
+    private async Task<int> ClassifyEpubInventoryAsync(
+        ClassifyEpubInventoryCommand command,
+        TextWriter output,
+        TextWriter error,
+        CliTextCatalog text,
+        CancellationToken cancellationToken)
+    {
+        const long maximumReportBytes = 64L * 1024 * 1024;
+        if (!Path.IsPathFullyQualified(command.QualificationReportPath)
+            || !Path.IsPathFullyQualified(command.OutputPath)
+            || !Path.IsPathFullyQualified(command.RepositoryRoot))
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorInventoryMatrixAbsolutePaths"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        var qualificationPath = Path.GetFullPath(command.QualificationReportPath);
+        var outputPath = Path.GetFullPath(command.OutputPath);
+        var repositoryRoot = Path.TrimEndingDirectorySeparator(Path.GetFullPath(command.RepositoryRoot));
+        if (IsInside(repositoryRoot, qualificationPath) || IsInside(repositoryRoot, outputPath))
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorInventoryMatrixRepositoryPath"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        if (PathsEqual(qualificationPath, outputPath))
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorInventoryMatrixInputConflict"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        var input = new FileInfo(qualificationPath);
+        if (!input.Exists || input.Attributes.HasFlag(FileAttributes.ReparsePoint))
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_INPUT", "ErrorInventoryMatrixUnsafeInput"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        if (input.Length > maximumReportBytes)
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_INPUT", "ErrorInventoryMatrixInputLimit"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        if (File.Exists(outputPath) && command.Force && !IsRecognizedDifferenceMatrix(outputPath))
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_INVALID_OUTPUT", "ErrorInventoryMatrixOutputUnrecognized"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        var bytes = await File.ReadAllBytesAsync(qualificationPath, cancellationToken).ConfigureAwait(false);
+        var actualHash = new EpubCorpusSha256(Convert.ToHexString(SHA256.HashData(bytes)));
+        if (actualHash != command.ExpectedQualificationSha256)
+        {
+            await error.WriteLineAsync(text.Diagnostic("FLOWCLI_HASH_MISMATCH", "ErrorInventoryMatrixHashMismatch"))
+                .ConfigureAwait(false);
+            return 1;
+        }
+
+        var qualification = EpubPrivateQualificationReportJsonSerializer.Deserialize(bytes);
+        var matrix = _privateDifferenceMatrixService.Create(qualification, actualHash);
+        var lockAcquisition = CliExecutionLock.Acquire(outputPath, command.Resume);
+        using var executionLock = lockAcquisition.ExecutionLock;
+        if (!await ReportLockAcquisitionAsync(lockAcquisition, outputPath, output, error, text).ConfigureAwait(false))
+        {
+            return 1;
+        }
+
+        var outputPreparation = CliOutputPolicy.PrepareFile(outputPath, command.Force, command.Resume);
+        if (!await ReportOutputPreparationAsync(outputPreparation, outputPath, output, error, text)
+                .ConfigureAwait(false))
+        {
+            executionLock!.Complete();
+            return 1;
+        }
+
+        await EpubPrivateDifferenceMatrixJsonSerializer.WriteAtomicallyAsync(matrix, outputPath, cancellationToken)
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelInventoryMatrixReport", outputPath)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format(
+                "LabelInventoryMatrixSummary",
+                matrix.Summary.TotalCandidates,
+                matrix.Summary.Approved,
+                matrix.Summary.ApprovedWithApproximations,
+                matrix.Summary.UnsupportedContent,
+                matrix.Summary.ContentLoss,
+                matrix.Summary.BrokenSourceReference,
+                matrix.Summary.FlowError,
+                matrix.Summary.HumanReviewRequired))
+            .ConfigureAwait(false);
+        executionLock!.Complete();
+        return matrix.Summary.ContentLoss == 0 && matrix.Summary.FlowError == 0 ? 0 : 2;
+    }
+
+    private static bool IsRecognizedDifferenceMatrix(string path)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(File.ReadAllBytes(path));
+            return document.RootElement.ValueKind == JsonValueKind.Object
+                   && document.RootElement.TryGetProperty("format", out var format)
+                   && format.GetString() == EpubPrivateDifferenceMatrix.CurrentFormat;
+        }
+        catch (JsonException)
+        {
+            return false;
+        }
     }
 
     private static async Task WriteEpubInspectionAsync(

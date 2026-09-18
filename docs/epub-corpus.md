@@ -37,6 +37,28 @@ flow --language pt-BR --banner epub-inventory-qualify C:\books `
 
 The two declarations record caller assertions; they do not establish legal rights or detect every DRM system. Exit code `0` means that every discovered candidate was eligible, completed the automatic pipeline without measured fidelity loss and produced stable evidence twice. Exit code `2` keeps the report but signals a failed, lossy, inconclusive, nondeterministic or skipped candidate. Human review remains a separate per-publication workflow.
 
+## Private difference matrix
+
+`EpubPrivateDifferenceMatrixService` classifies evidence already recorded by private qualification. It does not open or import the EPUB files again. Every difference receives one typed category and cause, together with its stable code, severity, count, phase and metric. A neutral resource location is included only when the qualification input already provides one.
+
+The categories separate Flow behavior from source defects and human decisions: `Approved`, `ApprovedWithApproximations`, `UnsupportedContent`, `ContentLoss`, `BrokenSourceReference`, `FlowError` and `HumanReviewRequired`. Candidate precedence is conservative: Flow error, content loss, broken source reference, unsupported content, pending human evidence, approximation and approval. Regardless of the automatic category, the human-review state remains pending until a person records a separate decision.
+
+```powershell
+$qualification = 'C:\flow-local\epub-qualification.json'
+$qualificationHash = (Get-FileHash $qualification -Algorithm SHA256).Hash
+
+flow --language pt-BR epub-inventory-matrix $qualification `
+  --qualification-sha256 $qualificationHash `
+  --output C:\flow-local\epub-difference-matrix.json `
+  --repository-root C:\src\FlowEngineNet
+```
+
+The CLI accepts only the known `flow-epub-private-qualification-0.1` contract, verifies the complete input-file hash, rejects duplicate candidate IDs and validates the report summary before classification. It writes `flow-epub-private-difference-matrix-0.1` atomically as deterministic UTF-8 without BOM and with LF line endings. Input and output must be absolute regular files outside the repository, and replacing a recognized matrix requires `--force`.
+
+The matrix remains private. Exact source and qualification hashes can identify bytes even though the format excludes paths, file names, titles, authors, publisher identifiers, publication text and asset bytes. It is regression evidence, not an editorial approval or an EPUB conformance certificate.
+
+The first resource-cause triage found 28 embedded font files across five private candidates. Every file was referenced by publication CSS. They now produce `EPUB074` with the typed `EmbeddedFontSubstitution` cause instead of generic `EPUB009` evidence. Two complete qualifications and two matrix generations were byte-stable: five candidates contained approximations, one retained unsupported image-link associations, and none contained measured loss or Flow errors. The same 28 fonts appear once in inspection and once in import evidence, so their aggregated occurrence total is 56 without implying 56 distinct files.
+
 ## What "corpus" means here
 
 The corpus is a list of EPUB files used to test the importer. It is not a new book format and it is not part of the Reader. Each catalog entry says which local EPUB to use, how to verify its bytes, what license rules apply, and which results Flow should produce.

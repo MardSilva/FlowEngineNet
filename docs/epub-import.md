@@ -77,13 +77,15 @@ Image diagnostics are `EPUB038` invalid bytes, `EPUB039` false/mismatched MIME, 
 
 MathML in the standard namespace maps to immutable `MathExpression` or `InlineMath` nodes. The importer retains a restricted Presentation MathML element vocabulary, safe nonlinking attributes, text nodes, source child order, `alttext`, and plain-text/TeX annotations as textual alternatives. It never evaluates the formula or invents an interpretation. Foreign/unknown wrappers are flattened only when safe children can remain; `script`, `annotation-xml`, event handlers, links, styles, and other excluded attributes/content are removed. Aggregated `EPUB063` diagnostics identify each class of semantic loss.
 
-The import diagnostics form the unsupported-resource report for this profile: `EPUB062` means an SVG survived only after sanitization; `EPUB063` means a MathML construct was flattened or removed; `EPUB009`, `EPUB010`, and the existing image diagnostics continue to describe unsupported manifest resources, XHTML constructs, and image fallbacks. None of these findings is silently converted into trusted markup.
+The import diagnostics form the unsupported-resource report for this profile: `EPUB062` means an SVG survived only after sanitization; `EPUB063` means a MathML construct was flattened or removed; `EPUB074` identifies embedded-font substitution; `EPUB009`, `EPUB010`, and the existing image diagnostics continue to describe unsupported manifest resources, XHTML constructs, and image fallbacks. None of these findings is silently converted into trusted markup.
 
 ## Safe typed CSS subset
 
 The importer reads internal manifest-declared `text/css` stylesheets, XHTML `style` elements, and `style` attributes. External or unsafe stylesheet URLs are never fetched. The parser implements only simple element, class, ID, and compound selectors without combinators or pseudo-selectors. Within that subset it applies inheritance, selector specificity, source order, and the final precedence of a style attribute.
 
 Only `font-family`, `font-size`, `font-weight`, `font-style`, unitless/percentage `line-height`, `text-align`, `text-transform`, `text-decoration`, `letter-spacing`, paragraph block margins, and `text-indent` can survive. Values are parsed into `TypographyStyle`, `Length`, and enums. The selected first semantic font family is stored rather than a CSS fallback expression. No selector, declaration, stylesheet text, CSS variable, or URL enters `FlowDocument`.
+
+An embedded OTF, TTF, WOFF or WOFF2 resource is structurally recognized but its bytes are not copied into `FlowDocument` or generated HTML. `EPUB074` records this as a typography approximation. The authored `font-family` name still reaches typed presentation and HTML: if the host has a matching family, the browser can use it; otherwise normal browser or reader fallback applies. Import never probes fonts installed on Windows, Linux or another host, because that environment-dependent result must not alter the document, diagnostics or hash. Font obfuscation remains separate protection evidence and is never bypassed.
 
 Class and ID rules are represented accurately through `DocumentPresentation.NodeTypography`, an immutable map from stable `NodeId` to typed partial styles. This avoids incorrectly promoting one paragraph's class to the global `Body` role. The map is optional presentation, is serialized for development round trips, and remains excluded from `flow-c14n-0.1` and document hashes. Layout resolves each node through Flow defaults, author role/node presentation, user preferences, and renderer safety constraints in that order.
 
@@ -151,7 +153,7 @@ When both formats exist, a usable EPUB 3 Navigation Document takes precedence ov
 
 TOC diagnostics are stable: `EPUB016` multiple TOCs, `EPUB017` malformed TOC structure, `EPUB018` missing destinations, `EPUB019` empty labels, `EPUB020` levels outside 1..6, `EPUB021` circular/self references, and `EPUB022` Navigation Document/NCX conflicts. Empty labels receive a deterministic source-reference label so their destination is not lost. Unresolvable and circular destinations are excluded because admitting them would make the resulting `FlowDocument` invalid; their label and source reference remain visible in diagnostics.
 
-Unsupported block elements produce `EPUB010` and retain recoverable textual content in a paragraph. Unsupported manifest resources produce `EPUB009`. Missing resources, invalid references, and structural validation failures are explicit diagnostics; they are never silently accepted as a successful import.
+Unsupported block elements produce `EPUB010` and retain recoverable textual content in a paragraph. Unknown or relevant unsupported manifest resources produce `EPUB009`; recognized embedded fonts use the narrower `EPUB074`. Missing resources, invalid references, and structural validation failures are explicit diagnostics; they are never silently accepted as a successful import.
 
 ## Security limits
 

@@ -752,6 +752,10 @@ public sealed class EpubImporter : IEpubImporter
                                                     manifest.Path,
                                                     StringComparison.Ordinal))
                     ? EpubFidelityStatus.Unsupported
+                    : diagnostics.Any(diagnostic =>
+                        diagnostic.Code == EpubDiagnosticCodes.EmbeddedFontBytesNotPreserved
+                        && string.Equals(diagnostic.Resource, manifest.Path, StringComparison.Ordinal))
+                        ? EpubFidelityStatus.Approximated
                     : (EpubFidelityStatus?)null;
             Add(EpubFidelityMetric.ManifestResources, manifest.Path, 1, status);
         }
@@ -1085,6 +1089,20 @@ public sealed class EpubImporter : IEpubImporter
                 continue;
             }
 
+            if (!item.ExistsInArchive)
+            {
+                continue;
+            }
+
+            if (EpubMediaTypeClassifier.IsEmbeddedFont(item.MediaType))
+            {
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.EmbeddedFontBytesNotPreserved,
+                    $"Embedded font resource '{item.Id}' ({item.MediaType}) is recognized, but its bytes are not retained by Flow; rendering may use an installed font family or a renderer fallback.",
+                    item.Path));
+                continue;
+            }
+
             diagnostics.Add(Warning(
                 EpubDiagnosticCodes.UnsupportedResource,
                 $"Manifest resource '{item.Id}' ({item.MediaType}) is not part of the imported reading content.",
@@ -1142,8 +1160,8 @@ public sealed class EpubImporter : IEpubImporter
     private static EpubDiagnostic Error(string code, string message, string? resource = null) =>
         new(code, EpubDiagnosticSeverity.Error, message, resource);
 
-    private static EpubDiagnostic Warning(string code, string message, string? resource = null) =>
-        new(code, EpubDiagnosticSeverity.Warning, message, resource);
+    private static EpubDiagnostic Warning(string code, string message, string? resource = null, int count = 1) =>
+        new(code, EpubDiagnosticSeverity.Warning, message, resource, count);
 
     private sealed record ManifestItem(
         string Id,
@@ -1368,7 +1386,8 @@ public sealed class EpubImporter : IEpubImporter
                 diagnostics.Add(Warning(
                     EpubDiagnosticCodes.HeadingLevelNormalized,
                     $"Normalized {occurrenceText} from source level {key.SourceLevel} to level {key.NormalizedLevel} to preserve a valid heading sequence within the XHTML resource.",
-                    key.ResourcePath));
+                    key.ResourcePath,
+                    count));
             }
 
             foreach (var (resourcePath, count) in noteResourceFallbacks.OrderBy(
@@ -1378,7 +1397,8 @@ public sealed class EpubImporter : IEpubImporter
                 diagnostics.Add(Warning(
                     EpubDiagnosticCodes.NoteResourceFallbackUsed,
                     $"Resolved {count} note reference(s) without a fragment because the target XHTML contained exactly one semantic note without a source ID.",
-                    resourcePath));
+                    resourcePath,
+                    count));
             }
 
             foreach (var (resourcePath, count) in linkedImageTargets.OrderBy(
@@ -1388,7 +1408,8 @@ public sealed class EpubImporter : IEpubImporter
                 diagnostics.Add(Warning(
                     EpubDiagnosticCodes.LinkedImageTargetNotRepresentable,
                     $"Preserved the image content of {count} image-only link(s), but the current Flow model cannot attach their destinations to figures.",
-                    resourcePath));
+                    resourcePath,
+                    count));
             }
         }
 

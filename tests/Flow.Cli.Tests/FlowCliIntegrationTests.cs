@@ -808,6 +808,7 @@ public sealed class FlowCliIntegrationTests
         Assert.Contains("--processing-json <processing.json>", result.Output, StringComparison.Ordinal);
         Assert.Contains("--source-map-json <source-map.json>", result.Output, StringComparison.Ordinal);
         Assert.Contains("flow epub-inspect <book.epub>", result.Output, StringComparison.Ordinal);
+        Assert.Contains("flow epub-inventory-matrix <qualification.json>", result.Output, StringComparison.Ordinal);
         Assert.Contains("flow corpus <manifest.json>", result.Output, StringComparison.Ordinal);
         Assert.Contains("flow epub-qualify <book.epub>", result.Output, StringComparison.Ordinal);
         Assert.Contains("flow epub-review <book.epub>", result.Output, StringComparison.Ordinal);
@@ -914,6 +915,95 @@ public sealed class FlowCliIntegrationTests
         Assert.DoesNotContain(sourceDirectory, json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("identifying-file-name", json, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Identifying private title", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task EpubInventoryMatrix_VerifiesInputHashWritesNeutralMatrixAndRejectsTampering()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var repositoryRoot = Directory.CreateDirectory(workspace.PathOf("repository")).FullName;
+        var privateDirectory = Directory.CreateDirectory(workspace.PathOf("private-evidence")).FullName;
+        var qualificationPath = Path.Combine(privateDirectory, "qualification.json");
+        var matrixPath = Path.Combine(privateDirectory, "matrix.json");
+        var tamperedOutput = Path.Combine(privateDirectory, "tampered-matrix.json");
+        var publication = new EpubPrivateQualificationItem(
+            new EpubCorpusPublicationId("candidate-0001"),
+            new EpubCorpusSha256(new string('A', 64)),
+            EpubPrivateInventoryStatus.ReviewRequired,
+            EpubPrivateQualificationStatus.Passed,
+            eligible: true,
+            stableAcrossRepeatedRuns: true,
+            Enum.GetValues<EpubCorpusExecutionPhase>(),
+            new EpubPrivateQualificationEvidence(
+                1, 1, 1, 1, 0, 10, 0, new string('B', 64), 10, 1, 1, 2, 4, 10,
+                1, 1, 1, 0, 0, 1, 0, 0, 0, 0),
+            [
+                new EpubPrivateQualificationDiagnosticCount(
+                    EpubDiagnosticCodes.LinkedImageTargetNotRepresentable,
+                    EpubCorpusExecutionDiagnosticSeverity.Warning,
+                    EpubCorpusExecutionPhase.Fidelity,
+                    4),
+            ]);
+        var report = new EpubPrivateQualificationReport(true, [publication]);
+        var reportBytes = EpubPrivateQualificationReportJsonSerializer.Serialize(report);
+        await File.WriteAllBytesAsync(qualificationPath, reportBytes);
+        var hash = Convert.ToHexString(SHA256.HashData(reportBytes));
+
+        var result = await RunAsync(
+            FlowCliApplication.CreateDefault(),
+            [
+                "--language", "pt-BR", "epub-inventory-matrix", qualificationPath,
+                "--qualification-sha256", hash, "--output", matrixPath,
+                "--repository-root", repositoryRoot,
+            ]);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("1 com conteúdo não suportado", result.Output, StringComparison.Ordinal);
+        var matrixBytes = await File.ReadAllBytesAsync(matrixPath);
+        Assert.Equal((byte)'\n', matrixBytes[^1]);
+        Assert.DoesNotContain((byte)'\r', matrixBytes);
+        var matrixText = Encoding.UTF8.GetString(matrixBytes);
+        Assert.Contains(EpubPrivateDifferenceMatrix.CurrentFormat, matrixText, StringComparison.Ordinal);
+        Assert.Contains("\"count\": 4", matrixText, StringComparison.Ordinal);
+        Assert.Contains("\"humanReview\": \"pending\"", matrixText, StringComparison.Ordinal);
+        Assert.DoesNotContain(privateDirectory, matrixText, StringComparison.OrdinalIgnoreCase);
+
+        await File.AppendAllTextAsync(qualificationPath, " ");
+        var tampered = await RunAsync(
+            FlowCliApplication.CreateDefault(),
+            [
+                "epub-inventory-matrix", qualificationPath, "--qualification-sha256", hash,
+                "--output", tamperedOutput, "--repository-root", repositoryRoot,
+            ]);
+
+        Assert.Equal(1, tampered.ExitCode);
+        Assert.Contains("FLOWCLI_HASH_MISMATCH", tampered.Error, StringComparison.Ordinal);
+        Assert.False(File.Exists(tamperedOutput));
+    }
+
+    [Fact]
+    public async Task EpubInventoryMatrix_RejectsOutputInsideRepository()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var repositoryRoot = Directory.CreateDirectory(workspace.PathOf("repository")).FullName;
+        var privateDirectory = Directory.CreateDirectory(workspace.PathOf("private-evidence")).FullName;
+        var qualificationPath = Path.Combine(privateDirectory, "qualification.json");
+        var bytes = EpubPrivateQualificationReportJsonSerializer.Serialize(
+            new EpubPrivateQualificationReport(true, []));
+        await File.WriteAllBytesAsync(qualificationPath, bytes);
+
+        var result = await RunAsync(
+            FlowCliApplication.CreateDefault(),
+            [
+                "epub-inventory-matrix", qualificationPath,
+                "--qualification-sha256", Convert.ToHexString(SHA256.HashData(bytes)),
+                "--output", Path.Combine(repositoryRoot, "matrix.json"),
+                "--repository-root", repositoryRoot,
+            ]);
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Contains("FLOWCLI_INVALID_OUTPUT", result.Error, StringComparison.Ordinal);
+        Assert.False(File.Exists(Path.Combine(repositoryRoot, "matrix.json")));
     }
 
     [Fact]

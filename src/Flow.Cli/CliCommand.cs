@@ -33,6 +33,14 @@ public sealed record QualifyEpubInventoryCommand(
     bool Force = false,
     bool Resume = false) : CliCommand;
 
+public sealed record ClassifyEpubInventoryCommand(
+    string QualificationReportPath,
+    EpubCorpusSha256 ExpectedQualificationSha256,
+    string OutputPath,
+    string RepositoryRoot,
+    bool Force = false,
+    bool Resume = false) : CliCommand;
+
 public sealed record CorpusCommand(
     string ManifestPath,
     string RepositoryRoot,

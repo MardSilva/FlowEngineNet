@@ -24,6 +24,7 @@ public sealed class CliCommandParser
             "epub-inspect" => ParseEpubInspect(arguments),
             "epub-inventory" => ParseEpubInventory(arguments),
             "epub-inventory-qualify" => ParseEpubInventoryQualify(arguments),
+            "epub-inventory-matrix" => ParseEpubInventoryMatrix(arguments),
             "corpus" => ParseCorpus(arguments),
             "epub-qualify" => ParseEpubQualify(arguments),
             "epub-review" => ParseEpubReview(arguments),
@@ -325,6 +326,77 @@ public sealed class CliCommandParser
             ? CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", EpubInventoryQualifyUsage)
             : CommandParseResult.Success(
                 new QualifyEpubInventoryCommand(arguments[1], reportPath, repositoryRoot, force, resume));
+    }
+
+    private static CommandParseResult ParseEpubInventoryMatrix(IReadOnlyList<string> arguments)
+    {
+        if (arguments.Count < 2)
+        {
+            return CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", EpubInventoryMatrixUsage);
+        }
+
+        string? expectedHash = null;
+        string? outputPath = null;
+        string? repositoryRoot = null;
+        var force = false;
+        var resume = false;
+        for (var index = 2; index < arguments.Count; index++)
+        {
+            var option = arguments[index];
+            switch (option)
+            {
+                case "--force" when !force:
+                    force = true;
+                    continue;
+                case "--resume" when !resume:
+                    resume = true;
+                    continue;
+                case "--force" or "--resume":
+                    return CommandParseResult.Failure("FLOWCLI_DUPLICATE_OPTION", "ErrorDuplicateOption", option);
+            }
+
+            if (++index >= arguments.Count || string.IsNullOrWhiteSpace(arguments[index]))
+            {
+                return CommandParseResult.Failure(
+                    "FLOWCLI_USAGE",
+                    "ErrorOptionRequiresValue",
+                    option,
+                    EpubInventoryMatrixUsage);
+            }
+
+            var value = arguments[index];
+            switch (option)
+            {
+                case "--qualification-sha256" when expectedHash is null:
+                    expectedHash = value;
+                    break;
+                case "--output" when outputPath is null:
+                    outputPath = value;
+                    break;
+                case "--repository-root" when repositoryRoot is null:
+                    repositoryRoot = value;
+                    break;
+                case "--qualification-sha256" or "--output" or "--repository-root":
+                    return CommandParseResult.Failure("FLOWCLI_DUPLICATE_OPTION", "ErrorDuplicateOption", option);
+                default:
+                    return CommandParseResult.Failure(
+                        "FLOWCLI_UNKNOWN_OPTION",
+                        "ErrorUnknownOption",
+                        "epub-inventory-matrix",
+                        option,
+                        EpubInventoryMatrixUsage);
+            }
+        }
+
+        if (expectedHash is null || outputPath is null || repositoryRoot is null)
+        {
+            return CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", EpubInventoryMatrixUsage);
+        }
+
+        return EpubCorpusSha256.TryParse(expectedHash, out var sha256)
+            ? CommandParseResult.Success(new ClassifyEpubInventoryCommand(
+                arguments[1], sha256, outputPath, repositoryRoot, force, resume))
+            : CommandParseResult.Failure("FLOWCLI_INVALID_VALUE", "ErrorInvalidQualificationSha256");
     }
 
     private static CommandParseResult ParseEpubQualify(IReadOnlyList<string> arguments)
@@ -806,6 +878,9 @@ public sealed class CliCommandParser
 
     private const string EpubInventoryQualifyUsage =
         "flow epub-inventory-qualify <directory> --report <report.json> --repository-root <absolute-directory> --legal-use --drm-free [--force] [--resume]";
+
+    private const string EpubInventoryMatrixUsage =
+        "flow epub-inventory-matrix <qualification.json> --qualification-sha256 <hash> --output <matrix.json> --repository-root <absolute-directory> [--force] [--resume]";
 
     private const string CorpusUsage =
         "flow corpus <manifest.json> --repository-root <directory> --report <report.json> [--external-root <directory>] [--baseline <baseline.json>] [--force] [--resume]";

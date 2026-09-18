@@ -152,7 +152,7 @@ public sealed class EpubPrivateQualificationService : IEpubPrivateQualificationS
                 group.Key.Code,
                 group.Key.Severity,
                 group.Key.Phase,
-                group.Count()));
+                group.Sum(static item => item.Count)));
         return new EpubPrivateQualificationItem(
             inventory.Id,
             inventory.Sha256,

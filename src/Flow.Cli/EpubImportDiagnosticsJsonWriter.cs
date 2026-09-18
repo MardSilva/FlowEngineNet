@@ -59,7 +59,7 @@ internal static class EpubImportDiagnosticsJsonWriter
     {
         var counts = diagnostics
             .GroupBy(static diagnostic => diagnostic.Severity)
-            .ToDictionary(static group => group.Key, static group => group.Count());
+            .ToDictionary(static group => group.Key, static group => group.Sum(static item => item.Count));
         writer.WritePropertyName("summary");
         writer.WriteStartObject();
         writer.WriteNumber("information", counts.GetValueOrDefault(EpubDiagnosticSeverity.Information));
@@ -78,6 +78,7 @@ internal static class EpubImportDiagnosticsJsonWriter
             writer.WriteString("code", diagnostic.Code);
             writer.WriteString("severity", diagnostic.Severity.ToString().ToLowerInvariant());
             writer.WriteString("message", diagnostic.Message);
+            writer.WriteNumber("count", diagnostic.Count);
             if (diagnostic.Resource is null)
             {
                 writer.WriteNull("resource");

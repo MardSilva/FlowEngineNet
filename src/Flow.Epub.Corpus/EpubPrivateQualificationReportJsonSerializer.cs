@@ -4,7 +4,7 @@ using System.Text.Json;
 namespace Flow.Epub.Corpus;
 
 /// <summary>Writes deterministic private qualification evidence without editorial identity or paths.</summary>
-public static class EpubPrivateQualificationReportJsonSerializer
+public static partial class EpubPrivateQualificationReportJsonSerializer
 {
     public static byte[] Serialize(EpubPrivateQualificationReport report)
     {

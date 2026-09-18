@@ -46,7 +46,8 @@ public sealed record EpubCorpusExecutionDiagnostic
         EpubCorpusExecutionPhase phase,
         string message,
         string? sourceCode = null,
-        string? resource = null)
+        string? resource = null,
+        int count = 1)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(code);
         ArgumentException.ThrowIfNullOrWhiteSpace(message);
@@ -60,12 +61,15 @@ public sealed record EpubCorpusExecutionDiagnostic
             throw new ArgumentOutOfRangeException(nameof(phase));
         }
 
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(count);
+
         Code = code;
         Severity = severity;
         Phase = phase;
         Message = message;
         SourceCode = string.IsNullOrWhiteSpace(sourceCode) ? null : sourceCode;
         Resource = NormalizeResource(resource);
+        Count = count;
     }
 
     public string Code { get; }
@@ -79,6 +83,8 @@ public sealed record EpubCorpusExecutionDiagnostic
     public string? SourceCode { get; }
 
     public string? Resource { get; }
+
+    public int Count { get; }
 
     private static string? NormalizeResource(string? resource)
     {
