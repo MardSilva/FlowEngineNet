@@ -305,6 +305,7 @@ internal sealed class EpubCssProcessor
 
             var property = declaration[..separator].Trim().ToLowerInvariant();
             var value = declaration[(separator + 1)..].Trim();
+            TrackReferencedImages(value, resourcePath, property);
             if (value.EndsWith("!important", StringComparison.OrdinalIgnoreCase))
             {
                 Report(EpubDiagnosticCodes.UnsupportedCssProperty, resourcePath, property, $"CSS !important on '{property}' is outside the supported cascade");
@@ -335,6 +336,94 @@ internal sealed class EpubCssProcessor
         }
 
         return result;
+    }
+
+    private void TrackReferencedImages(string value, string resourcePath, string property)
+    {
+        foreach (var target in EnumerateCssUrls(value))
+        {
+            if (target.StartsWith('#')
+                || Uri.TryCreate(target, UriKind.Absolute, out _)
+                || !EpubArchiveUtilities.TryNormalizeArchivePath(
+                    EpubArchiveUtilities.GetDirectory(resourcePath),
+                    target,
+                    out var referencedPath)
+                || !manifestMediaTypes.TryGetValue(referencedPath, out var mediaType)
+                || !EpubImageInspector.IsSupportedDeclaredMediaType(mediaType)
+                || !entries.ContainsKey(referencedPath))
+            {
+                continue;
+            }
+
+            consumedResources.Add(referencedPath);
+            Report(
+                EpubDiagnosticCodes.CssImageResourceNotPreserved,
+                referencedPath,
+                $"{resourcePath}:{property}",
+                $"Local image resource '{referencedPath}' is referenced by CSS property '{property}', but CSS images are presentation-only and are not retained as semantic Flow assets");
+        }
+    }
+
+    private static IEnumerable<string> EnumerateCssUrls(string value)
+    {
+        var position = 0;
+        while (position < value.Length)
+        {
+            var opening = value.IndexOf("url(", position, StringComparison.OrdinalIgnoreCase);
+            if (opening < 0)
+            {
+                yield break;
+            }
+
+            var start = opening + 4;
+            while (start < value.Length && char.IsWhiteSpace(value[start]))
+            {
+                start++;
+            }
+
+            if (start >= value.Length)
+            {
+                yield break;
+            }
+
+            var quote = value[start] is '\'' or '"' ? value[start++] : '\0';
+            var end = start;
+            if (quote == '\0')
+            {
+                end = value.IndexOf(')', start);
+            }
+            else
+            {
+                while (end < value.Length)
+                {
+                    if (value[end] == quote && (end == start || value[end - 1] != '\\'))
+                    {
+                        break;
+                    }
+
+                    end++;
+                }
+            }
+
+            if (end < 0 || end >= value.Length)
+            {
+                yield break;
+            }
+
+            var target = value[start..end].Trim();
+            if (target.Length > 0)
+            {
+                yield return target;
+            }
+
+            var closing = quote == '\0' ? end : value.IndexOf(')', end + 1);
+            if (closing < 0)
+            {
+                yield break;
+            }
+
+            position = closing + 1;
+        }
     }
 
     private void ExpandMargin(

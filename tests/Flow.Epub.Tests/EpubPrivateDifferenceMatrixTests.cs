@@ -141,6 +141,25 @@ public sealed class EpubPrivateDifferenceMatrixTests
     }
 
     [Fact]
+    public void Create_ClassifiesRecoveredPathCaseMismatchAsReferenceApproximation()
+    {
+        var report = new EpubPrivateQualificationReport(true,
+        [
+            Publication("case-recovery",
+            [
+                Diagnostic(EpubDiagnosticCodes.ArchivePathCaseMismatchRecovered),
+            ]),
+        ]);
+
+        var matrix = new EpubPrivateDifferenceMatrixService().Create(report, Hash('A'));
+
+        var difference = Assert.Single(Assert.Single(matrix.Candidates).Differences);
+        Assert.Equal(EpubPrivateDifferenceCategory.ApprovedWithApproximations, difference.Category);
+        Assert.Equal(EpubPrivateDifferenceCause.SourceApproximation, difference.Cause);
+        Assert.Equal(EpubPrivateDifferenceMetric.References, difference.Metric);
+    }
+
+    [Fact]
     public async Task AtomicWrite_CancellationPreservesExistingDestinationAndLeavesNoTemporaryFile()
     {
         var directory = Directory.CreateDirectory(Path.Combine(

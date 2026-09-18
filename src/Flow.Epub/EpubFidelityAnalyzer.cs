@@ -277,7 +277,8 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
             or EpubDiagnosticCodes.SvgImageSemanticLoss
             or EpubDiagnosticCodes.MathSemanticLoss
             or EpubDiagnosticCodes.EmbeddedFontBytesNotPreserved
-            or EpubDiagnosticCodes.LegacyPageMapNotImported)
+            or EpubDiagnosticCodes.LegacyPageMapNotImported
+            or EpubDiagnosticCodes.CssImageResourceNotPreserved)
         {
             return (EpubFidelityStatus.Approximated, EpubFidelityImpact.Minor);
         }

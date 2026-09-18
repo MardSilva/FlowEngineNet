@@ -58,6 +58,14 @@ The inspector and importer now recognize only that exact media type and emit `EP
 
 Two complete private qualifications produced byte-identical reports with SHA-256 `83B3DD8F8AD0C2492B615F31F57ED2F91AEC11E21AE980AF761F3770405649A0`. Two phase-level findings moved from `EPUB009` to `EPUB076`, while all 14 eligible publications retained the same canonical hashes as 21.6.4. The four measured lost units and three unrelated `EPUB009` findings remain explicit. Flow still has no page-list or source-page navigation model; that narrower boundary remains in `known-limitations.md`.
 
+### Final four private fidelity losses
+
+Four publications each retained one measured lost unit after the earlier real-world corrections. Direct inspection found two measurement mismatches and two omitted images rather than one shared cause.
+
+Image-only XHTML paragraphs now count as transformed when their output is a `Figure`; their images were already present, so these two corrections do not change either document. A linked image nested in transparent containers now becomes a `Figure` with its `FigureLink`. The final image reference differed from its manifest resource only by letter casing. Flow now uses the manifest path when the case-insensitive match is unique and records `EPUB077`; ambiguous matches remain missing instead of depending on the host file system.
+
+The two content recoveries add one figure each and correctly change only their two canonical hashes. Two complete qualifications produced byte-identical reports with SHA-256 `591BD560D37AB684E9B193390E3221AB73912C2C866B2CB6CCC8EDE35E9360E8`. All 14 eligible publications passed with zero measured lost units; the corrupt input remained skipped. The resulting matrix has 13 candidates with approximations, one with unrelated unsupported content, and one broken-source entry for the corrupt input.
+
 ### EPUB heading-level repair
 
 One private candidate originally stopped before layout because its XHTML repeatedly jumped from `h1` to `h3`. The importer now applies the smallest deterministic repair within each XHTML resource, keeps the first heading of every new chapter independent and emits `EPUB071` for every aggregated source pattern it changes. Manually created Flow documents remain subject to strict heading validation.
@@ -143,6 +151,12 @@ This replaced the failed assumption that independent Windows and Linux builds mu
 Human-readable CLI framing and review material now use resource catalogs for `en-US` and `pt-BR`. The HTML-book package also resolves generated interface text to English, `pt-PT` or `pt-BR` without translating authored content. Commands, JSON fields and diagnostic codes remain invariant.
 
 Original technical diagnostic details, runtime language switching and a complete localization audit remain current limitations.
+
+### CSS-only image resource classification
+
+The last generic `EPUB009` in the private corpus was a valid local JPEG referenced by an unsupported CSS background declaration. The CSS processor now resolves safe local image URLs relative to their stylesheet, including dot segments and percent-encoding, and records `EPUB078`. The image is accounted for as a presentation approximation instead of unsupported content; it does not enter `FlowDocument`, generated HTML or the canonical hash.
+
+External URLs, absolute paths, unsafe traversal, missing entries and non-image resources are not associated. The change deliberately does not claim support for CSS backgrounds or visual equivalence.
 
 ## Flow 0.1 foundation
 

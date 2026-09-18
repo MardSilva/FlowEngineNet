@@ -320,7 +320,9 @@ public sealed class EpubPrivateDifferenceMatrixService
             or EpubDiagnosticCodes.CssTargetNotRepresentable
             or EpubDiagnosticCodes.SvgImageSemanticLoss
             or EpubDiagnosticCodes.MathSemanticLoss
-            or EpubDiagnosticCodes.LegacyPageMapNotImported)
+            or EpubDiagnosticCodes.LegacyPageMapNotImported
+            or EpubDiagnosticCodes.ArchivePathCaseMismatchRecovered
+            or EpubDiagnosticCodes.CssImageResourceNotPreserved)
         {
             return (EpubPrivateDifferenceCategory.ApprovedWithApproximations,
                 EpubPrivateDifferenceCause.SourceApproximation);
@@ -423,7 +425,10 @@ public sealed class EpubPrivateDifferenceMatrixService
             or EpubDiagnosticCodes.MissingTableOfContentsTarget
             or EpubDiagnosticCodes.CircularTableOfContentsReference
             or EpubDiagnosticCodes.LinkedImageTargetNotRepresentable
-            or EpubDiagnosticCodes.LegacyPageMapNotImported) return EpubPrivateDifferenceMetric.References;
+            or EpubDiagnosticCodes.LegacyPageMapNotImported
+            or EpubDiagnosticCodes.ArchivePathCaseMismatchRecovered) return EpubPrivateDifferenceMetric.References;
+        if (code is EpubDiagnosticCodes.CssImageResourceNotPreserved)
+            return EpubPrivateDifferenceMetric.Assets;
         if (code.StartsWith("EPI", StringComparison.Ordinal)) return EpubPrivateDifferenceMetric.Inventory;
         if (code is EpubDiagnosticCodes.InvalidMetadata
             or EpubDiagnosticCodes.OrphanMetadataRefinement

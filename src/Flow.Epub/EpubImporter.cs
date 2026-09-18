@@ -767,6 +767,7 @@ public sealed class EpubImporter : IEpubImporter
                     : diagnostics.Any(diagnostic =>
                         diagnostic.Code is EpubDiagnosticCodes.EmbeddedFontBytesNotPreserved
                             or EpubDiagnosticCodes.LegacyPageMapNotImported
+                            or EpubDiagnosticCodes.CssImageResourceNotPreserved
                         && string.Equals(diagnostic.Resource, manifest.Path, StringComparison.Ordinal))
                         ? EpubFidelityStatus.Approximated
                     : (EpubFidelityStatus?)null;
@@ -788,7 +789,14 @@ public sealed class EpubImporter : IEpubImporter
                 xhtml.Item.Path,
                 body.DescendantNodes().OfType<XText>().Sum(static text => EpubFidelityAnalyzer.CountSignificant(text.Value)));
             Add(EpubFidelityMetric.Headings, xhtml.Item.Path, elements.LongCount(IsHeading));
-            Add(EpubFidelityMetric.Paragraphs, xhtml.Item.Path, elements.LongCount(static element => IsXhtml(element, "p")));
+            var paragraphs = elements.Where(static element => IsXhtml(element, "p")).ToArray();
+            var imageParagraphs = paragraphs.LongCount(ContainsMeasuredImage);
+            Add(EpubFidelityMetric.Paragraphs, xhtml.Item.Path, paragraphs.LongLength - imageParagraphs);
+            Add(
+                EpubFidelityMetric.Paragraphs,
+                xhtml.Item.Path,
+                imageParagraphs,
+                EpubFidelityStatus.Transformed);
             var ordinaryLinks = elements
                 .Where(static element => IsXhtml(element, "a")
                                          && HasHref(element)
@@ -874,6 +882,10 @@ public sealed class EpubImporter : IEpubImporter
 
     private static bool IsXhtml(XElement element, string localName) =>
         element.Name == XhtmlNamespace + localName;
+
+    private static bool ContainsMeasuredImage(XElement element) => element
+        .Descendants()
+        .Any(static descendant => IsXhtml(descendant, "img") || descendant.Name == SvgNamespace + "image");
 
     private static bool IsTransparentXhtmlContainer(XElement element) =>
         element.Name.Namespace == XhtmlNamespace
@@ -2413,7 +2425,22 @@ public sealed class EpubImporter : IEpubImporter
 
             foreach (var child in parent.Nodes())
             {
-                if (child is XText || child is XElement inlineElement && IsInlineElement(inlineElement))
+                if (child is XElement imageContainer
+                    && IsInlineElement(imageContainer)
+                    && imageContainer.Descendants().Any(IsExtractableInlineImage))
+                {
+                    FlushInlineBuffer();
+                    result.AddRange(await ConvertInlineContainerWithImagesAsync(
+                        imageContainer,
+                        resourcePath,
+                        cancellationToken).ConfigureAwait(false));
+                    continue;
+                }
+
+                if (child is XText
+                    || child is XElement inlineElement
+                    && IsInlineElement(inlineElement)
+                    && !IsExtractableInlineImage(inlineElement))
                 {
                     inlineBuffer.Add(child);
                     continue;
@@ -2428,6 +2455,43 @@ public sealed class EpubImporter : IEpubImporter
             }
 
             FlushInlineBuffer();
+            return result;
+        }
+
+        private async Task<IReadOnlyList<DocumentNode>> ConvertInlineContainerWithImagesAsync(
+            XElement container,
+            string resourcePath,
+            CancellationToken cancellationToken)
+        {
+            var result = new List<DocumentNode>();
+            foreach (var part in SplitInlineContent([container]))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (part.Image is not null)
+                {
+                    ReportUnsupported(
+                        part.Image,
+                        resourcePath,
+                        "Inline image promoted to an ordered Flow Figure inside a transparent block container");
+                    result.AddRange(await ConvertInlineImageAsync(
+                        part.Image,
+                        part.Image,
+                        resourcePath,
+                        cancellationToken).ConfigureAwait(false));
+                    continue;
+                }
+
+                var inline = ApplyInternationalization(
+                    container,
+                    ConvertInline(part.Nodes, resourcePath),
+                    resourcePath,
+                    inherit: true);
+                if (HasVisibleText(inline))
+                {
+                    result.Add(new Paragraph(GeneratedIdFor(container, "container-text"), inline));
+                }
+            }
+
             return result;
         }
 
@@ -3704,11 +3768,24 @@ public sealed class EpubImporter : IEpubImporter
             var initial = manifest.Values.FirstOrDefault(item => string.Equals(item.Path, requestedPath, StringComparison.Ordinal));
             if (initial is null)
             {
+                var caseInsensitiveMatches = manifest.Values
+                    .Where(item => string.Equals(item.Path, requestedPath, StringComparison.OrdinalIgnoreCase))
+                    .OrderBy(static item => item.Path, StringComparer.Ordinal)
+                    .ToArray();
+                if (caseInsensitiveMatches.Length != 1)
+                {
+                    diagnostics.Add(Warning(
+                        EpubDiagnosticCodes.MissingResource,
+                        $"The {usage} references '{requestedPath}', which is absent from the manifest.",
+                        requestedPath));
+                    return null;
+                }
+
+                initial = caseInsensitiveMatches[0];
                 diagnostics.Add(Warning(
-                    EpubDiagnosticCodes.MissingResource,
-                    $"The {usage} references '{requestedPath}', which is absent from the manifest.",
+                    EpubDiagnosticCodes.ArchivePathCaseMismatchRecovered,
+                    $"The {usage} references '{requestedPath}' with different letter casing; the unique manifest resource '{initial.Path}' was used.",
                     requestedPath));
-                return null;
             }
 
             var visited = new HashSet<string>(StringComparer.Ordinal);

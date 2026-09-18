@@ -37,6 +37,8 @@ Manifest destination counts describe resources accepted by the bounded import pi
 
 Each safe image occurrence that becomes a `Figure` counts as a transformed image, even when its bytes are shared with another occurrence through asset deduplication. An image originally placed inside a paragraph is segmented into a figure between ordered text blocks. The image is therefore represented, while the exact inline-versus-block distinction remains an explicit `EPUB010` approximation.
 
+A paragraph whose semantic output is one or more figures is counted as transformed rather than lost. Its image and any visible text remain measured by their own destination units. This avoids treating an image-only XHTML wrapper as missing paragraph content while keeping empty paragraphs and failed image imports visible through the ordinary source/destination reconciliation.
+
 ## CLI
 
 Use the report alongside, or independently from, the diagnostic JSON:
