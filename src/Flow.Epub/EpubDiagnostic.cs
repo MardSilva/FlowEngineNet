@@ -76,6 +76,7 @@ public static class EpubDiagnosticCodes
     public const string SvgImageFallbackUsed = "EPUB068";
     public const string SvgImageSemanticLoss = "EPUB069";
     public const string UnsupportedManifestProperty = "EPUB070";
+    public const string HeadingLevelNormalized = "EPUB071";
     public const string InvalidCssValue = "EPUB050";
     public const string ExternalStylesheetBlocked = "EPUB051";
     public const string CssTargetNotRepresentable = "EPUB052";

@@ -49,6 +49,8 @@ The CLI option `--fidelity-report <fidelity.json>` writes the deterministic repo
 
 Media overlays are never played or fetched. `EPUB031` reports each declaration and unresolved overlay reference. Other processing diagnostics are `EPUB028` circular fallback, `EPUB029` broken fallback, `EPUB030` repeated spine item, `EPUB032` invalid linear value, and `EPUB033` duplicate manifest resource path. `EPUB070` identifies an unsupported manifest property without incorrectly classifying the referenced resource itself as unsupported. A Navigation Document or NCX used during import is also counted as consumed package input rather than abandoned content.
 
+Heading sequences are checked within each imported XHTML resource. When the source skips upward from one level to a deeper nonadjacent level, such as `h1` to `h3`, the importer clamps the deeper heading to the next valid level and reports `EPUB071`. The first heading in another spine document starts an independent sequence. This keeps the resulting `FlowDocument` valid without hiding the source approximation or changing IDs, text, anchors, or reading order.
+
 Internal XHTML links are translated to stable Flow anchors when their targets can be represented. IDs on inline-only constructs are explicitly diagnosed and mapped to the nearest containing semantic block. External `http`, `https`, and `mailto` links are retained. Unknown schemes are not activated.
 
 ## Images, covers, and asset safety

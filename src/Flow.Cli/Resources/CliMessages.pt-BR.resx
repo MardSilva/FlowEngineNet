@@ -32,6 +32,10 @@
   <data name="HelpImport2" xml:space="preserve"><value>    [--metadata-json &lt;metadados.json&gt;] [--processing-json &lt;processamento.json&gt;] [--source-map-json &lt;mapa.json&gt;]</value></data>
   <data name="HelpImport3" xml:space="preserve"><value>    Sem --output, o nome do arquivo é derivado do título importado.</value></data>
   <data name="HelpEpubInspect" xml:space="preserve"><value>  flow epub-inspect &lt;livro.epub&gt; [--json &lt;relatório.json&gt;]    Inspeciona a estrutura do EPUB.</value></data>
+  <data name="HelpEpubInventory1" xml:space="preserve"><value>  flow epub-inventory &lt;diretório&gt; --output &lt;catálogo.json&gt; --repository-root &lt;diretório-absoluto&gt; [--force]</value></data>
+  <data name="HelpEpubInventory2" xml:space="preserve"><value>    Cria um catálogo local neutro sem persistir caminhos, títulos, autores, identificadores ou conteúdo.</value></data>
+  <data name="HelpEpubInventoryQualify1" xml:space="preserve"><value>  flow epub-inventory-qualify &lt;diretório&gt; --report &lt;relatório.json&gt; --repository-root &lt;diretório-absoluto&gt; --legal-use --drm-free</value></data>
+  <data name="HelpEpubInventoryQualify2" xml:space="preserve"><value>    [--force] [--resume]    Qualifica duas vezes cada candidato neutro elegível pela pipeline completa do Flow.</value></data>
   <data name="HelpCorpus1" xml:space="preserve"><value>  flow corpus &lt;manifesto.json&gt; --repository-root &lt;diretório&gt; --report &lt;relatório.json&gt;</value></data>
   <data name="HelpCorpus2" xml:space="preserve"><value>    [--external-root &lt;diretório&gt;] [--baseline &lt;baseline.json&gt;] [--force] [--resume]    Executa a qualificação offline repetida do corpus.</value></data>
   <data name="HelpEpubQualify1" xml:space="preserve"><value>  flow epub-qualify &lt;livro.epub&gt; --candidate-id &lt;id&gt; --sha256 &lt;hash&gt; --report &lt;relatório.json&gt;</value></data>
@@ -75,6 +79,13 @@
   <data name="Severity_Warning" xml:space="preserve"><value>Aviso</value></data>
   <data name="Severity_Error" xml:space="preserve"><value>Erro</value></data>
   <data name="ErrorInspectOnlyEpub" xml:space="preserve"><value>epub-inspect aceita apenas arquivos .epub.</value></data>
+  <data name="ErrorInventoryRepositoryPath" xml:space="preserve"><value>A origem do inventário e sua saída devem permanecer fora do repositório.</value></data>
+  <data name="ErrorInventorySourceOutput" xml:space="preserve"><value>O catálogo do inventário deve permanecer fora da pasta que contém os EPUBs.</value></data>
+  <data name="ErrorInventoryOutputExists" xml:space="preserve"><value>A saída do inventário já existe. Use --force para substituir um catálogo reconhecido.</value></data>
+  <data name="ErrorInventoryOutputUnrecognized" xml:space="preserve"><value>--force recusou substituir um arquivo que não é um catálogo privado reconhecido pelo Flow.</value></data>
+  <data name="ErrorInventoryQualificationAbsolutePaths" xml:space="preserve"><value>O relatório de qualificação e a raiz do repositório devem usar caminhos absolutos.</value></data>
+  <data name="ErrorInventoryQualificationRepositoryPath" xml:space="preserve"><value>A origem privada e o relatório de qualificação devem permanecer fora do repositório.</value></data>
+  <data name="ErrorInventoryQualificationSourceOutput" xml:space="preserve"><value>O relatório de qualificação privada deve permanecer fora da pasta que contém os EPUBs.</value></data>
   <data name="ErrorImportOnlyEpub" xml:space="preserve"><value>O comando import aceita apenas arquivos .epub nesta versão.</value></data>
   <data name="ErrorJsonSourceConflict" xml:space="preserve"><value>O relatório JSON deve usar um caminho diferente do EPUB de origem.</value></data>
   <data name="ErrorOutputSourceConflict" xml:space="preserve"><value>A saída deve usar um caminho diferente do EPUB de origem.</value></data>
@@ -137,6 +148,11 @@
   <data name="LabelProcessingJson" xml:space="preserve"><value>JSON de processamento: {0}</value></data>
   <data name="LabelSourceMapJson" xml:space="preserve"><value>JSON do mapa de origem: {0}</value></data>
   <data name="LabelCorpusManifest" xml:space="preserve"><value>Manifesto do corpus: {0}</value></data>
+  <data name="LabelInventoryReport" xml:space="preserve"><value>Inventário privado de EPUBs: {0}</value></data>
+  <data name="LabelInventoryFiles" xml:space="preserve"><value>Arquivos EPUB encontrados: {0}; conteúdos distintos: {1}.</value></data>
+  <data name="LabelInventorySummary" xml:space="preserve"><value>Inventário: {0} prontos, {1} para revisão, {2} protegidos, {3} corrompidos e {4} inadequados.</value></data>
+  <data name="LabelInventoryQualificationReport" xml:space="preserve"><value>Relatório privado de qualificação dos EPUBs: {0}</value></data>
+  <data name="LabelInventoryQualificationSummary" xml:space="preserve"><value>Qualificação: {0} no total, {1} elegíveis, {2} aprovados, {3} reprovados, {4} inconclusivos, {5} não determinísticos e {6} ignorados.</value></data>
   <data name="LabelCorpusReport" xml:space="preserve"><value>Relatório de qualificação do corpus: {0}</value></data>
   <data name="LabelCorpusTotal" xml:space="preserve"><value>Publicações do corpus: {0}</value></data>
   <data name="LabelCorpusSummary" xml:space="preserve"><value>Resultado do corpus: {0} aprovadas, {1} com falha, {2} ignoradas e {3} inconclusivas.</value></data>
@@ -274,6 +290,7 @@
   <data name="Diagnostic_EPUB068" xml:space="preserve"><value>Foi utilizado um fallback de imagem SVG.</value></data>
   <data name="Diagnostic_EPUB069" xml:space="preserve"><value>Parte da semântica da imagem SVG não pôde ser preservada.</value></data>
   <data name="Diagnostic_EPUB070" xml:space="preserve"><value>Uma propriedade do manifesto está fora do subconjunto suportado.</value></data>
+  <data name="Diagnostic_EPUB071" xml:space="preserve"><value>Um salto de nível de título do EPUB foi normalizado.</value></data>
   <data name="Diagnostic_EPC001" xml:space="preserve"><value>O JSON do manifesto do corpus é inválido.</value></data>
   <data name="Diagnostic_EPC002" xml:space="preserve"><value>A codificação do manifesto do corpus é inválida.</value></data>
   <data name="Diagnostic_EPC003" xml:space="preserve"><value>O formato do manifesto do corpus não é suportado.</value></data>

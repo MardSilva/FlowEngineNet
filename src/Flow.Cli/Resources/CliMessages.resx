@@ -32,6 +32,10 @@
   <data name="HelpImport2" xml:space="preserve"><value>    [--metadata-json &lt;metadata.json&gt;] [--processing-json &lt;processing.json&gt;] [--source-map-json &lt;source-map.json&gt;]</value></data>
   <data name="HelpImport3" xml:space="preserve"><value>    Without --output, the file name is derived from the imported book title.</value></data>
   <data name="HelpEpubInspect" xml:space="preserve"><value>  flow epub-inspect &lt;book.epub&gt; [--json &lt;report.json&gt;]       Inspect EPUB structure.</value></data>
+  <data name="HelpEpubInventory1" xml:space="preserve"><value>  flow epub-inventory &lt;directory&gt; --output &lt;catalog.json&gt; --repository-root &lt;absolute-directory&gt; [--force]</value></data>
+  <data name="HelpEpubInventory2" xml:space="preserve"><value>    Build a neutral local catalog without persisting paths, titles, authors, identifiers, or content.</value></data>
+  <data name="HelpEpubInventoryQualify1" xml:space="preserve"><value>  flow epub-inventory-qualify &lt;directory&gt; --report &lt;report.json&gt; --repository-root &lt;absolute-directory&gt; --legal-use --drm-free</value></data>
+  <data name="HelpEpubInventoryQualify2" xml:space="preserve"><value>    [--force] [--resume]    Qualify every eligible neutral candidate twice through the complete Flow pipeline.</value></data>
   <data name="HelpCorpus1" xml:space="preserve"><value>  flow corpus &lt;manifest.json&gt; --repository-root &lt;directory&gt; --report &lt;report.json&gt;</value></data>
   <data name="HelpCorpus2" xml:space="preserve"><value>    [--external-root &lt;directory&gt;] [--baseline &lt;baseline.json&gt;] [--force] [--resume]    Run repeated offline corpus qualification.</value></data>
   <data name="HelpEpubQualify1" xml:space="preserve"><value>  flow epub-qualify &lt;book.epub&gt; --candidate-id &lt;id&gt; --sha256 &lt;hash&gt; --report &lt;report.json&gt;</value></data>
@@ -75,6 +79,13 @@
   <data name="Severity_Warning" xml:space="preserve"><value>Warning</value></data>
   <data name="Severity_Error" xml:space="preserve"><value>Error</value></data>
   <data name="ErrorInspectOnlyEpub" xml:space="preserve"><value>epub-inspect accepts only .epub files.</value></data>
+  <data name="ErrorInventoryRepositoryPath" xml:space="preserve"><value>The inventory source and output must remain outside the repository.</value></data>
+  <data name="ErrorInventorySourceOutput" xml:space="preserve"><value>The inventory catalog must remain outside the source EPUB directory.</value></data>
+  <data name="ErrorInventoryOutputExists" xml:space="preserve"><value>The inventory output already exists. Use --force to replace a recognized inventory catalog.</value></data>
+  <data name="ErrorInventoryOutputUnrecognized" xml:space="preserve"><value>--force refused to replace a file that is not a recognized Flow private inventory catalog.</value></data>
+  <data name="ErrorInventoryQualificationAbsolutePaths" xml:space="preserve"><value>The qualification report and repository root must use absolute paths.</value></data>
+  <data name="ErrorInventoryQualificationRepositoryPath" xml:space="preserve"><value>The private source and qualification report must remain outside the repository.</value></data>
+  <data name="ErrorInventoryQualificationSourceOutput" xml:space="preserve"><value>The private qualification report must remain outside the source EPUB directory.</value></data>
   <data name="ErrorImportOnlyEpub" xml:space="preserve"><value>The import command currently accepts only .epub files.</value></data>
   <data name="ErrorJsonSourceConflict" xml:space="preserve"><value>The JSON report path must differ from the EPUB source path.</value></data>
   <data name="ErrorOutputSourceConflict" xml:space="preserve"><value>The output path must differ from the EPUB source path.</value></data>
@@ -137,6 +148,11 @@
   <data name="LabelProcessingJson" xml:space="preserve"><value>Processing JSON: {0}</value></data>
   <data name="LabelSourceMapJson" xml:space="preserve"><value>Source map JSON: {0}</value></data>
   <data name="LabelCorpusManifest" xml:space="preserve"><value>Corpus manifest: {0}</value></data>
+  <data name="LabelInventoryReport" xml:space="preserve"><value>Private EPUB inventory: {0}</value></data>
+  <data name="LabelInventoryFiles" xml:space="preserve"><value>Discovered EPUB files: {0}; distinct payloads: {1}.</value></data>
+  <data name="LabelInventorySummary" xml:space="preserve"><value>Inventory: {0} ready, {1} requiring review, {2} protected, {3} corrupt, and {4} unsuitable.</value></data>
+  <data name="LabelInventoryQualificationReport" xml:space="preserve"><value>Private EPUB qualification report: {0}</value></data>
+  <data name="LabelInventoryQualificationSummary" xml:space="preserve"><value>Qualification: {0} total, {1} eligible, {2} passed, {3} failed, {4} inconclusive, {5} nondeterministic, and {6} skipped.</value></data>
   <data name="LabelCorpusReport" xml:space="preserve"><value>Corpus qualification report: {0}</value></data>
   <data name="LabelCorpusTotal" xml:space="preserve"><value>Corpus publications: {0}</value></data>
   <data name="LabelCorpusSummary" xml:space="preserve"><value>Corpus result: {0} passed, {1} failed, {2} skipped, {3} inconclusive.</value></data>
@@ -274,6 +290,7 @@
   <data name="Diagnostic_EPUB068" xml:space="preserve"><value>An SVG image fallback was used.</value></data>
   <data name="Diagnostic_EPUB069" xml:space="preserve"><value>Some SVG image semantics could not be preserved.</value></data>
   <data name="Diagnostic_EPUB070" xml:space="preserve"><value>A manifest property is outside the supported subset.</value></data>
+  <data name="Diagnostic_EPUB071" xml:space="preserve"><value>A skipped EPUB heading level was normalized.</value></data>
   <data name="Diagnostic_EPC001" xml:space="preserve"><value>The corpus manifest JSON is invalid.</value></data>
   <data name="Diagnostic_EPC002" xml:space="preserve"><value>The corpus manifest encoding is invalid.</value></data>
   <data name="Diagnostic_EPC003" xml:space="preserve"><value>The corpus manifest format is unsupported.</value></data>

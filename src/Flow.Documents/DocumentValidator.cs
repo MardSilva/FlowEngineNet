@@ -105,10 +105,26 @@ public sealed class DocumentValidator
         FlowDocument document,
         ImmutableArray<ValidationDiagnostic>.Builder diagnostics)
     {
-        Heading? previousHeading = null;
+        IEqualityComparer<DocumentNode> nodeComparer = ReferenceEqualityComparer.Instance;
+        Heading? previousRootHeading = null;
+        var previousByChapter = new Dictionary<Chapter, Heading>(ReferenceEqualityComparer.Instance);
+        var parents = document.Index.Locations.ToDictionary(
+            static location => location.Node,
+            static location => location.Parent,
+            nodeComparer);
 
-        foreach (var heading in document.Index.Locations.Select(static location => location.Node).OfType<Heading>())
+        foreach (var location in document.Index.Locations)
         {
+            if (location.Node is not Heading heading)
+            {
+                continue;
+            }
+
+            var chapter = FindChapter(location.Parent, parents);
+            var previousHeading = chapter is null
+                ? previousRootHeading
+                : previousByChapter.GetValueOrDefault(chapter);
+
             if (heading.Level is < 1 or > 6)
             {
                 diagnostics.Add(Error(
@@ -124,7 +140,31 @@ public sealed class DocumentValidator
                     heading.Id));
             }
 
-            previousHeading = heading;
+            if (chapter is null)
+            {
+                previousRootHeading = heading;
+            }
+            else
+            {
+                previousByChapter[chapter] = heading;
+            }
+        }
+
+        static Chapter? FindChapter(
+            DocumentNode? node,
+            IReadOnlyDictionary<DocumentNode, DocumentNode?> parents)
+        {
+            while (node is not null)
+            {
+                if (node is Chapter chapter)
+                {
+                    return chapter;
+                }
+
+                node = parents.GetValueOrDefault(node);
+            }
+
+            return null;
         }
     }
 

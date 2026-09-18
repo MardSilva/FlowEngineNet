@@ -1196,11 +1196,13 @@ public sealed class EpubImporter : IEpubImporter
         private readonly Dictionary<string, int> approximatedAnchors = new(StringComparer.Ordinal);
         private readonly Dictionary<UnsupportedElementKey, int> mathLosses = [];
         private readonly Dictionary<SvgImageIssueKey, int> svgImageIssues = [];
+        private readonly Dictionary<HeadingLevelNormalizationKey, int> headingLevelNormalizations = [];
         private readonly HashSet<XElement> footnoteElements = [];
         private readonly Dictionary<XElement, NodeId> footnoteReferenceTargets = [];
         private readonly HashSet<XElement> invalidFootnoteReferences = [];
         private IReadOnlyDictionary<XElement, TypographyStyle> cssStyles = new Dictionary<XElement, TypographyStyle>();
         private AssetId? coverAssetId;
+        private int? previousHeadingLevel;
         private int generatedId;
 
         internal ConversionContext(
@@ -1321,6 +1323,18 @@ public sealed class EpubImporter : IEpubImporter
                 diagnostics.Add(Warning(
                     key.Code,
                     $"{key.Message} This occurred {occurrenceText}.",
+                    key.ResourcePath));
+            }
+
+            foreach (var (key, count) in headingLevelNormalizations
+                         .OrderBy(static item => item.Key.ResourcePath, StringComparer.Ordinal)
+                         .ThenBy(static item => item.Key.SourceLevel)
+                         .ThenBy(static item => item.Key.NormalizedLevel))
+            {
+                var occurrenceText = count == 1 ? "one heading" : $"{count} headings";
+                diagnostics.Add(Warning(
+                    EpubDiagnosticCodes.HeadingLevelNormalized,
+                    $"Normalized {occurrenceText} from source level {key.SourceLevel} to level {key.NormalizedLevel} to preserve a valid heading sequence within the XHTML resource.",
                     key.ResourcePath));
             }
         }
@@ -2075,6 +2089,7 @@ public sealed class EpubImporter : IEpubImporter
         internal async Task<Chapter> ConvertChapterAsync(XhtmlModel xhtml, CancellationToken cancellationToken)
         {
             var body = xhtml.Document.Root!.Element(XhtmlNamespace + "body")!;
+            previousHeadingLevel = null;
             var children = await ConvertChildrenAsync(body, xhtml.Item.Path, cancellationToken).ConfigureAwait(false);
 
             if (children.Count == 0)
@@ -2086,6 +2101,23 @@ public sealed class EpubImporter : IEpubImporter
             }
 
             return new Chapter(elementIds[body], children);
+        }
+
+        private int NormalizeHeadingLevel(int sourceLevel, string resourcePath)
+        {
+            var normalizedLevel = previousHeadingLevel is { } previous
+                                  && sourceLevel > previous + 1
+                ? previous + 1
+                : sourceLevel;
+
+            if (normalizedLevel != sourceLevel)
+            {
+                var key = new HeadingLevelNormalizationKey(resourcePath, sourceLevel, normalizedLevel);
+                headingLevelNormalizations[key] = headingLevelNormalizations.GetValueOrDefault(key) + 1;
+            }
+
+            previousHeadingLevel = normalizedLevel;
+            return normalizedLevel;
         }
 
         private async Task<IEnumerable<DocumentNode>> ConvertBlockAsync(
@@ -2143,7 +2175,9 @@ public sealed class EpubImporter : IEpubImporter
                 case "h4":
                 case "h5":
                 case "h6":
-                    return [new Heading(IdFor(element, "heading"), name[1] - '0', ConvertInlineContent(element, resourcePath))];
+                    var sourceLevel = name[1] - '0';
+                    var normalizedLevel = NormalizeHeadingLevel(sourceLevel, resourcePath);
+                    return [new Heading(IdFor(element, "heading"), normalizedLevel, ConvertInlineContent(element, resourcePath))];
                 case "p":
                     return await ConvertParagraphAsync(element, resourcePath, cancellationToken).ConfigureAwait(false);
                 case "ol":
@@ -4221,6 +4255,11 @@ public sealed class EpubImporter : IEpubImporter
         private readonly record struct SourceLocationKey(string ResourcePath, string? Fragment);
 
         private readonly record struct SvgImageIssueKey(string Code, string Message, string ResourcePath);
+
+        private readonly record struct HeadingLevelNormalizationKey(
+            string ResourcePath,
+            int SourceLevel,
+            int NormalizedLevel);
 
         private sealed record InlineContentPart(IReadOnlyList<XNode> Nodes, XElement? Image);
 

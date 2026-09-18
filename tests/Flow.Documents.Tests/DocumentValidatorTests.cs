@@ -98,6 +98,26 @@ public sealed class DocumentValidatorTests
     }
 
     [Fact]
+    public void Validate_TreatsHeadingSequencesInSeparateChaptersIndependently()
+    {
+        var document = CreateDocument(
+        [
+            new Chapter(
+                new NodeId("chapter-one"),
+                [new Heading(new NodeId("heading-one"), 1, [new Text("One")])]),
+            new Chapter(
+                new NodeId("chapter-two"),
+                [new Heading(new NodeId("heading-three"), 3, [new Text("Independent")])]),
+        ]);
+
+        var result = _validator.Validate(document);
+
+        Assert.DoesNotContain(
+            result.Diagnostics,
+            diagnostic => diagnostic.Code == ValidationDiagnosticCodes.InvalidHeadingLevel);
+    }
+
+    [Fact]
     public void Validate_ReportsInvalidAndUnresolvedFlowLinks()
     {
         var document = CreateDocument(

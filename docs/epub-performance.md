@@ -1,6 +1,6 @@
 # EPUB performance, progress, and cancellation
 
-Prompt 17 adds observation and cancellation contracts for large-publication experiments. These measurements are runtime evidence only: they are excluded from `FlowDocument`, `.flow.json`, canonical bytes, hashes, signatures, and deterministic HTML payloads.
+Increment 17 adds observation and cancellation contracts for large-publication experiments. These measurements are runtime evidence only: they are excluded from `FlowDocument`, `.flow.json`, canonical bytes, hashes, signatures, and deterministic HTML payloads.
 
 ## Typed observations
 
@@ -42,7 +42,7 @@ CLI final outputs use temporary files/directories. Cancellation or failure remov
 - corpus mobile and desktop packages are laid out, rendered, verified, summarized, and released sequentially;
 - HTML package verification retains path and ID indexes instead of every parsed XML tree at once.
 
-The EPUB ZIP is still buffered in memory to provide bounded, seekable `ZipArchive` processing. During one package phase, XML trees, the semantic document, standalone HTML used by package splitting, and that package's files can coexist temporarily. These are known remaining memory costs for Prompt 19 measurement, not evidence of a universal supported book size.
+The EPUB ZIP is still buffered in memory to provide bounded, seekable `ZipArchive` processing. During one package phase, XML trees, the semantic document, standalone HTML used by package splitting, and that package's files can coexist temporarily. These are known remaining memory costs for the increment 19 measurement, not evidence of a universal supported book size.
 
 ## Recommended host limits
 

@@ -229,6 +229,10 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
                 StringComparison.Ordinal))
             ?.Value;
 
+        var languages = metadata?.Elements(DcNamespace + "language")
+            .Select(static element => NormalizedText(element.Value))
+            .Where(static value => value.Length > 0)
+            .ToArray() ?? [];
         var package = new EpubPackageInfo(
             packagePath,
             declaredVersion,
@@ -236,11 +240,12 @@ public sealed class EpubPublicationInspector : IEpubPublicationInspector
             uniqueIdentifierId,
             identifier is null ? null : NormalizedOptional(identifier.Value),
             title,
-            FirstMetadataValue(metadata, DcNamespace + "language"),
+            languages.FirstOrDefault(),
             creators,
             FirstMetadataValue(metadata, DcNamespace + "publisher"),
             FirstMetadataValue(metadata, DcNamespace + "description"),
-            NormalizedOptional(modified));
+            NormalizedOptional(modified),
+            languages);
 
         var manifest = new List<EpubManifestItemInfo>();
         var manifestById = new Dictionary<string, EpubManifestItemInfo>(StringComparer.Ordinal);

@@ -20,6 +20,19 @@ public sealed record ImportEpubCommand(
 
 public sealed record InspectEpubCommand(string SourcePath, string? JsonOutputPath) : CliCommand;
 
+public sealed record InventoryEpubCommand(
+    string SourceDirectory,
+    string OutputPath,
+    string RepositoryRoot,
+    bool Force = false) : CliCommand;
+
+public sealed record QualifyEpubInventoryCommand(
+    string SourceDirectory,
+    string ReportPath,
+    string RepositoryRoot,
+    bool Force = false,
+    bool Resume = false) : CliCommand;
+
 public sealed record CorpusCommand(
     string ManifestPath,
     string RepositoryRoot,

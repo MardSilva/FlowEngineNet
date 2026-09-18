@@ -24,7 +24,8 @@ public sealed record EpubPackageInfo
         IEnumerable<string> creators,
         string? publisher = null,
         string? description = null,
-        string? modified = null)
+        string? modified = null,
+        IEnumerable<string>? languages = null)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         ArgumentNullException.ThrowIfNull(creators);
@@ -40,6 +41,11 @@ public sealed record EpubPackageInfo
         Publisher = publisher;
         Description = description;
         Modified = modified;
+        Languages = (languages ?? (language is null ? [] : [language]))
+            .Where(static value => !string.IsNullOrWhiteSpace(value))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .Order(StringComparer.OrdinalIgnoreCase)
+            .ToImmutableArray();
     }
 
     public string Path { get; }
@@ -55,6 +61,9 @@ public sealed record EpubPackageInfo
     public string? Title { get; }
 
     public string? Language { get; }
+
+    /// <summary>Gets every non-empty language declared by the package in deterministic order.</summary>
+    public ImmutableArray<string> Languages { get; }
 
     public ImmutableArray<string> Creators { get; }
 

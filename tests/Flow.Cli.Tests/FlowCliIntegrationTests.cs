@@ -844,6 +844,79 @@ public sealed class FlowCliIntegrationTests
     }
 
     [Fact]
+    public async Task EpubInventory_WritesNeutralCatalogAndRequiresForceForRecognizedReplacement()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var repositoryRoot = Directory.CreateDirectory(workspace.PathOf("repository")).FullName;
+        var sourceDirectory = Directory.CreateDirectory(workspace.PathOf("private-books")).FullName;
+        var outputDirectory = Directory.CreateDirectory(workspace.PathOf("private-reports")).FullName;
+        var epubPath = Path.Combine(sourceDirectory, "identifying-file-name.epub");
+        var outputPath = Path.Combine(outputDirectory, "inventory.json");
+        CreateMinimalEpub(epubPath, "Identifying private title");
+        var application = FlowCliApplication.CreateDefault();
+
+        var first = await RunAsync(
+            application,
+            [
+                "--language", "pt-BR", "--banner", "epub-inventory", sourceDirectory,
+                "--output", outputPath, "--repository-root", repositoryRoot,
+            ]);
+        var refused = await RunAsync(
+            application,
+            [
+                "epub-inventory", sourceDirectory,
+                "--output", outputPath, "--repository-root", repositoryRoot,
+            ]);
+        var replaced = await RunAsync(
+            application,
+            [
+                "epub-inventory", sourceDirectory,
+                "--output", outputPath, "--repository-root", repositoryRoot, "--force",
+            ]);
+
+        Assert.Equal(0, first.ExitCode);
+        Assert.Contains("Flow Engine .NET", first.Output, StringComparison.Ordinal);
+        Assert.Contains("Arquivos EPUB encontrados: 1; conteúdos distintos: 1.", first.Output, StringComparison.Ordinal);
+        Assert.Equal(1, refused.ExitCode);
+        Assert.Contains("FLOWCLI_OUTPUT_EXISTS", refused.Error, StringComparison.Ordinal);
+        Assert.Equal(0, replaced.ExitCode);
+        var json = await File.ReadAllTextAsync(outputPath);
+        Assert.Contains(EpubPrivateInventoryReport.CurrentFormat, json, StringComparison.Ordinal);
+        Assert.DoesNotContain(sourceDirectory, json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("identifying-file-name", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Identifying private title", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task EpubInventoryQualification_RunsEligibleBooksTwiceAndWritesNeutralReport()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var repositoryRoot = Directory.CreateDirectory(workspace.PathOf("repository")).FullName;
+        var sourceDirectory = Directory.CreateDirectory(workspace.PathOf("private-books")).FullName;
+        var reportDirectory = Directory.CreateDirectory(workspace.PathOf("private-reports")).FullName;
+        var epubPath = Path.Combine(sourceDirectory, "identifying-file-name.epub");
+        var reportPath = Path.Combine(reportDirectory, "qualification.json");
+        CreateMinimalEpub(epubPath, "Identifying private title");
+
+        var result = await RunAsync(
+            FlowCliApplication.CreateDefault(),
+            [
+                "--language", "pt-BR", "epub-inventory-qualify", sourceDirectory,
+                "--report", reportPath, "--repository-root", repositoryRoot,
+                "--legal-use", "--drm-free",
+            ]);
+
+        Assert.Equal(0, result.ExitCode);
+        Assert.Contains("1 elegíveis, 1 aprovados", result.Output, StringComparison.Ordinal);
+        var json = await File.ReadAllTextAsync(reportPath);
+        Assert.Contains(EpubPrivateQualificationReport.CurrentFormat, json, StringComparison.Ordinal);
+        Assert.Contains("\"deterministicAcrossRepeatedRuns\": true", json, StringComparison.Ordinal);
+        Assert.DoesNotContain(sourceDirectory, json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("identifying-file-name", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Identifying private title", json, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task PortugueseReports_AreLocalizedWithoutChangingGeneratedDocumentBytes()
     {
         using var workspace = new TemporaryWorkspace();

@@ -43,6 +43,57 @@ public sealed class EpubImporterTests
         Assert.Equal("image/png", document.Assets[figure.AssetId].MediaType);
     }
 
+    [Fact]
+    public async Task ImportAsync_NormalizesSkippedHeadingLevelsPerChapterDeterministically()
+    {
+        const string chapterOne = """
+            <html xmlns="http://www.w3.org/1999/xhtml">
+              <body>
+                <h1 id="one">One</h1>
+                <h3 id="two">Two</h3>
+                <h3 id="three">Three</h3>
+                <h4 id="four">Four</h4>
+              </body>
+            </html>
+            """;
+        const string chapterTwo = """
+            <html xmlns="http://www.w3.org/1999/xhtml">
+              <body><h3 id="independent">Independent chapter</h3></body>
+            </html>
+            """;
+        await using var source = MinimalEpubFactory.Create(chapterOne: chapterOne, chapterTwo: chapterTwo);
+        var bytes = source.ToArray();
+
+        var first = await new EpubImporter().ImportAsync(new MemoryStream(bytes, writable: false));
+        var second = await new EpubImporter().ImportAsync(new MemoryStream(bytes, writable: false));
+
+        Assert.True(first.IsSuccess, string.Join(Environment.NewLine, first.Diagnostics));
+        Assert.True(second.IsSuccess, string.Join(Environment.NewLine, second.Diagnostics));
+        var firstDocument = Assert.IsType<FlowDocument>(first.Document);
+        var secondDocument = Assert.IsType<FlowDocument>(second.Document);
+        var firstChapters = firstDocument.Content.Children.Cast<Chapter>().ToArray();
+        Assert.Equal([1, 2, 3, 4], firstChapters[0].Children.OfType<Heading>().Select(static heading => heading.Level));
+        Assert.Equal([3], firstChapters[1].Children.OfType<Heading>().Select(static heading => heading.Level));
+        Assert.Equal(
+            firstDocument.Index.Locations.Select(static location => location.Node.Id),
+            secondDocument.Index.Locations.Select(static location => location.Node.Id));
+        Assert.Equal(first.Diagnostics.ToArray(), second.Diagnostics.ToArray());
+
+        var normalization = Assert.Single(first.Diagnostics, static diagnostic =>
+            diagnostic.Code == EpubDiagnosticCodes.HeadingLevelNormalized);
+        Assert.Equal(EpubDiagnosticSeverity.Warning, normalization.Severity);
+        Assert.Equal("EPUB/text/chapter-1.xhtml", normalization.Resource);
+        Assert.DoesNotContain(
+            first.Diagnostics,
+            static diagnostic => diagnostic.Code == EpubDiagnosticCodes.DocumentValidation);
+
+        var fidelity = new EpubFidelityAnalyzer().Analyze(first);
+        Assert.Contains(fidelity.Findings, static finding =>
+            finding.RelatedDiagnosticCode == EpubDiagnosticCodes.HeadingLevelNormalized
+            && finding.Status == EpubFidelityStatus.Approximated);
+        Assert.Equal(0, fidelity.Summary.LostCount);
+    }
+
     private static IEnumerable<InlineNode> DescendantsAndSelf(InlineNode node)
     {
         yield return node;

@@ -40,6 +40,8 @@ Every stable EPUB, document-validation and Flow JSON diagnostic code currently h
 flow sample [output]
 flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>] [--fidelity-report <fidelity.json>]
 flow epub-inspect <book.epub> [--json <report.json>]
+flow epub-inventory <directory> --output <catalog.json> --repository-root <absolute-directory> [--force]
+flow epub-inventory-qualify <directory> --report <report.json> --repository-root <absolute-directory> --legal-use --drm-free [--force] [--resume]
 flow corpus <manifest.json> --repository-root <directory> --report <report.json> [--external-root <directory>] [--baseline <baseline.json>] [--force] [--resume]
 flow epub-qualify <book.epub> --candidate-id <id> --sha256 <hash> --report <report.json> --repository-root <absolute-directory> --legal-use --drm-free [--repetitions <n>] [--include-environment] [--force] [--resume]
 flow epub-review <book.epub> --candidate-id <id> --sha256 <hash> --output <absolute-directory> --repository-root <absolute-directory> --legal-use --drm-free [--ui-language <auto|en|pt-PT|pt-BR>] [--force] [--resume]
@@ -75,6 +77,14 @@ The imported `.flow.json` contains only canonical Flow metadata. Publisher, cont
 
 `epub-inspect` reads only the EPUB container and OPF structure. It reports the EPUB 2/3 family, principal metadata, manifest properties, fallback and media-overlay IDs, linear/non-linear and repeated spine references, navigation documents, archive sizes, resource types, missing resources, unsupported resources, and diagnostics without producing a `FlowDocument`. `--json` writes the deterministic `flow-epub-inspection-0.1` report even when the publication is invalid enough to return exit code `1`. Spine entries are always emitted by declared position; manifest sorting in JSON is never treated as reading order.
 
+`epub-inventory` recursively reads an explicitly supplied private directory under the existing bounded archive and XML limits. It does not convert or modify source files. Identical payloads are collapsed by SHA-256 with a retained copy count. The catalog records neutral IDs, hashes, EPUB family, declared languages, byte/resource/spine counts, protection evidence, status and stable diagnostic codes. It does not store source paths, file names, titles, authors, publisher identifiers or content.
+
+The source and catalog must remain outside the repository, and the catalog cannot be written inside the source directory. `--force` replaces only a JSON file whose format is already `flow-epub-private-inventory-0.1`.
+
+`epub-inventory-qualify` repeats inventory locally, selects only ready or review-required candidates and associates each source by its verified SHA-256. It reuses the corpus executor to run inspection, import, validation, fidelity analysis, Flow JSON round-trip, canonical integrity, mobile and desktop layouts and HTML-book verification twice. Unknown encryption, corrupt archives and structurally unsuitable inputs are recorded as skipped instead of being opened by the semantic pipeline.
+
+The command requires `--legal-use` and `--drm-free`. Its path-free `flow-epub-private-qualification-0.1` report contains only neutral candidate IDs, hashes, counts, completed phases and aggregated diagnostic codes. It excludes file names, physical paths, titles, authors, publisher identifiers, source text and asset bytes. A candidate with measured fidelity loss is failed even when the remaining phases complete. Exit code `0` requires every discovered candidate to be eligible, approved, lossless under the measured profile and deterministic; failed, inconclusive, nondeterministic or skipped entries produce exit code `2` while preserving the complete report.
+
 `corpus` reads a `flow-epub-corpus-0.1` manifest, discovers only the permitted local inputs, runs the complete corpus pipeline twice and writes `flow-epub-corpus-qualification-0.1`. `--baseline` compares the observed evidence with an existing reviewed baseline; the command never creates or accepts a replacement baseline. The report excludes physical publication paths. Exit code `2` indicates a failed, skipped or inconclusive publication, non-deterministic repeated evidence, or baseline mismatch.
 
 `epub-qualify` runs the automatic large-publication gate at least twice. The neutral candidate ID, expected SHA-256, absolute repository root and the `--legal-use`/`--drm-free` declarations are mandatory. The source EPUB and report are rejected inside the repository tree. A technically successful run normally reports the overall status `inconclusive`, because human review remains separate; the command still returns `0` when every automatic check passed or passed with warnings. `--include-environment` adds approximate duration, managed-heap and working-set observations to a clearly non-deterministic report section. It is off by default.
@@ -83,7 +93,7 @@ The imported `.flow.json` contains only canonical Flow metadata. Publisher, cont
 
 ### Output replacement and interrupted runs
 
-`corpus`, `epub-qualify`, and `epub-review` do not replace an existing final output by default. `--force` permits replacement, but the final file or directory remains untouched until the new result is complete and ready for its atomic commit. Existing review directories must still contain a recognized Flow review manifest; `--force` never authorizes deletion of an arbitrary directory.
+`corpus`, `epub-inventory-qualify`, `epub-qualify`, and `epub-review` do not replace an existing final output by default. `--force` permits replacement, but the final file or directory remains untouched until the new result is complete and ready for its atomic commit. Existing review directories must still contain a recognized Flow review manifest; `--force` never authorizes deletion of an arbitrary directory.
 
 Each command holds a hidden `.<destination>.flow-execution.lock` sidecar for its complete execution. The handle allows read-only status inspection but rejects another writer. The sidecar persists after release and records a random 128-bit execution ID, state, format and SHA-256 fingerprint of the normalized destination. It never contains the destination path, book content or source metadata, and it is excluded from Git, reports, canonicalization and hashes. The execution ID is printed for local log correlation but is intentionally nondeterministic.
 
@@ -112,6 +122,8 @@ During development, invoke the executable through the project:
 ```powershell
 dotnet run --project src/Flow.Cli -- sample sample.flow.json
 dotnet run --project src/Flow.Cli -- --language pt-BR --banner help
+dotnet run --project src/Flow.Cli -- --language pt-BR --banner epub-inventory C:\books --output C:\flow-local\epub-inventory.json --repository-root C:\src\FlowEngineNet
+dotnet run --project src/Flow.Cli -- --language pt-BR --banner epub-inventory-qualify C:\books --report C:\flow-local\epub-qualification.json --repository-root C:\src\FlowEngineNet --legal-use --drm-free
 dotnet run --project src/Flow.Cli -- epub-inspect book.epub --json inspection.json
 dotnet run --project src/Flow.Cli -- corpus epub-corpus.json --repository-root C:\src\FlowEngineNet --report C:\flow-local\corpus.json --force
 dotnet run --project src/Flow.Cli -- epub-qualify C:\books\book.epub --candidate-id candidate-001 --sha256 $sha256 --report C:\flow-local\gate.json --repository-root C:\src\FlowEngineNet --legal-use --drm-free

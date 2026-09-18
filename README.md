@@ -193,6 +193,7 @@ The final clean-directory review passes 134 tests with zero build warnings; see 
 - [Public EPUB corpus coverage matrix](docs/epub-corpus-matrix.md)
 - [0.1 conformance profile](docs/conformance.md)
 - [Known limitations](docs/known-limitations.md)
+- [Resolved and reduced limitations](docs/resolved-limitations.md)
 - [0.1 release review](docs/0.1-release-review.md)
 - [Roadmap](docs/roadmap.md)
 - [Research findings](docs/research-findings.md)
@@ -218,6 +219,12 @@ The CLI keeps command names, option names, JSON fields and diagnostic codes inva
 ```powershell
 dotnet run --project src/Flow.Cli -- --language pt-BR --banner help
 dotnet run --project src/Flow.Cli -- --language en-US --no-color help
+```
+
+Global options must precede the command. The banner can accompany any operation:
+
+```powershell
+dotnet run --project src/Flow.Cli -- --language pt-BR --banner epub-inspect C:\books\book.epub
 ```
 
 ### Test the packaged CLI
@@ -273,6 +280,38 @@ dotnet run --project src/Flow.Cli -- render samples/SampleBook/sample.flow.json 
 ### Qualify and review a real EPUB
 
 The corpus, automatic gate and assisted review are available through the CLI. They remain evidence workflows, not EPUB conformance certification. A real publication must be DRM-free and legally available to the caller. Flow records those declarations but cannot verify publication rights.
+
+### Inventory a private EPUB directory
+
+`epub-inventory` recursively discovers local `.epub` files without converting, copying, renaming or writing to them. It hashes every readable candidate, deduplicates identical payloads, inspects EPUB version, languages, reading order and resource counts, and separates corrupt, structurally unsuitable, protected and review-required candidates. Known EPUB font-obfuscation algorithms are reported for review rather than automatically called DRM.
+
+The catalog must stay outside both the repository and the source directory:
+
+```powershell
+dotnet run --project src/Flow.Cli -- `
+  --language pt-BR `
+  --banner `
+  epub-inventory C:\books `
+  --output C:\flow-local\epub-inventory.json `
+  --repository-root C:\src\FlowEngineNet
+```
+
+The deterministic JSON contains neutral candidate IDs, SHA-256 values, sizes, languages, structural counts, statuses and diagnostic codes. It excludes file and directory names, physical paths, titles, authors, publisher identifiers and publication content. An existing recognized catalog requires `--force`; unrelated files are never replaced.
+
+To qualify every eligible candidate through the complete Flow pipeline twice, keep the report outside the repository and source directory and make the legal declarations explicitly:
+
+```powershell
+dotnet run --project src/Flow.Cli -- `
+  --language pt-BR `
+  --banner `
+  epub-inventory-qualify C:\books `
+  --report C:\flow-local\epub-qualification.json `
+  --repository-root C:\src\FlowEngineNet `
+  --legal-use `
+  --drm-free
+```
+
+The qualification report contains neutral IDs, source and canonical hashes, phase and semantic counts, aggregated diagnostic codes and the repeated-run result. It omits physical paths, file names, editorial metadata and publication text. Protected, corrupt or structurally unsuitable candidates appear as explicitly skipped entries. This automatic batch is regression evidence, not human review or EPUB conformance certification.
 
 Keep the EPUB, gate report and generated review package outside the repository:
 

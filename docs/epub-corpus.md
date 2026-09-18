@@ -4,6 +4,39 @@ The `flow-epub-corpus-0.1` profile describes publications used for `Flow.Epub` i
 
 The catalog contract, local discovery API, end-to-end executor, reviewed baselines, repeated-run qualification, and optional EPUBCheck adapter are implemented.
 
+## Private directory inventory
+
+`IEpubPrivateInventoryService` builds a neutral catalog before a private directory enters corpus qualification. Discovery is recursive, bounded by candidate count and depth, skips symbolic links and reparse points, opens files read-only, and applies the existing EPUB archive and XML limits during structural inspection.
+
+Readable files receive SHA-256 hashes before inspection. Identical bytes become one candidate with a copy count. `EpubPrivateInventoryReportJsonSerializer` writes deterministic UTF-8 without BOM and with LF line endings. The report excludes source paths, file names, titles, authors, publisher identifiers, timestamps and content.
+
+Protection handling is conservative. IDPF and Adobe font-obfuscation algorithms cause review instead of a DRM claim. Unknown encryption is classified as protected and is not decrypted. A `rights.xml` file records review evidence but is not proof of DRM by itself. Invalid archives, unknown EPUB families and publications without a supported linear XHTML reading order receive separate statuses instead of being omitted.
+
+The CLI requires the source and output to remain outside the repository and refuses to place its catalog in the source tree:
+
+```powershell
+flow --language pt-BR --banner epub-inventory C:\books `
+  --output C:\flow-local\epub-inventory.json `
+  --repository-root C:\src\FlowEngineNet
+```
+
+## Private directory qualification
+
+`IEpubPrivateQualificationService` turns the neutral inventory into a repeated semantic qualification without persisting a manifest containing private paths. Ready and review-required candidates are rediscovered by their expected size and SHA-256. Protected, corrupt and unsuitable candidates stay in the report with an explicit skipped status.
+
+Each eligible candidate goes through the existing `EpubCorpusQualificationService` twice. The phases cover structural inspection, import, document validation, fidelity analysis, Flow JSON round-trip, canonical hash comparison, mobile and desktop layouts and HTML-book verification. Required phase outcomes are expressed through an in-memory local corpus entry; no second importer or renderer pipeline exists for the private workflow.
+
+`flow-epub-private-qualification-0.1` stores neutral IDs, source and canonical hashes, completed phases, semantic and output counts, fidelity loss and aggregated diagnostic codes. It excludes the physical path, file name, title, author, publisher identifier, publication text, ordered node IDs and asset bytes. Because hashes can identify exact bytes, this report is private and must remain outside Git.
+
+```powershell
+flow --language pt-BR --banner epub-inventory-qualify C:\books `
+  --report C:\flow-local\epub-qualification.json `
+  --repository-root C:\src\FlowEngineNet `
+  --legal-use --drm-free
+```
+
+The two declarations record caller assertions; they do not establish legal rights or detect every DRM system. Exit code `0` means that every discovered candidate was eligible, completed the automatic pipeline without measured fidelity loss and produced stable evidence twice. Exit code `2` keeps the report but signals a failed, lossy, inconclusive, nondeterministic or skipped candidate. Human review remains a separate per-publication workflow.
+
 ## What "corpus" means here
 
 The corpus is a list of EPUB files used to test the importer. It is not a new book format and it is not part of the Reader. Each catalog entry says which local EPUB to use, how to verify its bytes, what license rules apply, and which results Flow should produce.

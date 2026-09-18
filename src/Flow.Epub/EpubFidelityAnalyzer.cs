@@ -251,6 +251,7 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
     {
         if (code is EpubDiagnosticCodes.UnsupportedElement
             or EpubDiagnosticCodes.UnsupportedManifestProperty
+            or EpubDiagnosticCodes.HeadingLevelNormalized
             or EpubDiagnosticCodes.UnsupportedCssProperty
             or EpubDiagnosticCodes.UnsupportedCssSelector
             or EpubDiagnosticCodes.CssTargetNotRepresentable

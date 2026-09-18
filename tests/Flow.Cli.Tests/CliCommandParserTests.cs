@@ -42,6 +42,23 @@ public sealed class CliCommandParserTests
         var epubInspect = Assert.IsType<InspectEpubCommand>(
             _parser.Parse(["epub-inspect", "book.epub", "--json", "report.json"]).Command);
         Assert.Equal("report.json", epubInspect.JsonOutputPath);
+        var inventory = Assert.IsType<InventoryEpubCommand>(_parser.Parse(
+        [
+            "epub-inventory", "books", "--output", "inventory.json", "--repository-root", "repository", "--force",
+        ]).Command);
+        Assert.Equal("books", inventory.SourceDirectory);
+        Assert.Equal("inventory.json", inventory.OutputPath);
+        Assert.Equal("repository", inventory.RepositoryRoot);
+        Assert.True(inventory.Force);
+        var inventoryQualification = Assert.IsType<QualifyEpubInventoryCommand>(_parser.Parse(
+        [
+            "epub-inventory-qualify", "books", "--report", "qualification.json",
+            "--repository-root", "repository", "--legal-use", "--drm-free", "--force", "--resume",
+        ]).Command);
+        Assert.Equal("books", inventoryQualification.SourceDirectory);
+        Assert.Equal("qualification.json", inventoryQualification.ReportPath);
+        Assert.True(inventoryQualification.Force);
+        Assert.True(inventoryQualification.Resume);
         Assert.IsType<InspectCommand>(_parser.Parse(["inspect", "book.flow.json"]).Command);
         Assert.IsType<ValidateCommand>(_parser.Parse(["validate", "book.flow.json"]).Command);
         Assert.IsType<HashCommand>(_parser.Parse(["hash", "book.flow.json"]).Command);
@@ -175,6 +192,18 @@ public sealed class CliCommandParserTests
         Assert.StartsWith(
             "FLOWCLI_UNKNOWN_OPTION:",
             _parser.Parse(["import", "book.epub", "--unknown", "book.flow.json"]).Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_USAGE:",
+            _parser.Parse(["epub-inventory", "books", "--output", "inventory.json"]).Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_DECLARATION_REQUIRED:",
+            _parser.Parse(
+            [
+                "epub-inventory-qualify", "books", "--report", "qualification.json",
+                "--repository-root", "repository",
+            ]).Error,
             StringComparison.Ordinal);
         Assert.StartsWith(
             "FLOWCLI_DUPLICATE_OPTION:",
