@@ -2,6 +2,7 @@ using System.Xml.Linq;
 using Flow.Documents;
 using Flow.Layout;
 using Flow.Rendering.Html;
+using Flow.Security;
 
 namespace Flow.Epub.Tests;
 
@@ -93,6 +94,64 @@ public sealed class EpubFootnoteImportTests
     }
 
     [Fact]
+    public async Task ImportAsync_ResolvesResourceOnlyReferenceWhenTargetContainsExactlyOneNote()
+    {
+        const string chapter = """
+            <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+              <body><h1>Chapter</h1><p>Reference<a epub:type="noteref" href="chapter-2.xhtml">1</a>.</p></body>
+            </html>
+            """;
+        const string notes = """
+            <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
+              <body><aside epub:type="endnote"><p>Only note.</p></aside></body>
+            </html>
+            """;
+        await using var epub = MinimalEpubFactory.Create(
+            package: Package,
+            chapterOne: chapter,
+            chapterTwo: notes,
+            includeImage: false);
+
+        var result = await new EpubImporter().ImportAsync(epub);
+
+        Assert.True(result.IsSuccess, string.Join(Environment.NewLine, result.Diagnostics));
+        var fallback = Assert.Single(result.Diagnostics, static item =>
+            item.Code == EpubDiagnosticCodes.NoteResourceFallbackUsed);
+        Assert.Contains("1 note reference(s)", fallback.Message, StringComparison.Ordinal);
+        Assert.DoesNotContain(result.Diagnostics, static item => item.Code == EpubDiagnosticCodes.OrphanNoteReference);
+        var document = Assert.IsType<FlowDocument>(result.Document);
+        var reference = Assert.Single(document.Index.Locations
+            .Select(static item => item.Node)
+            .OfType<Paragraph>()
+            .SelectMany(static paragraph => paragraph.Content)
+            .OfType<FootnoteReference>());
+        Assert.IsType<Footnote>(document.Index.GetLocations(reference.TargetId).Single().Node);
+
+        var fidelity = new EpubFidelityAnalyzer().Analyze(result);
+        var noteReferences = fidelity.Measurements.Single(static item =>
+            item.Metric == EpubFidelityMetric.NoteReferences);
+        Assert.Equal(0, noteReferences.LostCount);
+        Assert.Contains(fidelity.Findings, static finding =>
+            finding.RelatedDiagnosticCode == EpubDiagnosticCodes.NoteResourceFallbackUsed
+            && finding.Status == EpubFidelityStatus.Approximated);
+
+        var serializer = new FlowJsonDocumentSerializer();
+        var integrity = new Sha256DocumentIntegrityService(new FlowDocumentCanonicalizer());
+        await using var json = new MemoryStream();
+        await serializer.SerializeAsync(document, json);
+        json.Position = 0;
+        var roundTripped = await serializer.DeserializeAsync(json);
+        Assert.Equal(integrity.ComputeHash(document), integrity.ComputeHash(roundTripped));
+
+        var preferences = new UserReadingPreferences();
+        var layout = new AdaptiveLayoutEngine().Layout(
+            roundTripped,
+            new LayoutContext(390, 844, userPreferences: preferences));
+        var html = XDocument.Parse(new HtmlDocumentRenderer().RenderToString(roundTripped, layout, preferences));
+        Assert.Single(html.Descendants("a"), element => (string?)element.Attribute("role") == "doc-noteref");
+    }
+
+    [Fact]
     public async Task ImportAsync_DiagnosesOrphanReferenceUnreferencedNoteAndMissingBacklink()
     {
         const string chapter = """
@@ -127,10 +186,13 @@ public sealed class EpubFootnoteImportTests
             <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
               <body>
                 <p><a epub:type="noteref" href="#duplicate">ambiguous</a></p>
+                <p><a epub:type="noteref" href="chapter-1.xhtml">ambiguous resource</a></p>
                 <aside id="duplicate" epub:type="footnote"><p>Duplicate one</p></aside>
                 <aside id="duplicate" epub:type="footnote"><p>Duplicate</p></aside>
                 <aside id="note-a" epub:type="footnote"><p>A <a epub:type="noteref" href="#note-b">2</a></p></aside>
                 <aside id="note-b" epub:type="footnote"><p>B <a epub:type="noteref" href="#note-a">1</a></p></aside>
+                <aside epub:type="footnote"><p>Implicit one</p></aside>
+                <aside epub:type="footnote"><p>Implicit two</p></aside>
               </body>
             </html>
             """;
@@ -145,5 +207,7 @@ public sealed class EpubFootnoteImportTests
         Assert.NotNull(result.Document);
         Assert.Contains(result.Diagnostics, static diagnostic => diagnostic.Code == EpubDiagnosticCodes.AmbiguousNoteDestination);
         Assert.Contains(result.Diagnostics, static diagnostic => diagnostic.Code == EpubDiagnosticCodes.CircularNoteReference);
+        Assert.DoesNotContain(result.Diagnostics, static diagnostic =>
+            diagnostic.Code == EpubDiagnosticCodes.NoteResourceFallbackUsed);
     }
 }

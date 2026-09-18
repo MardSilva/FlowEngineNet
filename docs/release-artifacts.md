@@ -1,5 +1,7 @@
 # Local release artifacts
 
+English | [Português (Brasil)](pt-BR/release-artifacts.md)
+
 Flow can assemble and validate a release candidate for the CLI without publishing it. This workflow is intended for development and CI while the package remains experimental.
 
 Run it from the repository root after restore:

@@ -20,4 +20,10 @@
   <data name="Label_note" xml:space="preserve"><value>nota</value></data>
   <data name="Label_table" xml:space="preserve"><value>tabela</value></data>
   <data name="Label_table-of-contents" xml:space="preserve"><value>sumário</value></data>
+  <data name="Label_linked-image" xml:space="preserve"><value>imagem com link</value></data>
+  <data name="Label_ruby" xml:space="preserve"><value>anotação ruby</value></data>
+  <data name="Label_bidirectional" xml:space="preserve"><value>texto bidirecional</value></data>
+  <data name="Label_math" xml:space="preserve"><value>conteúdo matemático</value></data>
+  <data name="Label_svg" xml:space="preserve"><value>imagem SVG</value></data>
+  <data name="Label_diagnostics" xml:space="preserve"><value>capítulo com mais diagnósticos</value></data>
 </root>

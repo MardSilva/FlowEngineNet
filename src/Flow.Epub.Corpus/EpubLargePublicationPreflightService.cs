@@ -248,6 +248,12 @@ public sealed class EpubLargePublicationPreflightService : IEpubLargePublication
         long xhtmlBytes = 0;
         foreach (var item in manifest)
         {
+            if (EpubMediaTypeClassifier.IsEmbeddedFont(item.MediaType))
+            {
+                fonts++;
+                continue;
+            }
+
             switch (item.MediaType)
             {
                 case XhtmlMediaType:
@@ -262,10 +268,6 @@ public sealed class EpubLargePublicationPreflightService : IEpubLargePublication
                     break;
                 case "image/jpeg" or "image/png" or "image/gif" or "image/webp":
                     raster++;
-                    break;
-                case "font/otf" or "font/ttf" or "font/woff" or "font/woff2"
-                    or "application/vnd.ms-opentype" or "application/font-woff":
-                    fonts++;
                     break;
                 default:
                     if (item.MediaType.StartsWith("audio/", StringComparison.OrdinalIgnoreCase))

@@ -2,6 +2,7 @@ using System.Xml.Linq;
 using Flow.Documents;
 using Flow.Layout;
 using Flow.Rendering.Html;
+using Flow.Security;
 
 namespace Flow.Epub.Tests;
 
@@ -98,6 +99,72 @@ public sealed class EpubTableImportTests
         Assert.Equal(3, table.Bodies[0].Rows[0].Cells[0].ColumnSpan);
         Assert.Equal(2, table.Bodies[0].Rows[1].Cells.Length);
         Assert.DoesNotContain(result.Diagnostics, static diagnostic => diagnostic.Code == EpubDiagnosticCodes.InvalidTableStructure);
+    }
+
+    [Fact]
+    public async Task ImportAsync_RecognizesColumnMetadataWithoutCreatingPhantomCellsOrChangingCanonicalContent()
+    {
+        const string withColumns = """
+            <html xmlns="http://www.w3.org/1999/xhtml"><body>
+              <table id="data"><colgroup><col span="1" class="label" /><col style="width: 50%" /></colgroup>
+                <tbody id="body"><tr id="row"><td id="label">Label</td><td id="value">Value</td></tr></tbody>
+              </table>
+            </body></html>
+            """;
+        const string withoutColumns = """
+            <html xmlns="http://www.w3.org/1999/xhtml"><body>
+              <table id="data">
+                <tbody id="body"><tr id="row"><td id="label">Label</td><td id="value">Value</td></tr></tbody>
+              </table>
+            </body></html>
+            """;
+        await using var epubWithColumns = MinimalEpubFactory.Create(chapterOne: withColumns);
+        await using var epubWithoutColumns = MinimalEpubFactory.Create(chapterOne: withoutColumns);
+
+        var withColumnsResult = await new EpubImporter().ImportAsync(epubWithColumns);
+        var withoutColumnsResult = await new EpubImporter().ImportAsync(epubWithoutColumns);
+
+        Assert.True(withColumnsResult.IsSuccess, string.Join(Environment.NewLine, withColumnsResult.Diagnostics));
+        var diagnostic = Assert.Single(withColumnsResult.Diagnostics, static item =>
+            item.Code == EpubDiagnosticCodes.TableColumnMetadataNotRepresented);
+        Assert.Equal(EpubDiagnosticSeverity.Warning, diagnostic.Severity);
+        Assert.DoesNotContain(withColumnsResult.Diagnostics, static item =>
+            item.Code == EpubDiagnosticCodes.InvalidTableStructure);
+        var table = Assert.Single(withColumnsResult.Document!.Index.Locations
+            .Select(static item => item.Node)
+            .OfType<Table>());
+        var body = Assert.Single(table.Bodies);
+        var row = Assert.Single(body.Rows);
+        Assert.Equal(2, row.Cells.Length);
+        Assert.Equal("LabelValue", NodeText(table));
+
+        var integrity = new Sha256DocumentIntegrityService(new FlowDocumentCanonicalizer());
+        Assert.Equal(
+            integrity.ComputeHash(withoutColumnsResult.Document!),
+            integrity.ComputeHash(withColumnsResult.Document!));
+    }
+
+    [Fact]
+    public async Task ImportAsync_KeepsMalformedColumnGroupOnTheStructuralRecoveryPath()
+    {
+        const string chapter = """
+            <html xmlns="http://www.w3.org/1999/xhtml"><body>
+              <table><colgroup><col /><div>Unexpected content</div></colgroup>
+                <tbody><tr><td>Cell</td></tr></tbody>
+              </table>
+            </body></html>
+            """;
+        await using var epub = MinimalEpubFactory.Create(chapterOne: chapter);
+
+        var result = await new EpubImporter().ImportAsync(epub);
+
+        Assert.True(result.IsSuccess, string.Join(Environment.NewLine, result.Diagnostics));
+        Assert.Contains(result.Diagnostics, static item => item.Code == EpubDiagnosticCodes.InvalidTableStructure);
+        Assert.DoesNotContain(result.Diagnostics, static item =>
+            item.Code == EpubDiagnosticCodes.TableColumnMetadataNotRepresented);
+        var table = Assert.Single(result.Document!.Index.Locations.Select(static item => item.Node).OfType<Table>());
+        Assert.Contains("Unexpected content", NodeText(table), StringComparison.Ordinal);
+        Assert.Contains("Cell", NodeText(table), StringComparison.Ordinal);
     }
 
     [Fact]

@@ -136,7 +136,7 @@ try {
 
     if ($inspection.IndexOf('The Flow Experiment', [System.StringComparison]::Ordinal) -lt 0 -or
         $validation.IndexOf('Valid:', [System.StringComparison]::Ordinal) -lt 0 -or
-        $hash.IndexOf('flow-c14n-0.1', [System.StringComparison]::Ordinal) -lt 0) {
+        $hash.IndexOf('flow-c14n-0.2', [System.StringComparison]::Ordinal) -lt 0) {
         throw 'One or more installed CLI smoke checks returned unexpected output.'
     }
 

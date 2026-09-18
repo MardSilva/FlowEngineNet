@@ -37,6 +37,10 @@ jobs:
       - name: Verify formatting
         run: dotnet format Flow.sln --verify-no-changes --no-restore
 
+      - name: Verify bilingual documentation
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-documentation.ps1
+
       - name: Build
         run: dotnet build Flow.sln --no-restore
 

@@ -1,5 +1,7 @@
 # Flow 0.1 conformance profile
 
+English | [Português (Brasil)](pt-BR/conformance.md)
+
 The Flow 0.1 conformance suite is a small executable research profile. It does not claim W3C, EPUB, HTML, accessibility, cryptographic, archival, or legal conformance. Each numbered case protects one invariant from the original 0.1 definition of done.
 
 | ID | Invariant | Executable evidence |

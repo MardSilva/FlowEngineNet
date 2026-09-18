@@ -37,6 +37,32 @@ public sealed class EpubCorpusExecutorTests
     }
 
     [Fact]
+    public async Task ExecuteAsync_VerifiesHtmlPackagesContainingSafePercentEncodedMailto()
+    {
+        const string chapter = """
+            <html xmlns="http://www.w3.org/1999/xhtml"><body>
+              <h1 id="start">Start</h1>
+              <p><a href="mailto:reader%40example.invalid?subject=Hello%20Flow">Email</a></p>
+            </body></html>
+            """;
+        using var workspace = new CorpusExecutionWorkspace();
+        using var epub = MinimalEpubFactory.Create(chapterOne: chapter);
+        var publication = workspace.AddBytes(
+            "encoded-mailto",
+            epub.ToArray(),
+            expectedFeatures: ["spine"],
+            expectedResults: ["html-book-package"]);
+
+        var result = Assert.Single((await new EpubCorpusExecutor()
+            .ExecuteAsync(workspace.Manifest(publication), workspace.Options())).Publications);
+
+        Assert.Equal(EpubCorpusExecutionStatus.Passed, result.Status);
+        Assert.Equal(2, result.Evidence.HtmlPackageCount);
+        Assert.DoesNotContain(result.Diagnostics, static item =>
+            item.Code == EpubCorpusExecutionDiagnosticCodes.HtmlPackageFailed);
+    }
+
+    [Fact]
     public async Task ExecuteAsync_InvalidImportedDocumentFailsValidationAndKeepsPartialEvidence()
     {
         using var workspace = new CorpusExecutionWorkspace();

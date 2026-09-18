@@ -597,7 +597,8 @@ public sealed class EpubCorpusExecutor : IEpubCorpusExecutor
                 phase,
                 diagnostic.Message,
                 diagnostic.Code,
-                diagnostic.Resource));
+                diagnostic.Resource,
+                diagnostic.Count));
         }
     }
 

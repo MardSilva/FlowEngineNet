@@ -1,5 +1,7 @@
 # Roadmap
 
+English | [Português (Brasil)](pt-BR/roadmap.md)
+
 ## 0.1
 
 - Canonical document model, validation, stable anchors, and hashing

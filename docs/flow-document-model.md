@@ -1,5 +1,7 @@
 # Flow document model
 
+English | [Português (Brasil)](pt-BR/flow-document-model.md)
+
 ## Status
 
 The first Flow 0.1 semantic model, stable anchors, document index, and structural validator are implemented. They represent and validate content without depending on layout or rendering technology.
@@ -72,14 +74,14 @@ The basic block model supports:
 - `Heading`, with a locally enforced level from 1 through 6;
 - `Paragraph` and `BlockQuote`;
 - `OrderedList`, `UnorderedList`, and addressable `ListItem` nodes;
-- `Figure`, which references a `FlowAsset` through `AssetId`;
+- `Figure`, which references a `FlowAsset` through `AssetId` and can carry an optional typed `FigureLink`;
 - addressable `Caption` and `Footnote` nodes;
 - semantic `Table`, `TableCaption`, `TableHead`, `TableBody`, `TableFoot`, `TableRow`, `TableHeaderCell`, and `TableCell` nodes;
 - block `MathExpression` with a restricted immutable Presentation MathML tree and optional textual alternative;
 - `HorizontalRule` and `CodeBlock`;
 - semantic `TableOfContents`, with optional typed entries and stable anchor targets. An empty entry collection reserves automatic generation for a later milestone.
 
-A figure owns its optional caption relationship directly. Whether an asset exists and whether IDs are unique are document-level validation concerns and are deliberately not hidden inside node constructors.
+A figure owns its optional caption and link relationships directly. A `FigureLink` is either an internal `DocumentAnchor` or a validated absolute HTTP, HTTPS or `mailto` URI; it never fetches the destination. Whether an asset and internal target exist and whether IDs are unique are document-level validation concerns and are deliberately not hidden inside node constructors.
 
 ### Tables
 
@@ -167,11 +169,11 @@ Resolution is pure: it allocates a new resolved result and never mutates `FlowDo
 
 `DocumentIntegrity` can carry an algorithm, hash, and canonicalization version. `Flow.Security` now provides `FlowDocumentCanonicalizer` and `Sha256DocumentIntegrityService`; the stored integrity record itself is excluded from its hash input to avoid recursion.
 
-`Flow.Security` also provides an experimental local RSA signature proof of concept over the same canonical bytes. `DocumentSignature` is not part of `FlowDocument` and is not serialized in `flow-json-0.1`; key ownership, transport, and trust remain external. See [signatures.md](signatures.md).
+`Flow.Security` also provides an experimental local RSA signature proof of concept over the same canonical bytes. `DocumentSignature` is not part of `FlowDocument` and is not serialized in `flow-json-0.2`; key ownership, transport, and trust remain external. See [signatures.md](signatures.md).
 
 Presentation, layout context, renderer constraints, and reader state will not participate in the canonical document hash.
 
-The experimental `flow-json-0.1` serializer preserves presentation and integrity for round-trip development interchange. It is deliberately separate from the compact `flow-c14n-0.1` projection. The exact included and excluded fields are specified in [canonicalization.md](canonicalization.md).
+The experimental `flow-json-0.2` serializer preserves presentation, integrity and typed figure links for round-trip development interchange, while continuing to read 0.1 documents. It is deliberately separate from the compact `flow-c14n-0.2` projection. The exact included and excluded fields and the legacy 0.1 compatibility path are specified in [canonicalization.md](canonicalization.md).
 
 ## Deferred behavior
 

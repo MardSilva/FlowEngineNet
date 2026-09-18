@@ -10,11 +10,12 @@ internal static class FlowJsonReader
     {
         RequireKind(root, JsonValueKind.Object, "$");
         var format = RequiredString(root, "format", "$.format");
-        if (!string.Equals(format, FlowJsonWriter.FormatVersion, StringComparison.Ordinal))
+        if (!string.Equals(format, FlowJsonWriter.FormatVersion, StringComparison.Ordinal)
+            && !string.Equals(format, "flow-json-0.1", StringComparison.Ordinal))
         {
             throw Error(
                 FlowSerializationDiagnosticCodes.UnsupportedFormat,
-                $"Unsupported Flow JSON format '{format}'. Expected '{FlowJsonWriter.FormatVersion}'.",
+                $"Unsupported Flow JSON format '{format}'. Expected '{FlowJsonWriter.FormatVersion}' or legacy 'flow-json-0.1'.",
                 "$.format");
         }
 
@@ -141,7 +142,8 @@ internal static class FlowJsonReader
                 id,
                 new AssetId(RequiredString(element, "assetId", $"{path}.assetId")),
                 ReadOptionalCaption(element, path),
-                OptionalString(element, "alternativeText", $"{path}.alternativeText")),
+                OptionalString(element, "alternativeText", $"{path}.alternativeText"),
+                ReadOptionalFigureLink(element, path)),
             "caption" => new Caption(id, ReadInlineProperty(element, "content", path)),
             "footnote" => new Footnote(id, ReadChildren(element, path)),
             "table" => new Table(
@@ -187,6 +189,44 @@ internal static class FlowJsonReader
                 $"Unsupported document node type '{type}' at '{path}'.",
                 $"{path}.type"),
         };
+    }
+
+    private static FigureLink? ReadOptionalFigureLink(JsonElement element, string path)
+    {
+        if (!element.TryGetProperty("link", out var link))
+        {
+            return null;
+        }
+
+        RequireKind(link, JsonValueKind.Object, $"{path}.link");
+        var kind = RequiredString(link, "kind", $"{path}.link.kind");
+        try
+        {
+            return kind switch
+            {
+                "internal" => FigureLink.Internal(DocumentAnchor.Parse(
+                    RequiredString(link, "anchor", $"{path}.link.anchor"))),
+                "external" => FigureLink.External(RequiredString(link, "uri", $"{path}.link.uri")),
+                _ => throw Error(
+                    FlowSerializationDiagnosticCodes.InvalidDocument,
+                    $"Unsupported figure link kind '{kind}'.",
+                    $"{path}.link.kind"),
+            };
+        }
+        catch (ArgumentException exception)
+        {
+            throw Error(
+                FlowSerializationDiagnosticCodes.InvalidDocument,
+                exception.Message,
+                $"{path}.link");
+        }
+        catch (FormatException exception)
+        {
+            throw Error(
+                FlowSerializationDiagnosticCodes.InvalidDocument,
+                exception.Message,
+                $"{path}.link");
+        }
     }
 
     private static IEnumerable<DocumentNode> ReadChildren(JsonElement parent, string path) =>

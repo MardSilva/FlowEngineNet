@@ -402,8 +402,19 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
                 : string.Empty;
 
             Line($"<figure id=\"{Id(figure.Id)}\"{publicationRole}{StyleAttribute(layoutNode, style)}>");
+            var linkTarget = figure.Link is null ? null : SafeHref(figure.Link.ToTargetString());
+            if (linkTarget is not null)
+            {
+                Line($"<a href=\"{Attribute(linkTarget)}\">");
+            }
+
             Line(
                 $"<img src=\"{Attribute(source)}\" alt=\"{Attribute(figure.AlternativeText ?? string.Empty)}\" />");
+            if (linkTarget is not null)
+            {
+                Line("</a>");
+            }
+
             foreach (var child in layoutNode.Children)
             {
                 WriteNode(child, figure);
@@ -696,12 +707,36 @@ public sealed class HtmlDocumentRenderer : IDocumentRenderer
                 return $"#{nodeId.Value}";
             }
 
+            if (target.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase))
+            {
+                return IsSafeMailtoHref(target) ? target : null;
+            }
+
             if (!Uri.TryCreate(target, UriKind.Absolute, out var uri))
             {
                 return null;
             }
 
-            return uri.Scheme is "http" or "https" or "mailto" ? target : null;
+            return uri.Scheme is "http" or "https" ? target : null;
+        }
+
+        private static bool IsSafeMailtoHref(string target)
+        {
+            if (!target.StartsWith("mailto:", StringComparison.OrdinalIgnoreCase)
+                || target.Length == "mailto:".Length
+                || target.Any(static character => char.IsControl(character) || char.IsWhiteSpace(character)))
+            {
+                return false;
+            }
+
+            try
+            {
+                return !Uri.UnescapeDataString(target).Any(char.IsControl);
+            }
+            catch (UriFormatException)
+            {
+                return false;
+            }
         }
 
         private static string SafeMediaType(string mediaType)

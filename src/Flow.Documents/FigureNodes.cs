@@ -5,7 +5,12 @@ namespace Flow.Documents;
 
 public sealed record Figure : DocumentNode
 {
-    public Figure(NodeId id, AssetId assetId, Caption? caption = null, string? alternativeText = null)
+    public Figure(
+        NodeId id,
+        AssetId assetId,
+        Caption? caption = null,
+        string? alternativeText = null,
+        FigureLink? link = null)
         : base(id)
     {
         ArgumentNullException.ThrowIfNull(assetId);
@@ -13,6 +18,7 @@ public sealed record Figure : DocumentNode
         AssetId = assetId;
         Caption = caption;
         AlternativeText = alternativeText;
+        Link = link;
     }
 
     public AssetId AssetId { get; }
@@ -20,6 +26,9 @@ public sealed record Figure : DocumentNode
     public Caption? Caption { get; }
 
     public string? AlternativeText { get; }
+
+    /// <summary>Gets the optional semantic destination activated by the figure.</summary>
+    public FigureLink? Link { get; }
 }
 
 public sealed record Caption : DocumentNode

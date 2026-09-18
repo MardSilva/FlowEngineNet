@@ -22,6 +22,10 @@ public sealed class CliCommandParser
             "sample" => ParseSample(arguments),
             "import" => ParseImport(arguments),
             "epub-inspect" => ParseEpubInspect(arguments),
+            "epub-inventory" => ParseEpubInventory(arguments),
+            "epub-inventory-qualify" => ParseEpubInventoryQualify(arguments),
+            "epub-inventory-matrix" => ParseEpubInventoryMatrix(arguments),
+            "epub-inventory-review" => ParseEpubInventoryReview(arguments),
             "corpus" => ParseCorpus(arguments),
             "epub-qualify" => ParseEpubQualify(arguments),
             "epub-review" => ParseEpubReview(arguments),
@@ -120,6 +124,66 @@ public sealed class CliCommandParser
             _ => CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", EpubInspectUsage),
         };
 
+    private static CommandParseResult ParseEpubInventory(IReadOnlyList<string> arguments)
+    {
+        if (arguments.Count < 2)
+        {
+            return CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", EpubInventoryUsage);
+        }
+
+        string? outputPath = null;
+        string? repositoryRoot = null;
+        var force = false;
+        for (var index = 2; index < arguments.Count; index++)
+        {
+            var option = arguments[index];
+            if (option == "--force")
+            {
+                if (force)
+                {
+                    return CommandParseResult.Failure("FLOWCLI_DUPLICATE_OPTION", "ErrorDuplicateOption", option);
+                }
+
+                force = true;
+                continue;
+            }
+
+            if (++index >= arguments.Count || string.IsNullOrWhiteSpace(arguments[index]))
+            {
+                return CommandParseResult.Failure(
+                    "FLOWCLI_USAGE",
+                    "ErrorOptionRequiresValue",
+                    option,
+                    EpubInventoryUsage);
+            }
+
+            var value = arguments[index];
+            switch (option)
+            {
+                case "--output" when outputPath is null:
+                    outputPath = value;
+                    break;
+                case "--repository-root" when repositoryRoot is null:
+                    repositoryRoot = value;
+                    break;
+                case "--output" or "--repository-root":
+                    return CommandParseResult.Failure("FLOWCLI_DUPLICATE_OPTION", "ErrorDuplicateOption", option);
+                default:
+                    return CommandParseResult.Failure(
+                        "FLOWCLI_UNKNOWN_OPTION",
+                        "ErrorUnknownOption",
+                        "epub-inventory",
+                        option,
+                        EpubInventoryUsage);
+            }
+        }
+
+        return outputPath is null || repositoryRoot is null
+            ? CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", EpubInventoryUsage)
+            : CommandParseResult.Success(
+                new InventoryEpubCommand(arguments[1], outputPath, repositoryRoot, force));
+    }
+
     private static CommandParseResult ParseCorpus(IReadOnlyList<string> arguments)
     {
         if (arguments.Count < 2)
@@ -188,6 +252,251 @@ public sealed class CliCommandParser
             ? CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", CorpusUsage)
             : CommandParseResult.Success(
                 new CorpusCommand(arguments[1], repositoryRoot, reportPath, externalRoot, baselinePath, force, resume));
+    }
+
+    private static CommandParseResult ParseEpubInventoryQualify(IReadOnlyList<string> arguments)
+    {
+        if (arguments.Count < 2)
+        {
+            return CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", EpubInventoryQualifyUsage);
+        }
+
+        string? reportPath = null;
+        string? repositoryRoot = null;
+        var legalUse = false;
+        var drmFree = false;
+        var force = false;
+        var resume = false;
+        for (var index = 2; index < arguments.Count; index++)
+        {
+            var option = arguments[index];
+            switch (option)
+            {
+                case "--legal-use" when !legalUse:
+                    legalUse = true;
+                    continue;
+                case "--drm-free" when !drmFree:
+                    drmFree = true;
+                    continue;
+                case "--force" when !force:
+                    force = true;
+                    continue;
+                case "--resume" when !resume:
+                    resume = true;
+                    continue;
+                case "--legal-use" or "--drm-free" or "--force" or "--resume":
+                    return CommandParseResult.Failure("FLOWCLI_DUPLICATE_OPTION", "ErrorDuplicateOption", option);
+            }
+
+            if (++index >= arguments.Count || string.IsNullOrWhiteSpace(arguments[index]))
+            {
+                return CommandParseResult.Failure(
+                    "FLOWCLI_USAGE",
+                    "ErrorOptionRequiresValue",
+                    option,
+                    EpubInventoryQualifyUsage);
+            }
+
+            var value = arguments[index];
+            switch (option)
+            {
+                case "--report" when reportPath is null:
+                    reportPath = value;
+                    break;
+                case "--repository-root" when repositoryRoot is null:
+                    repositoryRoot = value;
+                    break;
+                case "--report" or "--repository-root":
+                    return CommandParseResult.Failure("FLOWCLI_DUPLICATE_OPTION", "ErrorDuplicateOption", option);
+                default:
+                    return CommandParseResult.Failure(
+                        "FLOWCLI_UNKNOWN_OPTION",
+                        "ErrorUnknownOption",
+                        "epub-inventory-qualify",
+                        option,
+                        EpubInventoryQualifyUsage);
+            }
+        }
+
+        if (!legalUse || !drmFree)
+        {
+            return CommandParseResult.Failure("FLOWCLI_DECLARATION_REQUIRED", "ErrorRequiredEpubDeclarations");
+        }
+
+        return reportPath is null || repositoryRoot is null
+            ? CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", EpubInventoryQualifyUsage)
+            : CommandParseResult.Success(
+                new QualifyEpubInventoryCommand(arguments[1], reportPath, repositoryRoot, force, resume));
+    }
+
+    private static CommandParseResult ParseEpubInventoryMatrix(IReadOnlyList<string> arguments)
+    {
+        if (arguments.Count < 2)
+        {
+            return CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", EpubInventoryMatrixUsage);
+        }
+
+        string? expectedHash = null;
+        string? outputPath = null;
+        string? repositoryRoot = null;
+        var force = false;
+        var resume = false;
+        for (var index = 2; index < arguments.Count; index++)
+        {
+            var option = arguments[index];
+            switch (option)
+            {
+                case "--force" when !force:
+                    force = true;
+                    continue;
+                case "--resume" when !resume:
+                    resume = true;
+                    continue;
+                case "--force" or "--resume":
+                    return CommandParseResult.Failure("FLOWCLI_DUPLICATE_OPTION", "ErrorDuplicateOption", option);
+            }
+
+            if (++index >= arguments.Count || string.IsNullOrWhiteSpace(arguments[index]))
+            {
+                return CommandParseResult.Failure(
+                    "FLOWCLI_USAGE",
+                    "ErrorOptionRequiresValue",
+                    option,
+                    EpubInventoryMatrixUsage);
+            }
+
+            var value = arguments[index];
+            switch (option)
+            {
+                case "--qualification-sha256" when expectedHash is null:
+                    expectedHash = value;
+                    break;
+                case "--output" when outputPath is null:
+                    outputPath = value;
+                    break;
+                case "--repository-root" when repositoryRoot is null:
+                    repositoryRoot = value;
+                    break;
+                case "--qualification-sha256" or "--output" or "--repository-root":
+                    return CommandParseResult.Failure("FLOWCLI_DUPLICATE_OPTION", "ErrorDuplicateOption", option);
+                default:
+                    return CommandParseResult.Failure(
+                        "FLOWCLI_UNKNOWN_OPTION",
+                        "ErrorUnknownOption",
+                        "epub-inventory-matrix",
+                        option,
+                        EpubInventoryMatrixUsage);
+            }
+        }
+
+        if (expectedHash is null || outputPath is null || repositoryRoot is null)
+        {
+            return CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", EpubInventoryMatrixUsage);
+        }
+
+        return EpubCorpusSha256.TryParse(expectedHash, out var sha256)
+            ? CommandParseResult.Success(new ClassifyEpubInventoryCommand(
+                arguments[1], sha256, outputPath, repositoryRoot, force, resume))
+            : CommandParseResult.Failure("FLOWCLI_INVALID_VALUE", "ErrorInvalidQualificationSha256");
+    }
+
+    private static CommandParseResult ParseEpubInventoryReview(IReadOnlyList<string> arguments)
+    {
+        if (arguments.Count < 2)
+        {
+            return CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", EpubInventoryReviewUsage);
+        }
+
+        string? qualificationPath = null;
+        string? expectedHash = null;
+        string? outputDirectory = null;
+        string? repositoryRoot = null;
+        var uiLanguage = HtmlBookUiLanguage.Automatic;
+        var hasUiLanguage = false;
+        var legalUse = false;
+        var drmFree = false;
+        var force = false;
+        var resume = false;
+        for (var index = 2; index < arguments.Count; index++)
+        {
+            var option = arguments[index];
+            switch (option)
+            {
+                case "--legal-use" when !legalUse:
+                    legalUse = true;
+                    continue;
+                case "--drm-free" when !drmFree:
+                    drmFree = true;
+                    continue;
+                case "--force" when !force:
+                    force = true;
+                    continue;
+                case "--resume" when !resume:
+                    resume = true;
+                    continue;
+                case "--legal-use" or "--drm-free" or "--force" or "--resume":
+                    return CommandParseResult.Failure("FLOWCLI_DUPLICATE_OPTION", "ErrorDuplicateOption", option);
+            }
+
+            if (++index >= arguments.Count || string.IsNullOrWhiteSpace(arguments[index]))
+            {
+                return CommandParseResult.Failure(
+                    "FLOWCLI_USAGE",
+                    "ErrorOptionRequiresValue",
+                    option,
+                    EpubInventoryReviewUsage);
+            }
+
+            var value = arguments[index];
+            switch (option)
+            {
+                case "--qualification" when qualificationPath is null:
+                    qualificationPath = value;
+                    break;
+                case "--qualification-sha256" when expectedHash is null:
+                    expectedHash = value;
+                    break;
+                case "--output" when outputDirectory is null:
+                    outputDirectory = value;
+                    break;
+                case "--repository-root" when repositoryRoot is null:
+                    repositoryRoot = value;
+                    break;
+                case "--ui-language" when !hasUiLanguage:
+                    if (!TryParseUiLanguage(value, out uiLanguage))
+                    {
+                        return CommandParseResult.Failure("FLOWCLI_INVALID_VALUE", "ErrorInvalidUiLanguage");
+                    }
+
+                    hasUiLanguage = true;
+                    break;
+                case "--qualification" or "--qualification-sha256" or "--output" or "--repository-root"
+                    or "--ui-language":
+                    return CommandParseResult.Failure("FLOWCLI_DUPLICATE_OPTION", "ErrorDuplicateOption", option);
+                default:
+                    return CommandParseResult.Failure(
+                        "FLOWCLI_UNKNOWN_OPTION",
+                        "ErrorUnknownOption",
+                        "epub-inventory-review",
+                        option,
+                        EpubInventoryReviewUsage);
+            }
+        }
+
+        if (!legalUse || !drmFree)
+        {
+            return CommandParseResult.Failure("FLOWCLI_DECLARATION_REQUIRED", "ErrorRequiredEpubDeclarations");
+        }
+
+        if (qualificationPath is null || expectedHash is null || outputDirectory is null || repositoryRoot is null)
+        {
+            return CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", EpubInventoryReviewUsage);
+        }
+
+        return EpubCorpusSha256.TryParse(expectedHash, out var sha256)
+            ? CommandParseResult.Success(new ReviewEpubInventoryCommand(
+                arguments[1], qualificationPath, sha256, outputDirectory, repositoryRoot, uiLanguage, force, resume))
+            : CommandParseResult.Failure("FLOWCLI_INVALID_VALUE", "ErrorInvalidQualificationSha256");
     }
 
     private static CommandParseResult ParseEpubQualify(IReadOnlyList<string> arguments)
@@ -663,6 +972,18 @@ public sealed class CliCommandParser
         "flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>] [--fidelity-report <fidelity.json>] [--metadata-json <metadata.json>] [--processing-json <processing.json>] [--source-map-json <source-map.json>]";
 
     private const string EpubInspectUsage = "flow epub-inspect <book.epub> [--json <report.json>]";
+
+    private const string EpubInventoryUsage =
+        "flow epub-inventory <directory> --output <catalog.json> --repository-root <absolute-directory> [--force]";
+
+    private const string EpubInventoryQualifyUsage =
+        "flow epub-inventory-qualify <directory> --report <report.json> --repository-root <absolute-directory> --legal-use --drm-free [--force] [--resume]";
+
+    private const string EpubInventoryMatrixUsage =
+        "flow epub-inventory-matrix <qualification.json> --qualification-sha256 <hash> --output <matrix.json> --repository-root <absolute-directory> [--force] [--resume]";
+
+    private const string EpubInventoryReviewUsage =
+        "flow epub-inventory-review <directory> --qualification <qualification.json> --qualification-sha256 <hash> --output <absolute-directory> --repository-root <absolute-directory> --legal-use --drm-free [--ui-language <auto|en|pt-PT|pt-BR>] [--force] [--resume]";
 
     private const string CorpusUsage =
         "flow corpus <manifest.json> --repository-root <directory> --report <report.json> [--external-root <directory>] [--baseline <baseline.json>] [--force] [--resume]";

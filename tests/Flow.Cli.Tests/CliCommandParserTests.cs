@@ -42,6 +42,45 @@ public sealed class CliCommandParserTests
         var epubInspect = Assert.IsType<InspectEpubCommand>(
             _parser.Parse(["epub-inspect", "book.epub", "--json", "report.json"]).Command);
         Assert.Equal("report.json", epubInspect.JsonOutputPath);
+        var inventory = Assert.IsType<InventoryEpubCommand>(_parser.Parse(
+        [
+            "epub-inventory", "books", "--output", "inventory.json", "--repository-root", "repository", "--force",
+        ]).Command);
+        Assert.Equal("books", inventory.SourceDirectory);
+        Assert.Equal("inventory.json", inventory.OutputPath);
+        Assert.Equal("repository", inventory.RepositoryRoot);
+        Assert.True(inventory.Force);
+        var inventoryQualification = Assert.IsType<QualifyEpubInventoryCommand>(_parser.Parse(
+        [
+            "epub-inventory-qualify", "books", "--report", "qualification.json",
+            "--repository-root", "repository", "--legal-use", "--drm-free", "--force", "--resume",
+        ]).Command);
+        Assert.Equal("books", inventoryQualification.SourceDirectory);
+        Assert.Equal("qualification.json", inventoryQualification.ReportPath);
+        Assert.True(inventoryQualification.Force);
+        Assert.True(inventoryQualification.Resume);
+        var matrix = Assert.IsType<ClassifyEpubInventoryCommand>(_parser.Parse(
+        [
+            "epub-inventory-matrix", "qualification.json", "--qualification-sha256", new string('A', 64),
+            "--output", "matrix.json", "--repository-root", "repository", "--force", "--resume",
+        ]).Command);
+        Assert.Equal("qualification.json", matrix.QualificationReportPath);
+        Assert.Equal("matrix.json", matrix.OutputPath);
+        Assert.True(matrix.Force);
+        Assert.True(matrix.Resume);
+        var inventoryReview = Assert.IsType<ReviewEpubInventoryCommand>(_parser.Parse(
+        [
+            "epub-inventory-review", "books", "--qualification", "qualification.json",
+            "--qualification-sha256", new string('B', 64), "--output", "review",
+            "--repository-root", "repository", "--legal-use", "--drm-free",
+            "--ui-language", "pt-BR", "--force", "--resume",
+        ]).Command);
+        Assert.Equal("books", inventoryReview.SourceDirectory);
+        Assert.Equal("qualification.json", inventoryReview.QualificationReportPath);
+        Assert.Equal("review", inventoryReview.OutputDirectory);
+        Assert.Equal(HtmlBookUiLanguage.PortugueseBrazil, inventoryReview.UiLanguage);
+        Assert.True(inventoryReview.Force);
+        Assert.True(inventoryReview.Resume);
         Assert.IsType<InspectCommand>(_parser.Parse(["inspect", "book.flow.json"]).Command);
         Assert.IsType<ValidateCommand>(_parser.Parse(["validate", "book.flow.json"]).Command);
         Assert.IsType<HashCommand>(_parser.Parse(["hash", "book.flow.json"]).Command);
@@ -175,6 +214,26 @@ public sealed class CliCommandParserTests
         Assert.StartsWith(
             "FLOWCLI_UNKNOWN_OPTION:",
             _parser.Parse(["import", "book.epub", "--unknown", "book.flow.json"]).Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_USAGE:",
+            _parser.Parse(["epub-inventory", "books", "--output", "inventory.json"]).Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_DECLARATION_REQUIRED:",
+            _parser.Parse(
+            [
+                "epub-inventory-qualify", "books", "--report", "qualification.json",
+                "--repository-root", "repository",
+            ]).Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_INVALID_VALUE:",
+            _parser.Parse(
+            [
+                "epub-inventory-matrix", "qualification.json", "--qualification-sha256", "invalid",
+                "--output", "matrix.json", "--repository-root", "repository",
+            ]).Error,
             StringComparison.Ordinal);
         Assert.StartsWith(
             "FLOWCLI_DUPLICATE_OPTION:",

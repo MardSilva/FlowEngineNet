@@ -61,6 +61,47 @@ public sealed class EpubFidelityAnalyzerTests
     }
 
     [Fact]
+    public async Task Analyze_SeparatesTransparentContainerTransformationsFromSemanticApproximations()
+    {
+        const string chapter = """
+            <html xmlns="http://www.w3.org/1999/xhtml"><head><title>x</title></head><body>
+              <div><p>Antes <span>texto preservado</span>.</p><div><p>Depois.</p></div></div>
+              <p><span><img src="../images/flow.png" alt="Imagem preservada" /></span></p>
+              <aside><p>Conteúdo lateral.</p></aside>
+              <custom-box><p>Conteúdo desconhecido.</p></custom-box>
+            </body></html>
+            """;
+        await using var epub = MinimalEpubFactory.Create(chapterOne: chapter);
+        var import = await new EpubImporter().ImportAsync(epub);
+        var document = Assert.IsType<FlowDocument>(import.Document);
+        var integrity = new Sha256DocumentIntegrityService(new FlowDocumentCanonicalizer());
+        var before = integrity.ComputeHash(document);
+
+        var report = new EpubFidelityAnalyzer().Analyze(import);
+
+        var unknown = Measurement(report, EpubFidelityMetric.UnknownOrUnrepresentableElements);
+        Assert.Equal(6, unknown.SourceCount);
+        Assert.Equal(4, unknown.TransformedCount);
+        Assert.Equal(2, unknown.ApproximatedCount);
+        Assert.Equal(0, unknown.LostCount);
+        Assert.Equal(before, integrity.ComputeHash(document));
+        Assert.Equal(4, import.Diagnostics
+            .Where(static item => item.Code == EpubDiagnosticCodes.TransparentContainerTransformed)
+            .Sum(static item => item.Count));
+        Assert.All(
+            report.Findings.Where(static item =>
+                item.RelatedDiagnosticCode == EpubDiagnosticCodes.TransparentContainerTransformed),
+            static finding =>
+            {
+                Assert.Equal(EpubFidelityStatus.Transformed, finding.Status);
+                Assert.Equal(EpubFidelityImpact.Informational, finding.Impact);
+            });
+        Assert.Contains(report.Findings, static finding =>
+            finding.RelatedDiagnosticCode == EpubDiagnosticCodes.UnsupportedElement
+            && finding.Status == EpubFidelityStatus.Approximated);
+    }
+
+    [Fact]
     public async Task Analyze_ReportsDeduplicatedImagesAsManyToOneTransformation()
     {
         const string chapter = """
@@ -80,6 +121,25 @@ public sealed class EpubFidelityAnalyzerTests
         Assert.Equal(2, images.SourceCount);
         Assert.Equal(2, images.DestinationCount);
         Assert.Equal(2, images.TransformedCount);
+    }
+
+    [Fact]
+    public async Task Analyze_ClassifiesUnrepresentedTableColumnMetadataAsMinorApproximation()
+    {
+        const string chapter = """
+            <html xmlns="http://www.w3.org/1999/xhtml"><body>
+              <table><colgroup><col /><col /></colgroup><tbody><tr><td>A</td><td>B</td></tr></tbody></table>
+            </body></html>
+            """;
+        await using var epub = MinimalEpubFactory.Create(chapterOne: chapter);
+
+        var report = new EpubFidelityAnalyzer().Analyze(await new EpubImporter().ImportAsync(epub));
+
+        var finding = Assert.Single(report.Findings, static item =>
+            item.RelatedDiagnosticCode == EpubDiagnosticCodes.TableColumnMetadataNotRepresented);
+        Assert.Equal(EpubFidelityStatus.Approximated, finding.Status);
+        Assert.Equal(EpubFidelityImpact.Minor, finding.Impact);
+        Assert.Equal(1, finding.Count);
     }
 
     [Fact]

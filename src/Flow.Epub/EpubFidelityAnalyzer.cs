@@ -64,6 +64,12 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
             return new EpubFidelityMeasurement(metric, 0, destination, 0, 0, 0, 0, 0);
         }
 
+        var forcedPreserved = sourceItems
+            .Where(static item => item.ForcedStatus == EpubFidelityStatus.Preserved)
+            .Sum(static item => item.Count);
+        var forcedTransformed = sourceItems
+            .Where(static item => item.ForcedStatus == EpubFidelityStatus.Transformed)
+            .Sum(static item => item.Count);
         var approximated = sourceItems
             .Where(static item => item.ForcedStatus == EpubFidelityStatus.Approximated)
             .Sum(static item => item.Count);
@@ -73,11 +79,11 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
         var forcedLost = sourceItems
             .Where(static item => item.ForcedStatus == EpubFidelityStatus.Lost)
             .Sum(static item => item.Count);
-        var eligible = source - approximated - unsupported - forcedLost;
+        var eligible = source - forcedPreserved - forcedTransformed - approximated - unsupported - forcedLost;
         var represented = Math.Min(eligible, destination);
         var lost = forcedLost + eligible - represented;
-        var transformed = IsTransformation(metric) ? represented : 0;
-        var preserved = transformed == 0 ? represented : 0;
+        var transformed = forcedTransformed + (IsTransformation(metric) ? represented : 0);
+        var preserved = forcedPreserved + (IsTransformation(metric) ? 0 : represented);
         return new EpubFidelityMeasurement(
             metric,
             source,
@@ -134,8 +140,15 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
                 case CodeBlock code:
                     counts[EpubFidelityMetric.SignificantCharacters] += CountSignificant(code.Code);
                     break;
-                case Figure:
+                case Figure figure:
                     counts[EpubFidelityMetric.Images]++;
+                    if (figure.Link is not null)
+                    {
+                        counts[figure.Link.IsInternal
+                            ? EpubFidelityMetric.InternalLinks
+                            : EpubFidelityMetric.ExternalLinks]++;
+                    }
+
                     break;
                 case Footnote:
                     counts[EpubFidelityMetric.Notes]++;
@@ -236,7 +249,7 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
                 classification.Status,
                 classification.Impact,
                 group.Key.Message,
-                group.Count(),
+                group.Sum(static diagnostic => diagnostic.Count),
                 group.Key.Resource,
                 location?.Fragment,
                 location?.NodeId,
@@ -249,13 +262,30 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
         string code,
         EpubDiagnosticSeverity severity)
     {
+        if (code == EpubDiagnosticCodes.TransparentContainerTransformed)
+        {
+            return (EpubFidelityStatus.Transformed, EpubFidelityImpact.Informational);
+        }
+
+        if (code == EpubDiagnosticCodes.MissingImageAlternativeText)
+        {
+            return (EpubFidelityStatus.Approximated, EpubFidelityImpact.Moderate);
+        }
+
         if (code is EpubDiagnosticCodes.UnsupportedElement
             or EpubDiagnosticCodes.UnsupportedManifestProperty
+            or EpubDiagnosticCodes.HeadingLevelNormalized
+            or EpubDiagnosticCodes.NoteResourceFallbackUsed
             or EpubDiagnosticCodes.UnsupportedCssProperty
             or EpubDiagnosticCodes.UnsupportedCssSelector
             or EpubDiagnosticCodes.CssTargetNotRepresentable
             or EpubDiagnosticCodes.SvgImageSemanticLoss
-            or EpubDiagnosticCodes.MathSemanticLoss)
+            or EpubDiagnosticCodes.MathSemanticLoss
+            or EpubDiagnosticCodes.EmbeddedFontBytesNotPreserved
+            or EpubDiagnosticCodes.LegacyPageMapNotImported
+            or EpubDiagnosticCodes.CssImageResourceNotPreserved
+            or EpubDiagnosticCodes.ImageAlternativeTextRecovered
+            or EpubDiagnosticCodes.TableColumnMetadataNotRepresented)
         {
             return (EpubFidelityStatus.Approximated, EpubFidelityImpact.Minor);
         }
@@ -263,6 +293,7 @@ public sealed class EpubFidelityAnalyzer : IEpubFidelityAnalyzer
         if (code is EpubDiagnosticCodes.UnsupportedResource
             or EpubDiagnosticCodes.UnsupportedImageFormat
             or EpubDiagnosticCodes.UnsupportedMediaOverlay
+            or EpubDiagnosticCodes.LinkedImageTargetNotRepresentable
             or EpubDiagnosticCodes.UnsafeSvg)
         {
             return (EpubFidelityStatus.Unsupported, EpubFidelityImpact.Moderate);

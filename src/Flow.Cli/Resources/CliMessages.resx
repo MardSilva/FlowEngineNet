@@ -18,6 +18,7 @@
   <data name="ErrorRequiredEpubDeclarations" xml:space="preserve"><value>Both --legal-use and --drm-free are required. These flags are explicit declarations by the caller; Flow does not infer rights or bypass DRM.</value></data>
   <data name="ErrorInvalidCandidateId" xml:space="preserve"><value>Candidate ID '{0}' is invalid. Use 1 to 64 lowercase ASCII letters, digits, dots, hyphens, or underscores.</value></data>
   <data name="ErrorInvalidSha256" xml:space="preserve"><value>--sha256 must contain exactly 64 hexadecimal characters.</value></data>
+  <data name="ErrorInvalidQualificationSha256" xml:space="preserve"><value>--qualification-sha256 must contain exactly 64 hexadecimal characters.</value></data>
   <data name="ErrorCancelled" xml:space="preserve"><value>The operation was cancelled; no partial final output was kept.</value></data>
   <data name="ErrorOperationFailed" xml:space="preserve"><value>The operation failed: {0}</value></data>
   <data name="HelpTitle" xml:space="preserve"><value>Flow Engine .NET 0.2.0-alpha.1 (experimental)</value></data>
@@ -32,6 +33,15 @@
   <data name="HelpImport2" xml:space="preserve"><value>    [--metadata-json &lt;metadata.json&gt;] [--processing-json &lt;processing.json&gt;] [--source-map-json &lt;source-map.json&gt;]</value></data>
   <data name="HelpImport3" xml:space="preserve"><value>    Without --output, the file name is derived from the imported book title.</value></data>
   <data name="HelpEpubInspect" xml:space="preserve"><value>  flow epub-inspect &lt;book.epub&gt; [--json &lt;report.json&gt;]       Inspect EPUB structure.</value></data>
+  <data name="HelpEpubInventory1" xml:space="preserve"><value>  flow epub-inventory &lt;directory&gt; --output &lt;catalog.json&gt; --repository-root &lt;absolute-directory&gt; [--force]</value></data>
+  <data name="HelpEpubInventory2" xml:space="preserve"><value>    Build a neutral local catalog without persisting paths, titles, authors, identifiers, or content.</value></data>
+  <data name="HelpEpubInventoryQualify1" xml:space="preserve"><value>  flow epub-inventory-qualify &lt;directory&gt; --report &lt;report.json&gt; --repository-root &lt;absolute-directory&gt; --legal-use --drm-free</value></data>
+  <data name="HelpEpubInventoryQualify2" xml:space="preserve"><value>    [--force] [--resume]    Qualify every eligible neutral candidate twice through the complete Flow pipeline.</value></data>
+  <data name="HelpEpubInventoryMatrix1" xml:space="preserve"><value>  flow epub-inventory-matrix &lt;qualification.json&gt; --qualification-sha256 &lt;hash&gt; --output &lt;matrix.json&gt;</value></data>
+  <data name="HelpEpubInventoryMatrix2" xml:space="preserve"><value>    --repository-root &lt;absolute-directory&gt; [--force] [--resume]    Classify existing neutral evidence without reopening EPUB files.</value></data>
+  <data name="HelpEpubInventoryReview1" xml:space="preserve"><value>  flow epub-inventory-review &lt;directory&gt; --qualification &lt;qualification.json&gt; --qualification-sha256 &lt;hash&gt; --output &lt;absolute-directory&gt;</value></data>
+  <data name="HelpEpubInventoryReview2" xml:space="preserve"><value>    --repository-root &lt;absolute-directory&gt; --legal-use --drm-free [--ui-language &lt;auto|en|pt-PT|pt-BR&gt;] [--force] [--resume]</value></data>
+  <data name="HelpEpubInventoryReview3" xml:space="preserve"><value>    Generate neutral mobile/desktop review packages for every qualified private candidate.</value></data>
   <data name="HelpCorpus1" xml:space="preserve"><value>  flow corpus &lt;manifest.json&gt; --repository-root &lt;directory&gt; --report &lt;report.json&gt;</value></data>
   <data name="HelpCorpus2" xml:space="preserve"><value>    [--external-root &lt;directory&gt;] [--baseline &lt;baseline.json&gt;] [--force] [--resume]    Run repeated offline corpus qualification.</value></data>
   <data name="HelpEpubQualify1" xml:space="preserve"><value>  flow epub-qualify &lt;book.epub&gt; --candidate-id &lt;id&gt; --sha256 &lt;hash&gt; --report &lt;report.json&gt;</value></data>
@@ -75,6 +85,25 @@
   <data name="Severity_Warning" xml:space="preserve"><value>Warning</value></data>
   <data name="Severity_Error" xml:space="preserve"><value>Error</value></data>
   <data name="ErrorInspectOnlyEpub" xml:space="preserve"><value>epub-inspect accepts only .epub files.</value></data>
+  <data name="ErrorInventoryRepositoryPath" xml:space="preserve"><value>The inventory source and output must remain outside the repository.</value></data>
+  <data name="ErrorInventorySourceOutput" xml:space="preserve"><value>The inventory catalog must remain outside the source EPUB directory.</value></data>
+  <data name="ErrorInventoryOutputExists" xml:space="preserve"><value>The inventory output already exists. Use --force to replace a recognized inventory catalog.</value></data>
+  <data name="ErrorInventoryOutputUnrecognized" xml:space="preserve"><value>--force refused to replace a file that is not a recognized Flow private inventory catalog.</value></data>
+  <data name="ErrorInventoryQualificationAbsolutePaths" xml:space="preserve"><value>The qualification report and repository root must use absolute paths.</value></data>
+  <data name="ErrorInventoryQualificationRepositoryPath" xml:space="preserve"><value>The private source and qualification report must remain outside the repository.</value></data>
+  <data name="ErrorInventoryQualificationSourceOutput" xml:space="preserve"><value>The private qualification report must remain outside the source EPUB directory.</value></data>
+  <data name="ErrorInventoryMatrixAbsolutePaths" xml:space="preserve"><value>The qualification report, matrix output, and repository root must use absolute paths.</value></data>
+  <data name="ErrorInventoryMatrixRepositoryPath" xml:space="preserve"><value>The qualification report and private matrix must remain outside the repository.</value></data>
+  <data name="ErrorInventoryMatrixInputConflict" xml:space="preserve"><value>The private matrix output must use a path different from its qualification report.</value></data>
+  <data name="ErrorInventoryMatrixUnsafeInput" xml:space="preserve"><value>The qualification report is missing or is an unsafe file-system link.</value></data>
+  <data name="ErrorInventoryMatrixInputLimit" xml:space="preserve"><value>The qualification report exceeds the 64 MiB input limit.</value></data>
+  <data name="ErrorInventoryMatrixOutputUnrecognized" xml:space="preserve"><value>--force refused to replace a file that is not a recognized Flow private difference matrix.</value></data>
+  <data name="ErrorInventoryMatrixHashMismatch" xml:space="preserve"><value>The qualification report SHA-256 does not match --qualification-sha256; no matrix was written.</value></data>
+  <data name="ErrorInventoryReviewAbsolutePaths" xml:space="preserve"><value>The EPUB source, qualification report, review output, and repository root must use absolute paths.</value></data>
+  <data name="ErrorInventoryReviewRepositoryPath" xml:space="preserve"><value>The private EPUBs, qualification report, and visual review must remain outside the repository.</value></data>
+  <data name="ErrorInventoryReviewUnsafeInput" xml:space="preserve"><value>The qualification report is missing, too large, or is an unsafe file-system link.</value></data>
+  <data name="ErrorInventoryReviewHashMismatch" xml:space="preserve"><value>The qualification report SHA-256 does not match --qualification-sha256; no review package was written.</value></data>
+  <data name="ErrorInventoryReviewInputConflict" xml:space="preserve"><value>The qualification report must remain outside the EPUB source and visual-review output directories.</value></data>
   <data name="ErrorImportOnlyEpub" xml:space="preserve"><value>The import command currently accepts only .epub files.</value></data>
   <data name="ErrorJsonSourceConflict" xml:space="preserve"><value>The JSON report path must differ from the EPUB source path.</value></data>
   <data name="ErrorOutputSourceConflict" xml:space="preserve"><value>The output path must differ from the EPUB source path.</value></data>
@@ -137,6 +166,16 @@
   <data name="LabelProcessingJson" xml:space="preserve"><value>Processing JSON: {0}</value></data>
   <data name="LabelSourceMapJson" xml:space="preserve"><value>Source map JSON: {0}</value></data>
   <data name="LabelCorpusManifest" xml:space="preserve"><value>Corpus manifest: {0}</value></data>
+  <data name="LabelInventoryReport" xml:space="preserve"><value>Private EPUB inventory: {0}</value></data>
+  <data name="LabelInventoryFiles" xml:space="preserve"><value>Discovered EPUB files: {0}; distinct payloads: {1}.</value></data>
+  <data name="LabelInventorySummary" xml:space="preserve"><value>Inventory: {0} ready, {1} requiring review, {2} protected, {3} corrupt, and {4} unsuitable.</value></data>
+  <data name="LabelInventoryQualificationReport" xml:space="preserve"><value>Private EPUB qualification report: {0}</value></data>
+  <data name="LabelInventoryQualificationSummary" xml:space="preserve"><value>Qualification: {0} total, {1} eligible, {2} passed, {3} failed, {4} inconclusive, {5} nondeterministic, and {6} skipped.</value></data>
+  <data name="LabelInventoryMatrixReport" xml:space="preserve"><value>Private EPUB difference matrix: {0}</value></data>
+  <data name="LabelInventoryMatrixSummary" xml:space="preserve"><value>Matrix: {0} candidates; {1} approved, {2} with approximations, {3} with unsupported content, {4} with content loss, {5} with broken source references, {6} with Flow errors, and {7} requiring human review.</value></data>
+  <data name="LabelInventoryReviewDirectory" xml:space="preserve"><value>Private assisted-review directory: {0}</value></data>
+  <data name="LabelInventoryReviewIndex" xml:space="preserve"><value>Review index: {0}</value></data>
+  <data name="LabelInventoryReviewSummary" xml:space="preserve"><value>Visual review: {0} candidates; {1} packages generated, {2} missing sources, {3} skipped by qualification, and {4} failed.</value></data>
   <data name="LabelCorpusReport" xml:space="preserve"><value>Corpus qualification report: {0}</value></data>
   <data name="LabelCorpusTotal" xml:space="preserve"><value>Corpus publications: {0}</value></data>
   <data name="LabelCorpusSummary" xml:space="preserve"><value>Corpus result: {0} passed, {1} failed, {2} skipped, {3} inconclusive.</value></data>
@@ -274,6 +313,16 @@
   <data name="Diagnostic_EPUB068" xml:space="preserve"><value>An SVG image fallback was used.</value></data>
   <data name="Diagnostic_EPUB069" xml:space="preserve"><value>Some SVG image semantics could not be preserved.</value></data>
   <data name="Diagnostic_EPUB070" xml:space="preserve"><value>A manifest property is outside the supported subset.</value></data>
+  <data name="Diagnostic_EPUB071" xml:space="preserve"><value>A skipped EPUB heading level was normalized.</value></data>
+  <data name="Diagnostic_EPUB072" xml:space="preserve"><value>A note reference without a fragment used the only semantic note without a source ID in its target resource.</value></data>
+  <data name="Diagnostic_EPUB073" xml:space="preserve"><value>A link attached only to an image cannot be represented by the current Flow model.</value></data>
+  <data name="Diagnostic_EPUB074" xml:space="preserve"><value>An embedded font is recognized, but its bytes are not retained; rendering may use the installed family or a fallback.</value></data>
+  <data name="Diagnostic_EPUB075" xml:space="preserve"><value>A neutral XHTML container was flattened while preserving its child content and reading order.</value></data>
+  <data name="Diagnostic_EPUB076" xml:space="preserve"><value>A legacy EPUB 2 page map is recognized, but its source-page navigation is not imported.</value></data>
+  <data name="Diagnostic_EPUB077" xml:space="preserve"><value>An image path used different letter casing from its unique manifest resource; the manifest path was used.</value></data>
+  <data name="Diagnostic_EPUB078" xml:space="preserve"><value>A local image is referenced only through CSS and is not retained as a semantic Flow asset.</value></data>
+  <data name="Diagnostic_EPUB079" xml:space="preserve"><value>An image without alt text used another explicit textual alternative from the publication.</value></data>
+  <data name="Diagnostic_EPUB080" xml:space="preserve"><value>Table column metadata is not represented by the Flow table model.</value></data>
   <data name="Diagnostic_EPC001" xml:space="preserve"><value>The corpus manifest JSON is invalid.</value></data>
   <data name="Diagnostic_EPC002" xml:space="preserve"><value>The corpus manifest encoding is invalid.</value></data>
   <data name="Diagnostic_EPC003" xml:space="preserve"><value>The corpus manifest format is unsupported.</value></data>

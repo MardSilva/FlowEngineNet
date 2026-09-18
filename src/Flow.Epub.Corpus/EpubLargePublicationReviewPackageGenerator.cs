@@ -125,7 +125,7 @@ public sealed class EpubLargePublicationReviewPackageGenerator : IEpubLargePubli
                 .ConfigureAwait(false);
 
             var samples = CreateSamples(document, mobile.Evidence, desktop.Evidence);
-            var targets = CreateTargets(document, mobile.Evidence, desktop.Evidence);
+            var targets = CreateTargets(document, imported, mobile.Evidence, desktop.Evidence);
             var reviewItems = CreateReviewItems(samples, targets);
             var checklistBytes = SerializeChecklist(options.CandidateId, samples, targets, reviewItems);
             await File.WriteAllBytesAsync(
@@ -241,6 +241,7 @@ public sealed class EpubLargePublicationReviewPackageGenerator : IEpubLargePubli
 
     private static ImmutableArray<EpubLargePublicationReviewTarget> CreateTargets(
         FlowDocument document,
+        EpubImportResult import,
         HtmlBookPackageEvidence mobile,
         HtmlBookPackageEvidence desktop)
     {
@@ -250,6 +251,13 @@ public sealed class EpubLargePublicationReviewPackageGenerator : IEpubLargePubli
         };
         AddTarget("link", FindInlineOwner<Link>(document), targets, mobile, desktop);
         AddTarget("image", document.Index.Locations.Select(static item => item.Node).OfType<Figure>().FirstOrDefault(), targets, mobile, desktop);
+        AddTarget(
+            "linked-image",
+            document.Index.Locations.Select(static item => item.Node).OfType<Figure>()
+                .FirstOrDefault(static figure => figure.Link is not null),
+            targets,
+            mobile,
+            desktop);
         if (document.Presentation?.Cover is { } cover
             && document.Index.TryGetUniqueNode(cover.FigureId, out var coverNode))
         {
@@ -258,6 +266,24 @@ public sealed class EpubLargePublicationReviewPackageGenerator : IEpubLargePubli
 
         AddTarget("note", document.Index.Locations.Select(static item => item.Node).OfType<Footnote>().FirstOrDefault(), targets, mobile, desktop);
         AddTarget("table", document.Index.Locations.Select(static item => item.Node).OfType<Table>().FirstOrDefault(), targets, mobile, desktop);
+        AddTarget("ruby", FindInlineOwner<Ruby>(document), targets, mobile, desktop);
+        AddTarget("bidirectional", FindInlineOwner<BidirectionalSpan>(document), targets, mobile, desktop);
+        AddTarget(
+            "math",
+            document.Index.Locations.Select(static item => item.Node).OfType<MathExpression>().FirstOrDefault()
+            ?? FindInlineOwner<InlineMath>(document),
+            targets,
+            mobile,
+            desktop);
+        AddTarget(
+            "svg",
+            document.Index.Locations.Select(static item => item.Node).OfType<Figure>().FirstOrDefault(figure =>
+                document.Assets.TryGetValue(figure.AssetId, out var asset)
+                && string.Equals(asset.MediaType, "image/svg+xml", StringComparison.OrdinalIgnoreCase)),
+            targets,
+            mobile,
+            desktop);
+        AddTarget("diagnostics", FindDiagnosticChapter(document, import), targets, mobile, desktop);
         return targets.OrderBy(static item => item.Category, StringComparer.Ordinal).ToImmutableArray();
     }
 
@@ -275,6 +301,9 @@ public sealed class EpubLargePublicationReviewPackageGenerator : IEpubLargePubli
             Item("media.images-and-cover", targetCategories.Contains("image") || targetCategories.Contains("cover")),
             Item("notes", targetCategories.Contains("note")),
             Item("tables", targetCategories.Contains("table")),
+            Item("internationalization", targetCategories.Contains("ruby") || targetCategories.Contains("bidirectional")),
+            Item("math", targetCategories.Contains("math")),
+            Item("diagnostics", targetCategories.Contains("diagnostics")),
         };
         items.AddRange(samples.Select(sample => Pending($"sample.{Token(sample.Position)}")));
         return items.OrderBy(static item => item.Id, StringComparer.Ordinal).ToImmutableArray();
@@ -310,6 +339,56 @@ public sealed class EpubLargePublicationReviewPackageGenerator : IEpubLargePubli
         where TInline : InlineNode => document.Index.Locations
         .Select(static item => item.Node)
         .FirstOrDefault(node => EnumerateInline(node).OfType<TInline>().Any());
+
+    private static Chapter? FindDiagnosticChapter(FlowDocument document, EpubImportResult import)
+    {
+        if (import.SourceMap is null)
+        {
+            return null;
+        }
+
+        var resource = import.Diagnostics
+            .Where(static item => !string.IsNullOrWhiteSpace(item.Resource))
+            .GroupBy(static item => item.Resource!, StringComparer.Ordinal)
+            .Select(static group => new
+            {
+                Resource = group.Key,
+                Count = group.Sum(static item => item.Count),
+            })
+            .OrderByDescending(static item => item.Count)
+            .ThenBy(static item => item.Resource, StringComparer.Ordinal)
+            .FirstOrDefault();
+        if (resource is null)
+        {
+            return null;
+        }
+
+        var parentByNode = document.Index.Locations.ToDictionary(
+            static location => location.Node.Id,
+            static location => location.Parent?.Id);
+        foreach (var location in import.SourceMap.Locations
+                     .Where(item => string.Equals(item.ResourcePath, resource.Resource, StringComparison.Ordinal))
+                     .OrderBy(static item => item.Fragment, StringComparer.Ordinal))
+        {
+            var nodeId = location.NodeId;
+            while (document.Index.TryGetUniqueNode(nodeId, out var node))
+            {
+                if (node is Chapter chapter)
+                {
+                    return chapter;
+                }
+
+                if (!parentByNode.TryGetValue(nodeId, out var parentId) || parentId is null)
+                {
+                    break;
+                }
+
+                nodeId = parentId;
+            }
+        }
+
+        return null;
+    }
 
     private static IEnumerable<InlineNode> EnumerateInline(DocumentNode node)
     {

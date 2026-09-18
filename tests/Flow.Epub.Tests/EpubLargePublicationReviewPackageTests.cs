@@ -119,6 +119,25 @@ public sealed class EpubLargePublicationReviewPackageTests
     }
 
     [Fact]
+    public async Task VariedFixture_SelectsInternationalizationMathAndSvgTargets()
+    {
+        using var workspace = new TemporaryWorkspace();
+        var bytes = EpubCorpusFixtureFactory.CreateAll()["flow-epub3-varied"];
+        var candidate = workspace.AddCandidate("varied-review", bytes);
+        var output = Path.Combine(workspace.Path, "varied");
+
+        var result = await CreateGenerator().GenerateAsync(
+            candidate,
+            Options(candidate, bytes, output, workspace.RepositoryRoot));
+
+        Assert.Contains(result.Targets, static item => item.Category == "ruby");
+        Assert.Contains(result.Targets, static item => item.Category == "bidirectional");
+        Assert.Contains(result.Targets, static item => item.Category == "math");
+        Assert.Contains(result.Targets, static item => item.Category == "svg");
+        Assert.Contains(result.Targets, static item => item.Category == "diagnostics");
+    }
+
+    [Fact]
     public async Task RendererFailure_PreservesPreviousDestinationAndRemovesStagingDirectory()
     {
         using var workspace = new TemporaryWorkspace();

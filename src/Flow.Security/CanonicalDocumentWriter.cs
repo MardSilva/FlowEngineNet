@@ -5,10 +5,14 @@ namespace Flow.Security;
 
 internal static class CanonicalDocumentWriter
 {
-    internal static void Write(Utf8JsonWriter writer, FlowDocument document)
+    internal static void Write(
+        Utf8JsonWriter writer,
+        FlowDocument document,
+        string canonicalizationVersion,
+        bool includeFigureLinks)
     {
         writer.WriteStartObject();
-        writer.WriteString("canonicalization", FlowDocumentCanonicalizer.Version);
+        writer.WriteString("canonicalization", canonicalizationVersion);
 
         writer.WritePropertyName("identity");
         writer.WriteStartObject();
@@ -34,7 +38,7 @@ internal static class CanonicalDocumentWriter
         writer.WriteEndObject();
 
         writer.WritePropertyName("content");
-        WriteNodes(writer, document.Content.Children);
+        WriteNodes(writer, document.Content.Children, canonicalizationVersion, includeFigureLinks);
 
         writer.WritePropertyName("assets");
         writer.WriteStartArray();
@@ -52,30 +56,38 @@ internal static class CanonicalDocumentWriter
         writer.WriteEndObject();
     }
 
-    private static void WriteNodes(Utf8JsonWriter writer, IEnumerable<DocumentNode> nodes)
+    private static void WriteNodes(
+        Utf8JsonWriter writer,
+        IEnumerable<DocumentNode> nodes,
+        string canonicalizationVersion,
+        bool includeFigureLinks)
     {
         writer.WriteStartArray();
         foreach (var node in nodes)
         {
-            WriteNode(writer, node);
+            WriteNode(writer, node, canonicalizationVersion, includeFigureLinks);
         }
 
         writer.WriteEndArray();
     }
 
-    private static void WriteNode(Utf8JsonWriter writer, DocumentNode node)
+    private static void WriteNode(
+        Utf8JsonWriter writer,
+        DocumentNode node,
+        string canonicalizationVersion,
+        bool includeFigureLinks)
     {
         writer.WriteStartObject();
-        writer.WriteString("type", GetNodeType(node));
+        writer.WriteString("type", GetNodeType(node, canonicalizationVersion));
         writer.WriteString("id", node.Id.Value);
 
         switch (node)
         {
             case Chapter chapter:
-                WriteChildren(writer, chapter.Children);
+                WriteChildren(writer, chapter.Children, canonicalizationVersion, includeFigureLinks);
                 break;
             case Section section:
-                WriteChildren(writer, section.Children);
+                WriteChildren(writer, section.Children, canonicalizationVersion, includeFigureLinks);
                 break;
             case Heading heading:
                 writer.WriteNumber("level", heading.Level);
@@ -85,23 +97,48 @@ internal static class CanonicalDocumentWriter
                 WriteInlineProperty(writer, "content", paragraph.Content);
                 break;
             case BlockQuote blockQuote:
-                WriteChildren(writer, blockQuote.Children);
+                WriteChildren(writer, blockQuote.Children, canonicalizationVersion, includeFigureLinks);
                 break;
             case OrderedList orderedList:
                 writer.WriteNumber("start", orderedList.Start);
                 writer.WritePropertyName("items");
-                WriteNodes(writer, orderedList.Items);
+                WriteNodes(writer, orderedList.Items, canonicalizationVersion, includeFigureLinks);
                 break;
             case UnorderedList unorderedList:
                 writer.WritePropertyName("items");
-                WriteNodes(writer, unorderedList.Items);
+                WriteNodes(writer, unorderedList.Items, canonicalizationVersion, includeFigureLinks);
                 break;
             case ListItem listItem:
-                WriteChildren(writer, listItem.Children);
+                WriteChildren(writer, listItem.Children, canonicalizationVersion, includeFigureLinks);
                 break;
             case Figure figure:
                 writer.WriteString("assetId", figure.AssetId.Value);
                 WriteNullableString(writer, "alternativeText", figure.AlternativeText);
+                if (includeFigureLinks)
+                {
+                    writer.WritePropertyName("link");
+                    if (figure.Link is null)
+                    {
+                        writer.WriteNullValue();
+                    }
+                    else
+                    {
+                        writer.WriteStartObject();
+                        if (figure.Link.Anchor is not null)
+                        {
+                            writer.WriteString("kind", "internal");
+                            writer.WriteString("anchor", figure.Link.Anchor.Value);
+                        }
+                        else
+                        {
+                            writer.WriteString("kind", "external");
+                            writer.WriteString("uri", figure.Link.ExternalUri);
+                        }
+
+                        writer.WriteEndObject();
+                    }
+                }
+
                 writer.WritePropertyName("caption");
                 if (figure.Caption is null)
                 {
@@ -109,7 +146,7 @@ internal static class CanonicalDocumentWriter
                 }
                 else
                 {
-                    WriteNode(writer, figure.Caption);
+                    WriteNode(writer, figure.Caption, canonicalizationVersion, includeFigureLinks);
                 }
 
                 break;
@@ -117,36 +154,36 @@ internal static class CanonicalDocumentWriter
                 WriteInlineProperty(writer, "content", caption.Content);
                 break;
             case Footnote footnote:
-                WriteChildren(writer, footnote.Children);
+                WriteChildren(writer, footnote.Children, canonicalizationVersion, includeFigureLinks);
                 break;
             case Table table:
-                WriteNullableNode(writer, "caption", table.Caption);
-                WriteNullableNode(writer, "head", table.Head);
+                WriteNullableNode(writer, "caption", table.Caption, canonicalizationVersion, includeFigureLinks);
+                WriteNullableNode(writer, "head", table.Head, canonicalizationVersion, includeFigureLinks);
                 writer.WritePropertyName("bodies");
-                WriteNodes(writer, table.Bodies);
-                WriteNullableNode(writer, "foot", table.Foot);
+                WriteNodes(writer, table.Bodies, canonicalizationVersion, includeFigureLinks);
+                WriteNullableNode(writer, "foot", table.Foot, canonicalizationVersion, includeFigureLinks);
                 break;
             case TableCaption tableCaption:
-                WriteChildren(writer, tableCaption.Children);
+                WriteChildren(writer, tableCaption.Children, canonicalizationVersion, includeFigureLinks);
                 break;
             case TableHead tableHead:
-                WriteNodeArray(writer, "rows", tableHead.Rows);
+                WriteNodeArray(writer, "rows", tableHead.Rows, canonicalizationVersion, includeFigureLinks);
                 break;
             case TableBody tableBody:
-                WriteNodeArray(writer, "rows", tableBody.Rows);
+                WriteNodeArray(writer, "rows", tableBody.Rows, canonicalizationVersion, includeFigureLinks);
                 break;
             case TableFoot tableFoot:
-                WriteNodeArray(writer, "rows", tableFoot.Rows);
+                WriteNodeArray(writer, "rows", tableFoot.Rows, canonicalizationVersion, includeFigureLinks);
                 break;
             case TableRow tableRow:
-                WriteNodeArray(writer, "cells", tableRow.Cells);
+                WriteNodeArray(writer, "cells", tableRow.Cells, canonicalizationVersion, includeFigureLinks);
                 break;
             case TableHeaderCell headerCell:
-                WriteCell(writer, headerCell);
+                WriteCell(writer, headerCell, canonicalizationVersion, includeFigureLinks);
                 WriteNullableString(writer, "scope", headerCell.Scope?.ToString());
                 break;
             case TableCell tableCell:
-                WriteCell(writer, tableCell);
+                WriteCell(writer, tableCell, canonicalizationVersion, includeFigureLinks);
                 break;
             case MathExpression mathExpression:
                 WriteMathElement(writer, "root", mathExpression.Root);
@@ -176,13 +213,13 @@ internal static class CanonicalDocumentWriter
                 break;
             default:
                 throw new NotSupportedException(
-                    $"Node type '{node.GetType().FullName}' is not part of {FlowDocumentCanonicalizer.Version}.");
+                    $"Node type '{node.GetType().FullName}' is not part of {canonicalizationVersion}.");
         }
 
         writer.WriteEndObject();
     }
 
-    private static string GetNodeType(DocumentNode node) => node switch
+    private static string GetNodeType(DocumentNode node, string canonicalizationVersion) => node switch
     {
         Chapter => "chapter",
         Section => "section",
@@ -208,16 +245,16 @@ internal static class CanonicalDocumentWriter
         CodeBlock => "codeBlock",
         TableOfContents => "tableOfContents",
         _ => throw new NotSupportedException(
-            $"Node type '{node.GetType().FullName}' is not part of {FlowDocumentCanonicalizer.Version}."),
+            $"Node type '{node.GetType().FullName}' is not part of {canonicalizationVersion}."),
     };
 
-    private static void WriteChildren(Utf8JsonWriter writer, IEnumerable<DocumentNode> children)
+    private static void WriteChildren(Utf8JsonWriter writer, IEnumerable<DocumentNode> children, string version, bool includeFigureLinks)
     {
         writer.WritePropertyName("children");
-        WriteNodes(writer, children);
+        WriteNodes(writer, children, version, includeFigureLinks);
     }
 
-    private static void WriteNullableNode(Utf8JsonWriter writer, string propertyName, DocumentNode? node)
+    private static void WriteNullableNode(Utf8JsonWriter writer, string propertyName, DocumentNode? node, string version, bool includeFigureLinks)
     {
         writer.WritePropertyName(propertyName);
         if (node is null)
@@ -226,20 +263,22 @@ internal static class CanonicalDocumentWriter
         }
         else
         {
-            WriteNode(writer, node);
+            WriteNode(writer, node, version, includeFigureLinks);
         }
     }
 
     private static void WriteNodeArray(
         Utf8JsonWriter writer,
         string propertyName,
-        IEnumerable<DocumentNode> nodes)
+        IEnumerable<DocumentNode> nodes,
+        string version,
+        bool includeFigureLinks)
     {
         writer.WritePropertyName(propertyName);
-        WriteNodes(writer, nodes);
+        WriteNodes(writer, nodes, version, includeFigureLinks);
     }
 
-    private static void WriteCell(Utf8JsonWriter writer, TableCellNode cell)
+    private static void WriteCell(Utf8JsonWriter writer, TableCellNode cell, string version, bool includeFigureLinks)
     {
         writer.WriteNumber("columnSpan", cell.ColumnSpan);
         writer.WriteNumber("rowSpan", cell.RowSpan);
@@ -251,7 +290,7 @@ internal static class CanonicalDocumentWriter
         }
 
         writer.WriteEndArray();
-        WriteChildren(writer, cell.Children);
+        WriteChildren(writer, cell.Children, version, includeFigureLinks);
     }
 
     private static void WriteInlineProperty(
@@ -331,7 +370,7 @@ internal static class CanonicalDocumentWriter
                 break;
             default:
                 throw new NotSupportedException(
-                    $"Inline type '{node.GetType().FullName}' is not part of {FlowDocumentCanonicalizer.Version}.");
+                    $"Inline type '{node.GetType().FullName}' is not part of the canonical profile.");
         }
 
         writer.WriteEndObject();
@@ -355,7 +394,7 @@ internal static class CanonicalDocumentWriter
         RubyFallbackParenthesis => "rubyFallbackParenthesis",
         LineBreak => "lineBreak",
         _ => throw new NotSupportedException(
-            $"Inline type '{node.GetType().FullName}' is not part of {FlowDocumentCanonicalizer.Version}."),
+            $"Inline type '{node.GetType().FullName}' is not part of the canonical profile."),
     };
 
     private static void WriteMathElement(Utf8JsonWriter writer, string propertyName, MathElement element)
@@ -395,7 +434,7 @@ internal static class CanonicalDocumentWriter
                 break;
             default:
                 throw new NotSupportedException(
-                    $"Math type '{node.GetType().FullName}' is not part of {FlowDocumentCanonicalizer.Version}.");
+                    $"Math type '{node.GetType().FullName}' is not part of the canonical profile.");
         }
 
         writer.WriteEndObject();

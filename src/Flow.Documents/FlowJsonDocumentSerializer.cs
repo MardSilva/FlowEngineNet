@@ -5,7 +5,7 @@ using System.Text.Unicode;
 
 namespace Flow.Documents;
 
-/// <summary>Reads and writes the deterministic, experimental <c>flow-json-0.1</c> representation.</summary>
+/// <summary>Reads legacy <c>flow-json-0.1</c> and reads or writes deterministic <c>flow-json-0.2</c>.</summary>
 public sealed class FlowJsonDocumentSerializer : IFlowDocumentSerializer
 {
     /// <inheritdoc />

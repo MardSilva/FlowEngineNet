@@ -1,5 +1,7 @@
 # Adaptive layout 0.1
 
+English | [Português (Brasil)](pt-BR/adaptive-layout.md)
+
 `AdaptiveLayoutEngine` is a pure, renderer-independent transformation from an immutable `FlowDocument` and a runtime `LayoutContext` to an immutable `LayoutDocument`. The result contains semantic-node references, resolved reading styles, responsive constraints, and layout intentions. It contains no markup, style-sheet strings, coordinates, measured boxes, pages, or renderer output.
 
 ## Reading mode
@@ -34,4 +36,4 @@ Optional author intentions override these defaults except when the small-screen 
 
 ## Validation and identity
 
-The engine validates the semantic document before producing layout. Invalid hierarchy, references, assets, or IDs prevent layout and expose the validation diagnostic codes in the exception message. Layout identity and version are copied from `DocumentIdentity`; node identity is preserved from each semantic node. None of this runtime layout state participates in `flow-c14n-0.1` or `DocumentHash`.
+The engine validates the semantic document before producing layout. Invalid hierarchy, references, assets, or IDs prevent layout and expose the validation diagnostic codes in the exception message. Layout identity and version are copied from `DocumentIdentity`; node identity is preserved from each semantic node. None of this runtime layout state participates in a Flow canonical profile or `DocumentHash`.

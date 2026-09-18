@@ -1,4 +1,6 @@
 using System.IO.Compression;
+using System.Text;
+using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
 
@@ -6,6 +8,27 @@ namespace Flow.Epub;
 
 internal static class EpubArchiveUtilities
 {
+    private static readonly Regex Html5Doctype = new(
+        "^<!DOCTYPE\\s+html\\s*>$",
+        RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
+
+    private static readonly Regex XhtmlPublicDoctype = new(
+        "^<!DOCTYPE\\s+html\\s+PUBLIC\\s+\"(?<public>[^\"]+)\"\\s+\"(?<system>[^\"]+)\"\\s*>$",
+        RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
+
+    private static readonly Regex NcxPublicDoctype = new(
+        "^<!DOCTYPE\\s+ncx\\s+PUBLIC\\s+\"-//NISO//DTD ncx 2005-1//EN\"\\s+\"http://www.daisy.org/z3986/2005/ncx-2005-1.dtd\"\\s*>$",
+        RegexOptions.CultureInvariant | RegexOptions.NonBacktracking);
+
+    private static readonly IReadOnlyDictionary<string, string> KnownXhtmlPublicDoctypes =
+        new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            ["-//W3C//DTD XHTML 1.0 Strict//EN"] = "http://www.w3.org/TR/xhtml1/DTD/xhtml1-strict.dtd",
+            ["-//W3C//DTD XHTML 1.0 Transitional//EN"] = "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd",
+            ["-//W3C//DTD XHTML 1.0 Frameset//EN"] = "http://www.w3.org/TR/xhtml1/DTD/xhtml1-frameset.dtd",
+            ["-//W3C//DTD XHTML 1.1//EN"] = "http://www.w3.org/TR/xhtml11/DTD/xhtml11.dtd",
+        };
+
     internal static async Task<MemoryStream> CopyWithLimitAsync(
         Stream source,
         long maximumBytes,
@@ -110,7 +133,8 @@ internal static class EpubArchiveUtilities
         string resource,
         EpubImportLimits limits,
         List<EpubDiagnostic> diagnostics,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        EpubXmlDoctypeProfile doctypeProfile = EpubXmlDoctypeProfile.None)
     {
         try
         {
@@ -119,10 +143,26 @@ internal static class EpubArchiveUtilities
                 source,
                 limits.MaximumEntryBytes,
                 cancellationToken).ConfigureAwait(false);
+            var doctypeDisposition = doctypeProfile != EpubXmlDoctypeProfile.None
+                ? InspectDoctype(buffer, doctypeProfile)
+                : DoctypeDisposition.None;
+            if (doctypeDisposition == DoctypeDisposition.Unsupported)
+            {
+                diagnostics.Add(Error(
+                    EpubDiagnosticCodes.InvalidXml,
+                    $"XML resource '{resource}' declares an unsupported or unsafe DOCTYPE for its resource type. "
+                    + "Only exact known public declarations without an internal subset are accepted; DTD content is never loaded.",
+                    resource));
+                return null;
+            }
+
+            buffer.Position = 0;
             var settings = new XmlReaderSettings
             {
                 Async = false,
-                DtdProcessing = DtdProcessing.Prohibit,
+                DtdProcessing = doctypeDisposition == DoctypeDisposition.Known
+                    ? DtdProcessing.Ignore
+                    : DtdProcessing.Prohibit,
                 XmlResolver = null,
                 MaxCharactersInDocument = limits.MaximumXmlCharacters,
                 MaxCharactersFromEntities = 0,
@@ -145,6 +185,115 @@ internal static class EpubArchiveUtilities
                 resource));
             return null;
         }
+    }
+
+    private static DoctypeDisposition InspectDoctype(
+        MemoryStream buffer,
+        EpubXmlDoctypeProfile profile)
+    {
+        var source = DecodeForDoctypeInspection(buffer);
+        var start = source.IndexOf("<!DOCTYPE", StringComparison.Ordinal);
+        if (start < 0)
+        {
+            return DoctypeDisposition.None;
+        }
+
+        var end = FindDoctypeEnd(source, start + "<!DOCTYPE".Length);
+        if (end < 0)
+        {
+            return DoctypeDisposition.Unsupported;
+        }
+
+        var declaration = source[start..(end + 1)];
+        if (declaration.Contains('[', StringComparison.Ordinal)
+            || source.IndexOf("<!DOCTYPE", end + 1, StringComparison.Ordinal) >= 0)
+        {
+            return DoctypeDisposition.Unsupported;
+        }
+
+        if (profile == EpubXmlDoctypeProfile.Xhtml && Html5Doctype.IsMatch(declaration))
+        {
+            return DoctypeDisposition.Known;
+        }
+
+        var match = XhtmlPublicDoctype.Match(declaration);
+        var knownXhtml = profile == EpubXmlDoctypeProfile.Xhtml
+            && match.Success
+            && KnownXhtmlPublicDoctypes.TryGetValue(match.Groups["public"].Value, out var expectedSystemId)
+            && string.Equals(match.Groups["system"].Value, expectedSystemId, StringComparison.Ordinal);
+        var knownNcx = profile == EpubXmlDoctypeProfile.Ncx
+            && NcxPublicDoctype.IsMatch(declaration);
+        return knownXhtml || knownNcx
+                ? DoctypeDisposition.Known
+                : DoctypeDisposition.Unsupported;
+    }
+
+    private static string DecodeForDoctypeInspection(MemoryStream buffer)
+    {
+        var bytes = buffer.TryGetBuffer(out var segment)
+            ? segment.AsSpan(0, checked((int)buffer.Length))
+            : buffer.ToArray().AsSpan();
+        if (bytes.StartsWith(Encoding.UTF8.Preamble))
+        {
+            return Encoding.UTF8.GetString(bytes[Encoding.UTF8.Preamble.Length..]);
+        }
+
+        if (bytes.StartsWith(Encoding.UTF32.Preamble))
+        {
+            return Encoding.UTF32.GetString(bytes[Encoding.UTF32.Preamble.Length..]);
+        }
+
+        if (bytes.StartsWith(Encoding.BigEndianUnicode.Preamble))
+        {
+            return Encoding.BigEndianUnicode.GetString(bytes[Encoding.BigEndianUnicode.Preamble.Length..]);
+        }
+
+        if (bytes.StartsWith(Encoding.Unicode.Preamble))
+        {
+            return Encoding.Unicode.GetString(bytes[Encoding.Unicode.Preamble.Length..]);
+        }
+
+        // XML markup is ASCII-compatible for the encodings commonly used by EPUB.
+        // Latin-1 preserves byte positions while inspecting only the declaration syntax.
+        return Encoding.Latin1.GetString(bytes);
+    }
+
+    private static int FindDoctypeEnd(string source, int offset)
+    {
+        char quote = '\0';
+        var subsetDepth = 0;
+        for (var index = offset; index < source.Length; index++)
+        {
+            var character = source[index];
+            if (quote != '\0')
+            {
+                if (character == quote)
+                {
+                    quote = '\0';
+                }
+
+                continue;
+            }
+
+            if (character is '\'' or '"')
+            {
+                quote = character;
+            }
+            else if (character == '[')
+            {
+                subsetDepth++;
+            }
+            else if (character == ']')
+            {
+                subsetDepth--;
+            }
+            else if (character == '>' && subsetDepth == 0)
+            {
+                return index;
+            }
+        }
+
+        return -1;
     }
 
     internal static bool TryNormalizeArchivePath(string? baseDirectory, string value, out string normalized)
@@ -218,6 +367,20 @@ internal static class EpubArchiveUtilities
 
     private static EpubDiagnostic Error(string code, string message, string? resource = null) =>
         new(code, EpubDiagnosticSeverity.Error, message, resource);
+
+    private enum DoctypeDisposition
+    {
+        None,
+        Known,
+        Unsupported,
+    }
+}
+
+internal enum EpubXmlDoctypeProfile
+{
+    None,
+    Xhtml,
+    Ncx,
 }
 
 internal sealed class EpubLimitExceededException : Exception

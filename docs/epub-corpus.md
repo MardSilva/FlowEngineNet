@@ -1,8 +1,89 @@
 # Experimental EPUB corpus catalog
 
-The `flow-epub-corpus-0.1` profile describes publications used for `Flow.Epub` interoperability tests. The catalog records evidence about an input; it is not part of the converted book. Catalog fields, diagnostics, and results stay outside `FlowDocument`, `.flow.json`, `flow-c14n-0.1` canonicalization, hashes, and signatures.
+English | [Português (Brasil)](pt-BR/epub-corpus.md)
+
+The `flow-epub-corpus-0.1` profile describes publications used for `Flow.Epub` interoperability tests. The catalog records evidence about an input; it is not part of the converted book. Catalog fields, diagnostics, and results stay outside `FlowDocument`, `.flow.json`, the current `flow-c14n-0.2` canonicalization profile, hashes, and signatures.
 
 The catalog contract, local discovery API, end-to-end executor, reviewed baselines, repeated-run qualification, and optional EPUBCheck adapter are implemented.
+
+## Private directory inventory
+
+`IEpubPrivateInventoryService` builds a neutral catalog before a private directory enters corpus qualification. Discovery is recursive, bounded by candidate count and depth, skips symbolic links and reparse points, opens files read-only, and applies the existing EPUB archive and XML limits during structural inspection.
+
+Readable files receive SHA-256 hashes before inspection. Identical bytes become one candidate with a copy count. `EpubPrivateInventoryReportJsonSerializer` writes deterministic UTF-8 without BOM and with LF line endings. The report excludes source paths, file names, titles, authors, publisher identifiers, timestamps and content.
+
+Protection handling is conservative. IDPF and Adobe font-obfuscation algorithms cause review instead of a DRM claim. Unknown encryption is classified as protected and is not decrypted. A `rights.xml` file records review evidence but is not proof of DRM by itself. Invalid archives, unknown EPUB families and publications without a supported linear XHTML reading order receive separate statuses instead of being omitted.
+
+The CLI requires the source and output to remain outside the repository and refuses to place its catalog in the source tree:
+
+```powershell
+flow --language pt-BR --banner epub-inventory C:\books `
+  --output C:\flow-local\epub-inventory.json `
+  --repository-root C:\src\FlowEngineNet
+```
+
+## Private directory qualification
+
+`IEpubPrivateQualificationService` turns the neutral inventory into a repeated semantic qualification without persisting a manifest containing private paths. Ready and review-required candidates are rediscovered by their expected size and SHA-256. Protected, corrupt and unsuitable candidates stay in the report with an explicit skipped status.
+
+Each eligible candidate goes through the existing `EpubCorpusQualificationService` twice. The phases cover structural inspection, import, document validation, fidelity analysis, Flow JSON round-trip, canonical hash comparison, mobile and desktop layouts and HTML-book verification. Required phase outcomes are expressed through an in-memory local corpus entry; no second importer or renderer pipeline exists for the private workflow.
+
+`flow-epub-private-qualification-0.1` stores neutral IDs, source and canonical hashes, completed phases, semantic and output counts, fidelity loss and aggregated diagnostic codes. It excludes the physical path, file name, title, author, publisher identifier, publication text, ordered node IDs and asset bytes. Because hashes can identify exact bytes, this report is private and must remain outside Git.
+
+```powershell
+flow --language pt-BR --banner epub-inventory-qualify C:\books `
+  --report C:\flow-local\epub-qualification.json `
+  --repository-root C:\src\FlowEngineNet `
+  --legal-use --drm-free
+```
+
+The two declarations record caller assertions; they do not establish legal rights or detect every DRM system. Exit code `0` means that every discovered candidate was eligible, completed the automatic pipeline without measured fidelity loss and produced stable evidence twice. Exit code `2` keeps the report but signals a failed, lossy, inconclusive, nondeterministic or skipped candidate. Human review remains a separate per-publication workflow.
+
+## Private difference matrix
+
+`EpubPrivateDifferenceMatrixService` classifies evidence already recorded by private qualification. It does not open or import the EPUB files again. Every difference receives one typed category and cause, together with its stable code, severity, count, phase and metric. A neutral resource location is included only when the qualification input already provides one.
+
+The categories separate Flow behavior from source defects and human decisions: `Approved`, `ApprovedWithApproximations`, `UnsupportedContent`, `ContentLoss`, `BrokenSourceReference`, `FlowError` and `HumanReviewRequired`. Candidate precedence is conservative: Flow error, content loss, broken source reference, unsupported content, pending human evidence, approximation and approval. Regardless of the automatic category, the human-review state remains pending until a person records a separate decision.
+
+```powershell
+$qualification = 'C:\flow-local\epub-qualification.json'
+$qualificationHash = (Get-FileHash $qualification -Algorithm SHA256).Hash
+
+flow --language pt-BR epub-inventory-matrix $qualification `
+  --qualification-sha256 $qualificationHash `
+  --output C:\flow-local\epub-difference-matrix.json `
+  --repository-root C:\src\FlowEngineNet
+```
+
+The CLI accepts only the known `flow-epub-private-qualification-0.1` contract, verifies the complete input-file hash, rejects duplicate candidate IDs and validates the report summary before classification. It writes `flow-epub-private-difference-matrix-0.1` atomically as deterministic UTF-8 without BOM and with LF line endings. Input and output must be absolute regular files outside the repository, and replacing a recognized matrix requires `--force`.
+
+The matrix remains private. Exact source and qualification hashes can identify bytes even though the format excludes paths, file names, titles, authors, publisher identifiers, publication text and asset bytes. It is regression evidence, not an editorial approval or an EPUB conformance certificate.
+
+The first resource-cause triage found embedded fonts referenced by publication CSS. They produce `EPUB074` with the typed `EmbeddedFontSubstitution` cause instead of generic `EPUB009` evidence. The expanded local set contains 15 inputs: all 14 eligible publications pass repeated qualification without measured loss, and one corrupt input is skipped. Neutral `div`/`span` flattening contributes 22,598 informational `EPUB075` transformations. Fourteen TTF resources in two publications use the legacy `application/x-font-truetype` declaration. One EPUB 2 page map produces `EPUB076`; its XML, labels and destinations are not imported. The last four lost units were reconciled as two image-only paragraph transformations, one linked image inside a transparent container, and one unique image-path case mismatch recovered through `EPUB077`. The remaining `EPUB009` was a local JPEG referenced only by a CSS background. It now produces `EPUB078`, which records the presentation approximation without treating the resource as unknown or adding it to canonical content.
+
+The final `EPUB041` belongs to an image-only source fragment with no `alt`, ARIA label, title, caption, or nearby authored alternative. Flow does not guess from pixels, file names, metadata, or unrelated text. The difference matrix now classifies that case as `human-review-required` with cause `source-accessibility-defect`. Images that do provide another explicit XHTML alternative are preserved through `EPUB079`. Two complete qualifications after that correction were byte-identical with SHA-256 `81783C90F3F53EBF23C30F01E542544FA45C06D33D37C620EA0CAE981B059193`; no canonical document hash changed. The matrix SHA-256 was `5C6B8CA4F5BA4FCDEC60287C71BC0AF9EEE5BA20ACA1D4FEB5AAD432C2397520`: 13 candidates had automatic approximations, one required human accessibility review, the corrupt input retained broken-source evidence, and none had unsupported content, measured loss, or a Flow error.
+
+The final table triage found that all 24 `EPUB058` occurrences in four candidates were valid `colgroup` structures, not malformed table content. They now produce `EPUB080`: rows and cells remain unchanged, while unsupported column metadata stays visible as a table approximation. Two full reports were byte-identical with SHA-256 `29EFF347B578C901594692B08F8F592D9CB991A5C3241205DEF2547EB4B00C11`, and no canonical document hash changed. The matrix SHA-256 is `783E4D7877B0234C4C4D3C71A055EA4997E9BB93503C86581E58DA6E9F6F8CEF`; its category totals remain 13 approximations, one human-review case, and one broken corrupt source, with no unsupported content, measured loss, or Flow error.
+
+## Private assisted visual review
+
+`IEpubPrivateVisualReviewService` consumes a verified private qualification report and rediscovers eligible EPUBs by SHA-256. It reuses `EpubLargePublicationReviewPackageGenerator` for each candidate, so corpus review does not introduce another importer, layout engine or renderer. A failed candidate is recorded without preventing the remaining packages from being generated.
+
+```powershell
+$qualification = 'C:\flow-local\epub-qualification.json'
+$qualificationHash = (Get-FileHash $qualification -Algorithm SHA256).Hash
+
+flow --language pt-BR epub-inventory-review C:\books `
+  --qualification $qualification `
+  --qualification-sha256 $qualificationHash `
+  --output C:\flow-local\epub-visual-review `
+  --repository-root C:\src\FlowEngineNet `
+  --legal-use --drm-free --ui-language pt-BR
+```
+
+The output contains a localized `index.html`, a path-free `corpus-review.json` and one neutral directory per generated candidate. Each directory includes mobile and desktop packages, beginning/middle/end chapter samples, feature shortcuts and a human checklist. Feature shortcuts are emitted only when the imported document contains the relevant structure; they cover the TOC, links, images and covers, linked figures, notes, tables, ruby, bidirectional content, SVG, MathML and diagnostic concentration.
+
+The report uses deterministic UTF-8 without BOM and LF. It records neutral IDs, source and canonical hashes, generated sample positions, feature categories and stable failure codes. It excludes physical paths, file names, titles, authors, publisher identifiers, publication text and asset bytes. The HTML packages necessarily contain rendered book content and therefore remain private outside Git. Generation is review assistance, not an automatic visual, editorial or accessibility approval.
 
 ## What "corpus" means here
 

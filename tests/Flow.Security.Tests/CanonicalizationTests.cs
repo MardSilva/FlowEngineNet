@@ -200,7 +200,34 @@ public sealed class CanonicalizationTests
         Assert.Equal("SHA-256", result.Algorithm);
         Assert.Equal(64, result.Hash.Length);
         Assert.Equal(Convert.ToHexString(SHA256.HashData(canonicalBytes)), result.Hash);
-        Assert.Equal("flow-c14n-0.1", result.CanonicalizationVersion);
+        Assert.Equal("flow-c14n-0.2", result.CanonicalizationVersion);
+    }
+
+    [Fact]
+    public void ComputeHash_FigureLinkChangesCurrentProfileButLegacyProfileRemainsStable()
+    {
+        var target = new Heading(new NodeId("target"), 1, [new Text("Target")]);
+        FlowDocument Document(FigureLink? link) => new(
+            new DocumentIdentity(new DocumentId("urn:flow:test:figure-link")),
+            new DocumentMetadata("Figure link"),
+            new DocumentContent(
+            [
+                new Chapter(
+                    new NodeId("chapter"),
+                    [
+                        target,
+                        new Figure(new NodeId("figure"), new AssetId("image"), alternativeText: "Image", link: link),
+                    ]),
+            ]),
+            [Asset("image", [1])]);
+        var withoutLink = Document(null);
+        var withLink = Document(FigureLink.Internal(DocumentAnchor.Create([target.Id])));
+
+        Assert.NotEqual(_canonicalizer.Canonicalize(withoutLink), _canonicalizer.Canonicalize(withLink));
+
+        var legacy = new FlowDocumentCanonicalizerV01();
+        Assert.Equal("flow-c14n-0.1", legacy.CanonicalizationVersion);
+        Assert.Equal(legacy.Canonicalize(withoutLink), legacy.Canonicalize(withLink));
     }
 
     private Sha256DocumentIntegrityService CreateIntegrityService() => new(_canonicalizer);

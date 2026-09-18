@@ -1,5 +1,7 @@
 # Flow Engine .NET
 
+[English](README.md) | [Português (Brasil)](README.pt-BR.md)
+
 > **Experimental:** Flow 0.x is a research project, not a standardized file format. Do not use it yet for archival, legal, or production-critical documents.
 
 Flow Engine .NET explores a document model in which canonical identity and semantic content remain independent from viewport, typography, layout, pagination, and renderer technology.
@@ -23,7 +25,7 @@ Implemented:
 - typed, optional presentation and typography intentions;
 - reader-preference cascade with renderer safety constraints;
 - deterministic experimental `.flow.json` serialization;
-- `flow-c14n-0.1` canonicalization and SHA-256 document hashes;
+- versioned canonicalization (`flow-c14n-0.2`, with a legacy 0.1 compatibility writer) and SHA-256 document hashes;
 - experimental local RSA-PSS-SHA256 signatures over canonical bytes;
 - a diagnostic-first, security-bounded EPUB import prototype;
 - non-converting EPUB 2/3 package inspection with deterministic JSON reports;
@@ -189,17 +191,21 @@ The final clean-directory review passes 134 tests with zero build warnings; see 
 - [Experimental document signatures](docs/signatures.md)
 - [Experimental EPUB import](docs/epub-import.md)
 - [EPUB fidelity report](docs/epub-fidelity.md)
+- [EPUB performance, progress, and cancellation](docs/epub-performance.md)
 - [Experimental EPUB corpus catalog](docs/epub-corpus.md)
 - [Public EPUB corpus coverage matrix](docs/epub-corpus-matrix.md)
 - [0.1 conformance profile](docs/conformance.md)
 - [Known limitations](docs/known-limitations.md)
+- [Resolved and reduced limitations](docs/resolved-limitations.md)
 - [0.1 release review](docs/0.1-release-review.md)
+- [0.2 EPUB cycle review](docs/0.2-epub-cycle-review.md)
 - [Roadmap](docs/roadmap.md)
 - [Research findings](docs/research-findings.md)
+- [Documentation translation policy](docs/translation-policy.md)
 
 ## Roadmap direction
 
-The real EPUB cycle now follows these increments:
+The real EPUB cycle follows these stages:
 
 1. import EPUB through the CLI into a valid, deterministic `.flow.json`;
 2. expand accessibility metadata and media fallbacks (TOC navigation, notes, tables, ruby, inline languages, bidirectional semantics, MathML, and a safe typed CSS subset are now imported);
@@ -218,6 +224,12 @@ The CLI keeps command names, option names, JSON fields and diagnostic codes inva
 ```powershell
 dotnet run --project src/Flow.Cli -- --language pt-BR --banner help
 dotnet run --project src/Flow.Cli -- --language en-US --no-color help
+```
+
+Global options must precede the command. The banner can accompany any operation:
+
+```powershell
+dotnet run --project src/Flow.Cli -- --language pt-BR --banner epub-inspect C:\books\book.epub
 ```
 
 ### Test the packaged CLI
@@ -273,6 +285,71 @@ dotnet run --project src/Flow.Cli -- render samples/SampleBook/sample.flow.json 
 ### Qualify and review a real EPUB
 
 The corpus, automatic gate and assisted review are available through the CLI. They remain evidence workflows, not EPUB conformance certification. A real publication must be DRM-free and legally available to the caller. Flow records those declarations but cannot verify publication rights.
+
+### Inventory a private EPUB directory
+
+`epub-inventory` recursively discovers local `.epub` files without converting, copying, renaming or writing to them. It hashes every readable candidate, deduplicates identical payloads, inspects EPUB version, languages, reading order and resource counts, and separates corrupt, structurally unsuitable, protected and review-required candidates. Known EPUB font-obfuscation algorithms are reported for review rather than automatically called DRM.
+
+The catalog must stay outside both the repository and the source directory:
+
+```powershell
+dotnet run --project src/Flow.Cli -- `
+  --language pt-BR `
+  --banner `
+  epub-inventory C:\books `
+  --output C:\flow-local\epub-inventory.json `
+  --repository-root C:\src\FlowEngineNet
+```
+
+The deterministic JSON contains neutral candidate IDs, SHA-256 values, sizes, languages, structural counts, statuses and diagnostic codes. It excludes file and directory names, physical paths, titles, authors, publisher identifiers and publication content. An existing recognized catalog requires `--force`; unrelated files are never replaced.
+
+To qualify every eligible candidate through the complete Flow pipeline twice, keep the report outside the repository and source directory and make the legal declarations explicitly:
+
+```powershell
+dotnet run --project src/Flow.Cli -- `
+  --language pt-BR `
+  --banner `
+  epub-inventory-qualify C:\books `
+  --report C:\flow-local\epub-qualification.json `
+  --repository-root C:\src\FlowEngineNet `
+  --legal-use `
+  --drm-free
+```
+
+The qualification report contains neutral IDs, source and canonical hashes, phase and semantic counts, aggregated diagnostic codes and the repeated-run result. It omits physical paths, file names, editorial metadata and publication text. Protected, corrupt or structurally unsuitable candidates appear as explicitly skipped entries. The latest expanded private run discovered 15 inputs: all 14 eligible publications were processed twice with stable, lossless measured fidelity, while one corrupt input was skipped. Neutral `div`/`span` flattening accounted for 22,598 informational `EPUB075` transformations rather than approximations. Image-only paragraph wrappers are measured as transformations, linked images inside transparent containers remain figures, and one unique image-path case mismatch was recovered through `EPUB077`. A local raster image referenced only by an unsupported CSS background is identified through `EPUB078` as a presentation approximation instead of generic unsupported content. Images without `alt` can use an explicit `aria-label`, `aria-labelledby`, `title`, or `figcaption` through `EPUB079`; the one remaining source without any authored alternative stays as `EPUB041` and requires human review. The importer also recognizes the legacy TrueType declaration `application/x-font-truetype` and the exact EPUB 2 page-map media type. The 24 valid XHTML column groups found in four candidates now use `EPUB080` instead of the malformed-table diagnostic `EPUB058`; they do not create recovery cells or change canonical document hashes. Embedded font bytes, CSS-only image bytes, column definitions and page-map navigation are still excluded. This automatic batch is regression evidence, not human review or EPUB conformance certification.
+
+The qualification report can then be classified without opening the EPUB files again. The command requires the exact SHA-256 of the input report and writes a separate private matrix:
+
+```powershell
+$qualification = 'C:\flow-local\epub-qualification.json'
+$qualificationHash = (Get-FileHash $qualification -Algorithm SHA256).Hash
+
+dotnet run --project src/Flow.Cli -- `
+  --language pt-BR `
+  epub-inventory-matrix $qualification `
+  --qualification-sha256 $qualificationHash `
+  --output C:\flow-local\epub-difference-matrix.json `
+  --repository-root C:\src\FlowEngineNet
+```
+
+The matrix distinguishes approval, approximation, unsupported content, content loss, broken source references, Flow errors and cases that need human review. Automatic classification never completes the human-review field. Keep this file outside Git as well: it contains exact source and report hashes even though it omits editorial identity and book content.
+
+To prepare assisted visual review for every qualified candidate, pass the same qualification file and verified hash. The command rediscovers the EPUBs by SHA-256 and creates neutral candidate directories; it does not persist book names or source paths in `corpus-review.json`.
+
+```powershell
+dotnet run --project src/Flow.Cli -- `
+  --language pt-BR `
+  epub-inventory-review C:\books `
+  --qualification $qualification `
+  --qualification-sha256 $qualificationHash `
+  --output C:\flow-local\epub-visual-review `
+  --repository-root C:\src\FlowEngineNet `
+  --legal-use --drm-free --ui-language pt-BR
+```
+
+Open `index.html` in the output directory. Each candidate includes mobile and desktop books, beginning/middle/end samples and shortcuts for the TOC, images, linked figures, notes, tables, ruby, bidirectional text, SVG, MathML and the chapter associated with the largest diagnostic group when those features exist. The generated checklist remains inconclusive until a person records a decision.
+
+In the earlier six-candidate assisted-review batch, every candidate contained explicit automatic approximations and none had measured content loss, unsupported content or a Flow error. The expanded 15-input qualification is summarized above. Embedded OTF/TTF resources use `EPUB074`, not the generic `EPUB009`: an installed font with the authored family name may be selected by the browser, otherwise the browser or reader uses its fallback. Flow does not inspect operating-system fonts during import because that would make evidence depend on the machine running the command.
 
 Keep the EPUB, gate report and generated review package outside the repository:
 
