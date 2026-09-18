@@ -412,6 +412,10 @@ try {
 
     $libraryKeys = [string[]]@($libraryProperties | ForEach-Object { $_.Name })
     [Array]::Sort($libraryKeys, [System.StringComparer]::Ordinal)
+    $knownPackageLicenses = @{
+        'Spectre.Console'      = 'MIT'
+        'Spectre.Console.Ansi' = 'MIT'
+    }
     $bomReferences = @{}
     foreach ($libraryKey in $libraryKeys) {
         $identity = Get-LibraryIdentity -LibraryKey $libraryKey
@@ -440,6 +444,11 @@ try {
         }
         if ($library.type -eq 'project') {
             $component.licenses = @([ordered]@{ license = [ordered]@{ id = 'MIT' } })
+        }
+        elseif ($knownPackageLicenses.ContainsKey($identity.Name)) {
+            $component.licenses = @([ordered]@{
+                license = [ordered]@{ id = $knownPackageLicenses[$identity.Name] }
+            })
         }
         $component.properties = @([ordered]@{ name = 'flow:dependencyType'; value = [string]$library.type })
         $components += $component
@@ -510,6 +519,14 @@ try {
         $parsedSbom.metadata.component.version -ne $packageVersion -or
         $parsedSbom.components.Count -ne ($libraryKeys.Count - 1)) {
         throw 'The generated CycloneDX SBOM failed structural validation.'
+    }
+
+    foreach ($packageName in $knownPackageLicenses.Keys) {
+        $licensedComponents = @($parsedSbom.components | Where-Object { $_.name -ceq $packageName })
+        if ($licensedComponents.Count -ne 1 -or
+            $licensedComponents[0].licenses[0].license.id -cne $knownPackageLicenses[$packageName]) {
+            throw "SBOM does not identify the expected license for package: $packageName"
+        }
     }
 
     $knownBomReferences = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)

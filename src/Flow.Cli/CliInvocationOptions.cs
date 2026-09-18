@@ -5,7 +5,11 @@ public sealed record CliInvocationOptions(
     string CultureName,
     bool ShowBanner,
     bool UseColor,
-    IReadOnlyList<string> CommandArguments);
+    IReadOnlyList<string> CommandArguments)
+{
+    /// <summary>Gets whether the caller explicitly disabled ANSI color.</summary>
+    public bool NoColor { get; init; }
+}
 
 /// <summary>Parses global output options without changing command syntax.</summary>
 public static class CliInvocationOptionsParser
@@ -81,7 +85,10 @@ public static class CliInvocationOptionsParser
 
         var commandArguments = arguments.Skip(index).ToArray();
         return CliInvocationOptionsParseResult.Success(
-            new CliInvocationOptions(cultureName, showBanner, UseColor: false, commandArguments));
+            new CliInvocationOptions(cultureName, showBanner, UseColor: false, commandArguments)
+            {
+                NoColor = noColor,
+            });
     }
 }
 

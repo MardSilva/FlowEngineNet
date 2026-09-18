@@ -176,6 +176,7 @@ public sealed class CliCommandParserTests
         Assert.True(result.IsSuccess);
         Assert.Equal("pt-BR", result.Options!.CultureName);
         Assert.True(result.Options.ShowBanner);
+        Assert.True(result.Options.NoColor);
         Assert.False(result.Options.UseColor);
         Assert.Equal(["inspect", "book.flow.json"], result.Options.CommandArguments);
     }

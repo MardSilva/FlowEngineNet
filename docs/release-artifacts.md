@@ -53,6 +53,8 @@ CI builds the canonical candidate once on Ubuntu after the Windows/Linux source 
 
 The SBOM is derived from the packaged `flow.deps.json`, not from a manually maintained component list. It describes the CLI and the Flow runtime assemblies shipped inside the `.nupkg`, including their dependency relationships, package version, target framework, deployment type and MIT license declaration for project components.
 
+`Flow.Cli` uses `Spectre.Console` 0.57.2 as its presentation dependency. No domain project references it. `Spectre.Console` and its runtime companion `Spectre.Console.Ansi` are distributed under the MIT license; the release script requires each component to appear once in the generated SBOM and records the license explicitly. The current foundation does not change command output: rich help and interactive menus remain separate later increments.
+
 The package is framework-dependent. The .NET runtime and SDK are prerequisites rather than bundled components, so they do not appear as shipped SBOM components. Test-only NuGet packages are also absent because they are not distributed with the CLI.
 
 ## Validation

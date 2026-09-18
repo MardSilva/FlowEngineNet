@@ -21,6 +21,8 @@ O build canônico gera dois pacotes no mesmo ambiente Ubuntu, normaliza metadado
 
 O SBOM CycloneDX 1.5 cobre componentes enviados no pacote e dependências de runtime. Não cobre SDK, host, Actions, dependências só de teste ou bibliotecas do sistema operacional. `SHA256SUMS`, manifesto e validações verificam os arquivos produzidos.
 
+`Flow.Cli` usa `Spectre.Console` 0.57.2 somente na apresentação. Nenhum projeto de domínio depende dele. `Spectre.Console` e seu componente de runtime `Spectre.Console.Ansi` usam a licença MIT; o script de release exige uma ocorrência de cada componente no SBOM e registra a licença. Esta fundação ainda não altera a saída dos comandos: a ajuda rica e o menu interativo pertencem aos próximos incrementos.
+
 ## Limite atual
 
 Não há assinatura, feed público, instalador, build self-contained, macOS no CI, política de upgrade/rollback ou garantia de builder independente. Os artefatos do CI expiram e não são uma release suportada.
