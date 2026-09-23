@@ -54,11 +54,17 @@ Every stable EPUB, document-validation and Flow JSON diagnostic code currently h
 
 `--banner` prints an optional FIGlet-style ASCII heading. On an interactive terminal with ANSI support, the CLI can use a richer layout that adapts to the available width. Redirected output, captured output and terminals without ANSI support receive deterministic plain text instead. `--no-color` removes color without discarding the spacing and hierarchy of the interactive layout. These presentation options do not affect generated files, canonical bytes or hashes.
 
-## Interactive command preview
+## Interactive menu and guided assistants
 
 `flow menu` opens with a short introduction to the project, its EPUB-to-Flow workflow and the experimental status of the current format. The blue welcome panel appears once per session, before the keyboard-driven command catalog. Use the arrow keys and Enter to choose a category or command. Each command preview shows its purpose, direct syntax, required inputs, file effects and safety notes. `Back` returns to the previous level, `Exit` closes the menu, and Esc cancels it. Ctrl+C keeps the established cancellation behavior and exit code `130`.
 
-The menu is read-only at this stage: choosing a command displays information and never runs the operation. Redirected input or output, captured output and unsupported terminals are refused with `FLOWCLI_MENU_REQUIRES_INTERACTIVE`; use `flow help` and the equivalent direct command in automation. `--no-color` and `NO_COLOR` keep the interactive layout while removing color.
+The `import` and `epub-inspect` previews also offer a guided assistant. Both validate that the source is an existing regular local `.epub` file, show a complete summary, and require explicit confirmation before running. Import can use the title-derived `.flow.json` destination or a custom path and can select diagnostics, fidelity, source-metadata, processing, and source-map reports. Inspection can optionally write its deterministic JSON report. Optional reports receive predictable names beside the EPUB.
+
+The `inspect`, `validate`, and `hash` previews accept an existing regular `.flow.json` and run without writing files. Their normal output remains visible and copyable, including the canonical hash and profile. `validate` still reports semantic failure with exit code `2` in the result panel.
+
+The `render` assistant supports standalone HTML with an explicit logical width and height, or the multi-file HTML book with `auto`, `en`, `pt-PT`, or `pt-BR` interface text. Before rendering, it shows normalized source and destination paths, whether the destination already exists, the selected output type, and the viewport or interface language. Confirmation does not bypass the direct command's replacement checks.
+
+All assistants call the same typed commands and operations as direct CLI use. Import reports and HTML book packages retain their existing atomic-write behavior; standalone HTML retains the current direct-render behavior. After execution, the menu shows the actual exit code and the outputs written by that operation. Empty text input or `:cancel` returns without writing, while Esc cancels selection lists. Redirected input or output, captured output and unsupported terminals are refused with `FLOWCLI_MENU_REQUIRES_INTERACTIVE`; use `flow help` and the equivalent direct command in automation. `--no-color` and `NO_COLOR` keep the interactive layout while removing color.
 
 ## Command-specific help
 

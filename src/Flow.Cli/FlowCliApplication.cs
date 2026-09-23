@@ -122,7 +122,13 @@ public sealed class FlowCliApplication
                     return 1;
                 }
 
-                return await _menu.RunAsync(output, text, presentation, cancellationToken)
+                return await _menu.RunAsync(
+                        output,
+                        error,
+                        text,
+                        presentation,
+                        ExecuteMenuCommandAsync,
+                        cancellationToken)
                     .ConfigureAwait(false);
             }
 
@@ -167,6 +173,75 @@ public sealed class FlowCliApplication
                     text.Diagnostic("FLOWCLI_OPERATION_FAILED", "ErrorOperationFailed", exception.Message))
                 .ConfigureAwait(false);
             return 1;
+        }
+
+        async Task<CliMenuExecutionResult> ExecuteMenuCommandAsync(
+            CliCommand command,
+            CancellationToken token)
+        {
+            var observer = new CliMenuOperationObserver();
+            try
+            {
+                var exitCode = await _operations.ExecuteAsync(
+                        command,
+                        output,
+                        error,
+                        text,
+                        presentation,
+                        token,
+                        observer)
+                    .ConfigureAwait(false);
+                return new CliMenuExecutionResult(exitCode, observer.WrittenFiles);
+            }
+            catch (OperationCanceledException) when (token.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (FlowSerializationException exception)
+            {
+                await error.WriteLineAsync(
+                        $"{exception.Code}: {text.DiagnosticMessage(exception.Code, exception.Message)}")
+                    .ConfigureAwait(false);
+                return new CliMenuExecutionResult(1, observer.WrittenFiles);
+            }
+            catch (CliOperationException exception)
+            {
+                await error.WriteLineAsync(text.Diagnostic(
+                        "FLOWCLI_OPERATION_FAILED",
+                        exception.ResourceKey,
+                        exception.Arguments.ToArray()))
+                    .ConfigureAwait(false);
+                return new CliMenuExecutionResult(1, observer.WrittenFiles);
+            }
+            catch (Exception exception) when (exception is IOException
+                                              or UnauthorizedAccessException
+                                              or ArgumentException
+                                              or NotSupportedException)
+            {
+                await error.WriteLineAsync(
+                        text.Diagnostic("FLOWCLI_OPERATION_FAILED", "ErrorOperationFailed", exception.Message))
+                    .ConfigureAwait(false);
+                return new CliMenuExecutionResult(1, observer.WrittenFiles);
+            }
+        }
+    }
+
+    private sealed class CliMenuOperationObserver : ICliOperationObserver
+    {
+        private readonly List<string> _writtenFiles = [];
+
+        public System.Collections.Immutable.ImmutableArray<string> WrittenFiles => [.. _writtenFiles];
+
+        public void FileWritten(string path)
+        {
+            var fullPath = Path.GetFullPath(path);
+            var comparer = OperatingSystem.IsWindows()
+                ? StringComparer.OrdinalIgnoreCase
+                : StringComparer.Ordinal;
+            if (!_writtenFiles.Contains(fullPath, comparer))
+            {
+                _writtenFiles.Add(fullPath);
+            }
         }
     }
 }

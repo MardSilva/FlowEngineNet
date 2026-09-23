@@ -30,11 +30,17 @@ O pacote instalado é o build local; esses comandos não o publicam no NuGet. Pa
 
 `--banner` exibe um cabeçalho ASCII no estilo FIGlet. Em um terminal interativo com suporte a ANSI, a CLI pode usar uma apresentação mais rica e ajustada à largura disponível. Saídas redirecionadas ou capturadas e terminais sem ANSI recebem texto simples e determinístico. `--no-color` retira as cores sem abrir mão do espaçamento e da hierarquia do modo interativo. Essas opções não alteram arquivos, hashes nem relatórios.
 
-## Prévia interativa dos comandos
+## Menu interativo e assistentes guiados
 
 `flow menu` começa com uma apresentação curta do projeto, do fluxo entre EPUB e Flow e do estado experimental do formato atual. O painel azul aparece uma vez por sessão, antes do catálogo navegável pelo teclado. Use as setas e Enter para escolher uma categoria ou um comando. Cada prévia informa finalidade, sintaxe direta, entradas obrigatórias, efeitos nos arquivos e observações de segurança. `Voltar` retorna ao nível anterior, `Sair` fecha o menu e Esc cancela a navegação. Ctrl+C conserva o comportamento de cancelamento e o código de saída `130`.
 
-Nesta etapa, o menu serve somente para consulta: escolher um comando exibe suas informações, mas não executa a operação. Entrada ou saída redirecionada, captura de saída e terminais sem suporte são recusados com `FLOWCLI_MENU_REQUIRES_INTERACTIVE`; em automação, use `flow help` e o comando direto equivalente. `--no-color` e `NO_COLOR` mantêm a organização interativa, sem cores.
+As prévias de `import` e `epub-inspect` também oferecem um assistente. Os dois confirmam se a origem é um arquivo `.epub` local, comum e existente, mostram um resumo completo e pedem confirmação antes de executar. Na importação, você pode manter o destino `.flow.json` derivado do título ou informar outro caminho. Também pode escolher relatórios de diagnóstico, fidelidade, metadados de origem, processamento e mapa de origem. A inspeção pode gravar seu relatório JSON determinístico. Os relatórios opcionais recebem nomes previsíveis ao lado do EPUB.
+
+As prévias de `inspect`, `validate` e `hash` aceitam um arquivo `.flow.json` local e comum. Esses fluxos apenas leem o documento. A saída normal continua visível e pode ser copiada, inclusive o hash e o perfil canônico. Quando a validação encontra um erro semântico, o painel de resultado preserva o código de saída `2`.
+
+O assistente de `render` gera HTML standalone com largura e altura lógicas informadas pelo usuário ou um pacote de livro HTML com interface em `auto`, `en`, `pt-PT` ou `pt-BR`. Antes da execução, o resumo mostra os caminhos normalizados, informa se o destino existe e registra o tipo de saída, o viewport ou o idioma escolhido. A confirmação não ignora as regras de substituição do comando direto.
+
+Todos os assistentes chamam os mesmos comandos tipados e as mesmas operações da CLI direta. Relatórios de importação e pacotes HTML book mantêm a escrita atômica já existente; o HTML standalone conserva o comportamento atual do renderer direto. No fim, o menu mostra o código de saída e as saídas realmente gravadas. Uma entrada vazia ou `:cancel` volta sem criar arquivos; Esc cancela listas de seleção. Entrada ou saída redirecionada, captura de saída e terminais sem suporte continuam recusadas com `FLOWCLI_MENU_REQUIRES_INTERACTIVE`. Em automação, use `flow help` e o comando direto equivalente. `--no-color` e `NO_COLOR` preservam a organização interativa sem cores.
 
 ## Ajuda específica por comando
 

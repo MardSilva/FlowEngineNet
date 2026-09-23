@@ -85,7 +85,7 @@
   <data name="CommandHelpConditional" xml:space="preserve"><value>required by the selected mode</value></data>
   <data name="MenuTitle" xml:space="preserve"><value>Choose an area</value></data>
   <data name="MenuWelcomeDescription" xml:space="preserve"><value>Flow Engine is an experimental .NET engine for semantic documents. It inspects EPUB publications and imports supported content into .flow.json without tying the document to pages or a single renderer.</value></data>
-  <data name="MenuWelcomeReadOnly" xml:space="preserve"><value>This menu explains the available workflows before you use their direct commands. At this stage, it does not run operations.</value></data>
+  <data name="MenuWelcomeReadOnly" xml:space="preserve"><value>The menu can guide EPUB inspection and import. Other workflows remain available as documented direct commands.</value></data>
   <data name="MenuNavigationHint" xml:space="preserve"><value>Use the arrow keys and Enter. Press Esc to cancel.</value></data>
   <data name="MenuMoreChoices" xml:space="preserve"><value>Move up or down to see more choices.</value></data>
   <data name="MenuBack" xml:space="preserve"><value>Back</value></data>
@@ -104,6 +104,94 @@
   <data name="MenuDetailInputEntry" xml:space="preserve"><value>{0} [{1}]: {2}</value></data>
   <data name="MenuReturnFromDetails" xml:space="preserve"><value>Return to the command list</value></data>
   <data name="MenuDetailsPrompt" xml:space="preserve"><value>After reviewing the command</value></data>
+  <data name="AssistantConfigureAndRun" xml:space="preserve"><value>Configure and run</value></data>
+  <data name="AssistantEpubPathPrompt" xml:space="preserve"><value>Enter the local EPUB path</value></data>
+  <data name="AssistantTextCancellationHint" xml:space="preserve"><value>Press Enter on an empty line or type :cancel to go back.</value></data>
+  <data name="AssistantInvalidInputTitle" xml:space="preserve"><value>Check the input</value></data>
+  <data name="AssistantInvalidEpubPath" xml:space="preserve"><value>The EPUB path is invalid or cannot be accessed.</value></data>
+  <data name="AssistantEpubExtensionRequired" xml:space="preserve"><value>The selected file must have the .epub extension.</value></data>
+  <data name="AssistantEpubNotFound" xml:space="preserve"><value>The selected EPUB does not exist.</value></data>
+  <data name="AssistantEpubRegularFileRequired" xml:space="preserve"><value>The selected path must be a regular local file, not a directory or symbolic link.</value></data>
+  <data name="AssistantImportDestinationPrompt" xml:space="preserve"><value>Where should the Flow document be written?</value></data>
+  <data name="AssistantImportDestinationAutomatic" xml:space="preserve"><value>Automatic destination</value></data>
+  <data name="AssistantImportDestinationAutomaticDescription" xml:space="preserve"><value>Use the imported title and write beside the EPUB.</value></data>
+  <data name="AssistantImportDestinationCustom" xml:space="preserve"><value>Custom destination</value></data>
+  <data name="AssistantImportDestinationCustomDescription" xml:space="preserve"><value>Enter the complete .flow.json path.</value></data>
+  <data name="AssistantImportOutputPrompt" xml:space="preserve"><value>Enter the destination .flow.json path</value></data>
+  <data name="AssistantInvalidOutputPath" xml:space="preserve"><value>The output path is invalid.</value></data>
+  <data name="AssistantOutputMatchesSource" xml:space="preserve"><value>The output cannot replace the source EPUB.</value></data>
+  <data name="AssistantImportReportsPrompt" xml:space="preserve"><value>Select any additional reports</value></data>
+  <data name="AssistantMultiSelectionHint" xml:space="preserve"><value>Each report is optional and is written beside the EPUB.</value></data>
+  <data name="AssistantMultiSelectionInstructions" xml:space="preserve"><value>Use Space to select, Enter to continue, or Esc to cancel.</value></data>
+  <data name="AssistantReportDiagnostics" xml:space="preserve"><value>Diagnostics</value></data>
+  <data name="AssistantReportDiagnosticsDescription" xml:space="preserve"><value>All importer findings with codes, severity, and source resources.</value></data>
+  <data name="AssistantReportFidelity" xml:space="preserve"><value>Fidelity</value></data>
+  <data name="AssistantReportFidelityDescription" xml:space="preserve"><value>Preserved, approximated, unsupported, and lost content counts.</value></data>
+  <data name="AssistantReportMetadata" xml:space="preserve"><value>Source metadata</value></data>
+  <data name="AssistantReportMetadataDescription" xml:space="preserve"><value>OPF properties that do not belong to the canonical Flow document.</value></data>
+  <data name="AssistantReportProcessing" xml:space="preserve"><value>Processing</value></data>
+  <data name="AssistantReportProcessingDescription" xml:space="preserve"><value>Typed decisions about spine, fallbacks, resources, and exclusions.</value></data>
+  <data name="AssistantReportSourceMap" xml:space="preserve"><value>Source map</value></data>
+  <data name="AssistantReportSourceMapDescription" xml:space="preserve"><value>Traceability from EPUB resources and fragments to stable Flow node IDs.</value></data>
+  <data name="AssistantImportAutomaticOutputSummary" xml:space="preserve"><value>Automatic .flow.json name derived from the imported title, beside the EPUB.</value></data>
+  <data name="AssistantSummarySource" xml:space="preserve"><value>Source EPUB</value></data>
+  <data name="AssistantSummaryFlowOutput" xml:space="preserve"><value>Flow document</value></data>
+  <data name="AssistantSummaryReports" xml:space="preserve"><value>Additional reports</value></data>
+  <data name="AssistantSummaryInspectionReport" xml:space="preserve"><value>Inspection report</value></data>
+  <data name="AssistantImportSummaryTitle" xml:space="preserve"><value>Review the EPUB import</value></data>
+  <data name="AssistantInspectSummaryTitle" xml:space="preserve"><value>Review the EPUB inspection</value></data>
+  <data name="AssistantAtomicWriteNotice" xml:space="preserve"><value>Final files use the same atomic-write policy as the direct command.</value></data>
+  <data name="AssistantAutomaticOutputReplacementNotice" xml:space="preserve"><value>The exact automatic name is resolved from imported metadata during execution. If that title-derived file already exists, it is atomically replaced after this confirmation.</value></data>
+  <data name="AssistantExistingOutput" xml:space="preserve"><value>{0} (an existing file will be replaced only after confirmation)</value></data>
+  <data name="AssistantConfirmationPrompt" xml:space="preserve"><value>Run this operation?</value></data>
+  <data name="AssistantRun" xml:space="preserve"><value>Run now</value></data>
+  <data name="AssistantCancelBeforeRun" xml:space="preserve"><value>Cancel and return without writing files</value></data>
+  <data name="AssistantInspectReportPrompt" xml:space="preserve"><value>Should a deterministic JSON inspection report be written?</value></data>
+  <data name="AssistantInspectReportNone" xml:space="preserve"><value>Console summary only</value></data>
+  <data name="AssistantInspectReportJson" xml:space="preserve"><value>Console summary and JSON report</value></data>
+  <data name="AssistantInspectReportJsonDescription" xml:space="preserve"><value>Write a structured report beside the EPUB.</value></data>
+  <data name="AssistantResultTitle" xml:space="preserve"><value>Operation result</value></data>
+  <data name="AssistantExitCode" xml:space="preserve"><value>Exit code: {0}</value></data>
+  <data name="AssistantNoFilesWritten" xml:space="preserve"><value>No file was written.</value></data>
+  <data name="AssistantFilesWritten" xml:space="preserve"><value>Outputs written by this operation:</value></data>
+  <data name="AssistantReturnToMenu" xml:space="preserve"><value>Return to the command list</value></data>
+  <data name="AssistantAfterExecutionPrompt" xml:space="preserve"><value>After reviewing the result</value></data>
+  <data name="DocumentAssistantPathPrompt" xml:space="preserve"><value>Enter the local .flow.json path</value></data>
+  <data name="DocumentAssistantInvalidPath" xml:space="preserve"><value>The Flow document path is invalid or cannot be accessed.</value></data>
+  <data name="DocumentAssistantExtensionRequired" xml:space="preserve"><value>The selected file must end with .flow.json.</value></data>
+  <data name="DocumentAssistantNotFound" xml:space="preserve"><value>The selected Flow document does not exist.</value></data>
+  <data name="DocumentAssistantRegularFileRequired" xml:space="preserve"><value>The selected path must be a regular local file, not a directory or symbolic link.</value></data>
+  <data name="DocumentAssistantReadOnlySummaryTitle" xml:space="preserve"><value>Review the Flow document operation</value></data>
+  <data name="DocumentAssistantSummaryDocument" xml:space="preserve"><value>Flow document</value></data>
+  <data name="DocumentAssistantSummaryOperation" xml:space="preserve"><value>Operation</value></data>
+  <data name="DocumentAssistantOperation_inspect" xml:space="preserve"><value>Inspect semantic metadata and node counts</value></data>
+  <data name="DocumentAssistantOperation_validate" xml:space="preserve"><value>Validate semantic invariants and show diagnostics</value></data>
+  <data name="DocumentAssistantOperation_hash" xml:space="preserve"><value>Calculate the canonical hash and profile</value></data>
+  <data name="DocumentAssistantReadOnlyNotice" xml:space="preserve"><value>This operation only reads the selected document and does not write files.</value></data>
+  <data name="DocumentAssistantRenderTypePrompt" xml:space="preserve"><value>Choose the HTML output</value></data>
+  <data name="DocumentAssistantRenderStandalone" xml:space="preserve"><value>Standalone HTML</value></data>
+  <data name="DocumentAssistantRenderStandaloneDescription" xml:space="preserve"><value>One HTML5 file with embedded CSS for the selected viewport.</value></data>
+  <data name="DocumentAssistantRenderBook" xml:space="preserve"><value>HTML book package</value></data>
+  <data name="DocumentAssistantRenderBookDescription" xml:space="preserve"><value>A directory with index, contents, chapters, styles, assets, and manifest.</value></data>
+  <data name="DocumentAssistantHtmlOutputPrompt" xml:space="preserve"><value>Enter the standalone HTML destination</value></data>
+  <data name="DocumentAssistantBookOutputPrompt" xml:space="preserve"><value>Enter the HTML book destination directory</value></data>
+  <data name="DocumentAssistantDestinationMatchesSource" xml:space="preserve"><value>The render destination cannot replace the source Flow document.</value></data>
+  <data name="DocumentAssistantWidthPrompt" xml:space="preserve"><value>Enter the logical viewport width</value></data>
+  <data name="DocumentAssistantHeightPrompt" xml:space="preserve"><value>Enter the logical viewport height</value></data>
+  <data name="DocumentAssistantDimensionHint" xml:space="preserve"><value>Use a positive number with a decimal point when needed. Enter an empty value or :cancel to go back.</value></data>
+  <data name="DocumentAssistantInvalidDimension" xml:space="preserve"><value>The dimension must be a finite number greater than zero.</value></data>
+  <data name="DocumentAssistantUiLanguagePrompt" xml:space="preserve"><value>Choose the generated interface language</value></data>
+  <data name="DocumentAssistantUiLanguageAuto" xml:space="preserve"><value>Automatic from the publication language</value></data>
+  <data name="DocumentAssistantRenderSummaryTitle" xml:space="preserve"><value>Review the HTML render</value></data>
+  <data name="DocumentAssistantSummaryRenderType" xml:space="preserve"><value>Output type</value></data>
+  <data name="DocumentAssistantSummaryDestination" xml:space="preserve"><value>Destination</value></data>
+  <data name="DocumentAssistantSummaryViewport" xml:space="preserve"><value>Logical viewport</value></data>
+  <data name="DocumentAssistantSummaryUiLanguage" xml:space="preserve"><value>Interface language</value></data>
+  <data name="DocumentAssistantViewportValue" xml:space="preserve"><value>{0} × {1}</value></data>
+  <data name="DocumentAssistantNewDestination" xml:space="preserve"><value>{0} (new destination)</value></data>
+  <data name="DocumentAssistantExistingDestination" xml:space="preserve"><value>{0} (existing destination)</value></data>
+  <data name="DocumentAssistantRenderPolicyNotice" xml:space="preserve"><value>The direct render command keeps control of writing and replacement safety.</value></data>
+  <data name="DocumentAssistantExistingDestinationWarning" xml:space="preserve"><value>The destination already exists. Confirm only if you intend to let the existing render policy replace it.</value></data>
   <data name="CommandExitCode_0" xml:space="preserve"><value>The operation completed.</value></data>
   <data name="CommandExitCode_1" xml:space="preserve"><value>The command, input, or file operation failed.</value></data>
   <data name="CommandExitCode_2" xml:space="preserve"><value>Validation or automatic qualification did not pass.</value></data>

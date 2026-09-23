@@ -14,9 +14,22 @@ public sealed class CliMenuTests
         Assert.Equal("flow menu", descriptor.Usage);
     }
 
+    [Fact]
+    public void InteractiveAssistantsAreLimitedToDeliveredWorkflows()
+    {
+        Assert.Equal(
+            ["epub-inspect", "hash", "import", "inspect", "render", "validate"],
+            CliCommandCatalog.All
+                .Where(command => CliMenuController.SupportsAssistant(command.Name))
+                .Select(static command => command.Name)
+                .Order(StringComparer.Ordinal)
+                .ToArray());
+        Assert.False(CliMenuController.SupportsAssistant("execution-clean"));
+    }
+
     [Theory]
-    [InlineData("en-US", "EPUB books", "book.epub", "File effects", "does not run operations")]
-    [InlineData("pt-BR", "Livros EPUB", "book.epub", "Efeitos nos arquivos", "não executa operações")]
+    [InlineData("en-US", "EPUB books", "book.epub", "File effects", "guide EPUB inspection")]
+    [InlineData("pt-BR", "Livros EPUB", "book.epub", "Efeitos nos arquivos", "orientar a inspeção")]
     public void ModelAndDetailsReuseLocalizedCatalog(
         string culture,
         string epubGroupTitle,
@@ -60,7 +73,7 @@ public sealed class CliMenuTests
         Assert.Equal("import", details.CommandName);
         var welcome = Assert.Single(view.ShownWelcome);
         Assert.Contains("semantic documents", welcome.Description, StringComparison.Ordinal);
-        Assert.Contains("does not run operations", welcome.ReadOnlyNotice, StringComparison.Ordinal);
+        Assert.Contains("guide EPUB inspection", welcome.ReadOnlyNotice, StringComparison.Ordinal);
         Assert.Contains("Interactive menu closed", output.ToString(), StringComparison.Ordinal);
     }
 
@@ -209,12 +222,14 @@ public sealed class CliMenuTests
                 : new CliMenuCommandSelection(CliMenuCommandAction.Back));
         }
 
-        public Task<bool> ShowDetailsAsync(
+        public Task<CliMenuDetailsAction> ShowDetailsAsync(
             CliMenuDetails details,
+            bool assistantAvailable,
             CancellationToken cancellationToken)
         {
             ShownDetails.Add(details);
-            return Task.FromResult(true);
+            Assert.True(assistantAvailable);
+            return Task.FromResult(CliMenuDetailsAction.Back);
         }
     }
 
@@ -233,8 +248,9 @@ public sealed class CliMenuTests
             CliMenuGroup group,
             CancellationToken cancellationToken) => throw new InvalidOperationException();
 
-        public Task<bool> ShowDetailsAsync(
+        public Task<CliMenuDetailsAction> ShowDetailsAsync(
             CliMenuDetails details,
+            bool assistantAvailable,
             CancellationToken cancellationToken) => throw new InvalidOperationException();
     }
 
@@ -248,8 +264,10 @@ public sealed class CliMenuTests
 
         public Task<int> RunAsync(
             TextWriter output,
+            TextWriter error,
             CliTextCatalog text,
             CliPresentationProfile presentation,
+            CliMenuCommandExecutor executor,
             CancellationToken cancellationToken)
         {
             WasRun = true;
@@ -263,8 +281,10 @@ public sealed class CliMenuTests
     {
         public Task<int> RunAsync(
             TextWriter output,
+            TextWriter error,
             CliTextCatalog text,
             CliPresentationProfile presentation,
+            CliMenuCommandExecutor executor,
             CancellationToken cancellationToken) => Task.FromCanceled<int>(cancellationToken);
     }
 

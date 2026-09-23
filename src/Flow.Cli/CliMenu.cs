@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Spectre.Console;
+using Spectre.Console.Rendering;
 
 namespace Flow.Cli;
 
@@ -137,8 +138,9 @@ internal interface ICliMenuView
         CliMenuGroup group,
         CancellationToken cancellationToken);
 
-    public Task<bool> ShowDetailsAsync(
+    public Task<CliMenuDetailsAction> ShowDetailsAsync(
         CliMenuDetails details,
+        bool assistantAvailable,
         CancellationToken cancellationToken);
 }
 
@@ -146,22 +148,51 @@ internal interface ICliMenu
 {
     public Task<int> RunAsync(
         TextWriter output,
+        TextWriter error,
         CliTextCatalog text,
         CliPresentationProfile presentation,
+        CliMenuCommandExecutor executor,
         CancellationToken cancellationToken);
 }
 
-internal sealed class CliMenuController(ICliMenuView view)
+internal sealed class CliMenuController
 {
-    private readonly ICliMenuView _view = view ?? throw new ArgumentNullException(nameof(view));
+    private readonly ICliMenuView _view;
+    private readonly ICliAssistantView _assistantView;
+
+    public CliMenuController(ICliMenuView view)
+        : this(view, view as ICliAssistantView ?? new UnavailableAssistantView())
+    {
+    }
+
+    public CliMenuController(ICliMenuView view, ICliAssistantView assistantView)
+    {
+        _view = view ?? throw new ArgumentNullException(nameof(view));
+        _assistantView = assistantView ?? throw new ArgumentNullException(nameof(assistantView));
+    }
+
+    public Task<int> RunAsync(
+        TextWriter output,
+        CliTextCatalog text,
+        CancellationToken cancellationToken) =>
+        RunAsync(
+            output,
+            text,
+            static (_, _) => throw new InvalidOperationException("No command executor was configured."),
+            cancellationToken);
+
+    internal static bool SupportsAssistant(string commandName) =>
+        commandName is "import" or "epub-inspect" or "inspect" or "validate" or "hash" or "render";
 
     public async Task<int> RunAsync(
         TextWriter output,
         CliTextCatalog text,
+        CliMenuCommandExecutor executor,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(executor);
 
         var model = CliMenuModel.Create(text);
         await _view.ShowWelcomeAsync(CliMenuWelcome.Create(text), cancellationToken).ConfigureAwait(false);
@@ -201,17 +232,67 @@ internal sealed class CliMenuController(ICliMenuView view)
 
                 var command = commandSelection.Command
                     ?? throw new InvalidOperationException("A command menu selection has no command.");
-                var returnToCommands = await _view.ShowDetailsAsync(
+                var detailsAction = await _view.ShowDetailsAsync(
                         CliMenuDetails.Create(command, text),
+                        SupportsAssistant(command.Name),
                         cancellationToken)
                     .ConfigureAwait(false);
-                if (!returnToCommands)
+                if (detailsAction == CliMenuDetailsAction.Cancel)
                 {
                     await output.WriteLineAsync(text.Get("MenuCancelled")).ConfigureAwait(false);
                     return 0;
                 }
+
+                if (detailsAction == CliMenuDetailsAction.RunAssistant)
+                {
+                    if (command.Name is "import" or "epub-inspect")
+                    {
+                        await new CliEpubAssistant(_assistantView, text, executor)
+                            .RunAsync(command.Name, cancellationToken)
+                            .ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await new CliDocumentAssistant(_assistantView, text, executor)
+                            .RunAsync(command.Name, cancellationToken)
+                            .ConfigureAwait(false);
+                    }
+                }
             }
         }
+    }
+
+    private sealed class UnavailableAssistantView : ICliAssistantView
+    {
+        private static InvalidOperationException Error() =>
+            new("No EPUB assistant view was configured.");
+
+        public Task<CliAssistantTextResult> PromptTextAsync(
+            string title,
+            string cancellationHint,
+            CancellationToken cancellationToken) => throw Error();
+
+        public Task<CliAssistantChoiceResult> SelectOneAsync(
+            string title,
+            ImmutableArray<CliAssistantChoice> choices,
+            CancellationToken cancellationToken) => throw Error();
+
+        public Task<CliAssistantMultiChoiceResult> SelectManyAsync(
+            string title,
+            ImmutableArray<CliAssistantChoice> choices,
+            CancellationToken cancellationToken) => throw Error();
+
+        public Task ShowMessageAsync(string title, string message, CancellationToken cancellationToken) =>
+            throw Error();
+
+        public Task ShowSummaryAsync(CliAssistantSummary summary, CancellationToken cancellationToken) =>
+            throw Error();
+
+        public Task ShowExecutionResultAsync(
+            CliMenuExecutionResult result,
+            CancellationToken cancellationToken) => throw Error();
+
+        public Task WaitForReturnAsync(CancellationToken cancellationToken) => throw Error();
     }
 }
 
@@ -219,22 +300,25 @@ internal sealed class SpectreCliMenu : ICliMenu
 {
     public Task<int> RunAsync(
         TextWriter output,
+        TextWriter error,
         CliTextCatalog text,
         CliPresentationProfile presentation,
+        CliMenuCommandExecutor executor,
         CancellationToken cancellationToken)
     {
         var view = new SpectreCliMenuView(output, text, presentation);
-        return new CliMenuController(view).RunAsync(output, text, cancellationToken);
+        return new CliMenuController(view, view).RunAsync(output, text, executor, cancellationToken);
     }
 }
 
-internal sealed class SpectreCliMenuView : ICliMenuView
+internal sealed class SpectreCliMenuView : ICliMenuView, ICliAssistantView
 {
     private const int PageSize = 8;
     private readonly IAnsiConsole _console;
     private readonly CliTextCatalog _text;
     private readonly bool _useColor;
     private bool _mainMenuShown;
+    private bool _preserveNextPrompt;
 
     public SpectreCliMenuView(
         TextWriter output,
@@ -346,8 +430,9 @@ internal sealed class SpectreCliMenuView : ICliMenuView
             .ConfigureAwait(false)).Value;
     }
 
-    public async Task<bool> ShowDetailsAsync(
+    public async Task<CliMenuDetailsAction> ShowDetailsAsync(
         CliMenuDetails details,
+        bool assistantAvailable,
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(details);
@@ -370,14 +455,177 @@ internal sealed class SpectreCliMenuView : ICliMenuView
         };
         _console.Write(panel);
 
-        var back = new MenuDisplayChoice<bool>(_text.Get("MenuReturnFromDetails"), true);
-        var cancelled = new MenuDisplayChoice<bool>(string.Empty, false);
+        var choices = assistantAvailable
+            ? new[]
+            {
+                new MenuDisplayChoice<CliMenuDetailsAction>(
+                    _text.Get("AssistantConfigureAndRun"),
+                    CliMenuDetailsAction.RunAssistant),
+                new MenuDisplayChoice<CliMenuDetailsAction>(
+                    _text.Get("MenuReturnFromDetails"),
+                    CliMenuDetailsAction.Back),
+            }
+            :
+            [
+                new MenuDisplayChoice<CliMenuDetailsAction>(
+                    _text.Get("MenuReturnFromDetails"),
+                    CliMenuDetailsAction.Back),
+            ];
+        var cancelled = new MenuDisplayChoice<CliMenuDetailsAction>(string.Empty, CliMenuDetailsAction.Cancel);
         return (await PromptAsync(
                 _text.Get("MenuDetailsPrompt"),
-                [back],
+                choices,
                 cancelled,
                 cancellationToken)
             .ConfigureAwait(false)).Value;
+    }
+
+    public async Task<CliAssistantTextResult> PromptTextAsync(
+        string title,
+        string cancellationHint,
+        CancellationToken cancellationToken)
+    {
+        _console.Clear();
+        var prompt = new TextPrompt<string>(
+                $"[bold]{CliMarkup.EscapeExternal(title)}[/]{Environment.NewLine}"
+                + $"[dim]{CliMarkup.EscapeExternal(cancellationHint)}[/]{Environment.NewLine}> ")
+            .AllowEmpty();
+        var value = await _console.PromptAsync(prompt, cancellationToken).ConfigureAwait(false);
+        return string.IsNullOrWhiteSpace(value) || string.Equals(value.Trim(), ":cancel", StringComparison.OrdinalIgnoreCase)
+            ? CliAssistantTextResult.Cancelled
+            : CliAssistantTextResult.Entered(value);
+    }
+
+    public async Task<CliAssistantChoiceResult> SelectOneAsync(
+        string title,
+        ImmutableArray<CliAssistantChoice> choices,
+        CancellationToken cancellationToken)
+    {
+        if (_preserveNextPrompt)
+        {
+            _preserveNextPrompt = false;
+        }
+        else
+        {
+            _console.Clear();
+        }
+
+        var displayChoices = choices.Select(choice => new MenuDisplayChoice<CliAssistantChoiceResult>(
+            FormatAssistantChoice(choice),
+            new CliAssistantChoiceResult(CliAssistantChoiceAction.Select, choice.Id)));
+        var cancelled = new MenuDisplayChoice<CliAssistantChoiceResult>(
+            string.Empty,
+            new CliAssistantChoiceResult(CliAssistantChoiceAction.Cancel));
+        return (await PromptAsync(title, displayChoices, cancelled, cancellationToken).ConfigureAwait(false)).Value;
+    }
+
+    public async Task<CliAssistantMultiChoiceResult> SelectManyAsync(
+        string title,
+        ImmutableArray<CliAssistantChoice> choices,
+        CancellationToken cancellationToken)
+    {
+        _console.Clear();
+        var cancelled = new AssistantMultiChoice("__cancel", string.Empty);
+        var prompt = new MultiSelectionPrompt<AssistantMultiChoice>()
+            .Title($"[bold]{CliMarkup.EscapeExternal(title)}[/]{Environment.NewLine}"
+                   + $"[dim]{CliMarkup.EscapeExternal(_text.Get("AssistantMultiSelectionHint"))}[/]")
+            .NotRequired()
+            .PageSize(PageSize)
+            .MoreChoicesText(CliMarkup.EscapeExternal(_text.Get("MenuMoreChoices")))
+            .InstructionsText(CliMarkup.EscapeExternal(_text.Get("AssistantMultiSelectionInstructions")))
+            .UseConverter(choice => choice.Label)
+            .AddChoices(choices.Select(choice => new AssistantMultiChoice(
+                choice.Id,
+                CliMarkup.EscapeExternal(FormatAssistantChoice(choice)))))
+            .AddCancelResult(cancelled);
+        var selected = await _console.PromptAsync(prompt, cancellationToken).ConfigureAwait(false);
+        return selected.Any(choice => choice.Id == cancelled.Id)
+            ? new CliAssistantMultiChoiceResult(true, [])
+            : new CliAssistantMultiChoiceResult(false, [.. selected.Select(static choice => choice.Id)]);
+    }
+
+    public Task ShowMessageAsync(string title, string message, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var panel = new Panel(new Text(message))
+        {
+            Header = new PanelHeader(CliMarkup.EscapeExternal(title)),
+            Border = BoxBorder.Rounded,
+            Expand = true,
+        };
+        if (_useColor)
+        {
+            panel.BorderStyle = new Style(Color.Yellow);
+        }
+
+        _console.Write(panel);
+        return Task.CompletedTask;
+    }
+
+    public Task ShowSummaryAsync(CliAssistantSummary summary, CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _console.Clear();
+        var grid = new Grid();
+        grid.AddColumn(new GridColumn().NoWrap().PadRight(2));
+        grid.AddColumn();
+        foreach (var (label, value) in summary.Rows)
+        {
+            grid.AddRow(
+                new Markup(_useColor
+                    ? $"[bold deepskyblue1]{CliMarkup.EscapeExternal(label)}[/]"
+                    : $"[bold]{CliMarkup.EscapeExternal(label)}[/]"),
+                new Text(value));
+        }
+
+        var contentRows = new List<IRenderable> { grid };
+        contentRows.AddRange(summary.Warnings.Select(warning => (IRenderable)new Markup(_useColor
+            ? $"[yellow]{CliMarkup.EscapeExternal(warning)}[/]"
+            : CliMarkup.EscapeExternal(warning))));
+        var content = new Rows(contentRows);
+        var panel = new Panel(content)
+        {
+            Header = new PanelHeader(CliMarkup.EscapeExternal(summary.Title)),
+            Border = BoxBorder.Rounded,
+            Expand = true,
+        };
+        _console.Write(panel);
+        _preserveNextPrompt = true;
+        return Task.CompletedTask;
+    }
+
+    public Task ShowExecutionResultAsync(
+        CliMenuExecutionResult result,
+        CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        _console.WriteLine();
+        var rows = new List<IRenderable>
+        {
+            new Markup(_useColor
+                ? $"[bold {(result.ExitCode == 0 ? "green" : "red")}]"
+                  + $"{CliMarkup.EscapeExternal(_text.Format("AssistantExitCode", result.ExitCode))}[/]"
+                : $"[bold]{CliMarkup.EscapeExternal(_text.Format("AssistantExitCode", result.ExitCode))}[/]"),
+        };
+        rows.Add(new Text(result.WrittenFiles.IsEmpty
+            ? _text.Get("AssistantNoFilesWritten")
+            : _text.Get("AssistantFilesWritten")));
+        rows.AddRange(result.WrittenFiles.Select(static path => (IRenderable)new Text($"  {path}")));
+        _console.Write(new Panel(new Rows(rows))
+        {
+            Header = new PanelHeader(CliMarkup.EscapeExternal(_text.Get("AssistantResultTitle"))),
+            Border = BoxBorder.Rounded,
+            Expand = true,
+        });
+        return Task.CompletedTask;
+    }
+
+    public async Task WaitForReturnAsync(CancellationToken cancellationToken)
+    {
+        var back = new MenuDisplayChoice<bool>(_text.Get("AssistantReturnToMenu"), true);
+        var cancelled = new MenuDisplayChoice<bool>(string.Empty, false);
+        await PromptAsync(_text.Get("AssistantAfterExecutionPrompt"), [back], cancelled, cancellationToken)
+            .ConfigureAwait(false);
     }
 
     private async Task<MenuDisplayChoice<T>> PromptAsync<T>(
@@ -407,5 +655,10 @@ internal sealed class SpectreCliMenuView : ICliMenuView
             new Text(value));
     }
 
+    private static string FormatAssistantChoice(CliAssistantChoice choice) =>
+        choice.Description is null ? choice.Label : $"{choice.Label} - {choice.Description}";
+
     private sealed record MenuDisplayChoice<T>(string Label, T Value);
+
+    private sealed record AssistantMultiChoice(string Id, string Label);
 }
