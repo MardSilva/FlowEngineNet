@@ -4,6 +4,26 @@
 
 `Flow.Cli` compõe os serviços do motor sem framework pesado. Parsing de comandos e operações são separados para permitir testes. Durante o desenvolvimento, use `dotnet run --project src/Flow.Cli --`; o pacote local instala o comando `flow`.
 
+## Instalação local no perfil do usuário
+
+Ainda não existe MSI nem instalador gráfico. Durante o desenvolvimento, você pode empacotar a versão atual e instalá-la como uma ferramenta .NET no seu perfil:
+
+```powershell
+$packageDirectory = Join-Path $PWD "artifacts/local-tool"
+dotnet pack src/Flow.Cli/Flow.Cli.csproj --configuration Release --output $packageDirectory
+dotnet tool install --global FlowEngineNet.Tool --add-source $packageDirectory --ignore-failed-sources
+flow --language pt-BR --banner menu
+```
+
+Se a mesma versão de desenvolvimento já estiver instalada, remova-a antes de instalar o pacote recompilado. Isso é necessário porque a versão do pacote pode continuar igual entre builds locais:
+
+```powershell
+dotnet tool uninstall --global FlowEngineNet.Tool
+dotnet tool install --global FlowEngineNet.Tool --add-source $packageDirectory --ignore-failed-sources
+```
+
+O pacote instalado é o build local; esses comandos não o publicam no NuGet. Para remover o comando depois, execute `dotnet tool uninstall --global FlowEngineNet.Tool`. Se `flow` não for reconhecido logo após a instalação, abra outro terminal e confirme se o diretório padrão das ferramentas .NET está no `PATH`.
+
 ## Opções globais
 
 `--language <en-US|pt-BR>` escolhe os textos para pessoas. Sem a opção, a CLI usa `en-US`. Comandos, opções, caminhos, campos serializados e códigos diagnósticos não mudam. Em `pt-BR`, a CLI mostra um resumo traduzido e conserva o detalhe técnico original.

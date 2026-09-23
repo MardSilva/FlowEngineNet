@@ -18,6 +18,24 @@ Use `pwsh` on PowerShell 7 or Linux. The script obtains the package identity fro
 
 The deterministic summary is written to `artifacts/cli-smoke/smoke-result.json`; build products remain under the ignored `artifacts/` directory. The script requires the .NET 10 SDK selected by `global.json`. It does not publish, sign or install a machine-wide tool.
 
+There is no MSI or graphical installer yet. For local development, you can install the current build in your user profile as a global .NET tool:
+
+```powershell
+$packageDirectory = Join-Path $PWD "artifacts/local-tool"
+dotnet pack src/Flow.Cli/Flow.Cli.csproj --configuration Release --output $packageDirectory
+dotnet tool install --global FlowEngineNet.Tool --add-source $packageDirectory --ignore-failed-sources
+flow --language pt-BR --banner menu
+```
+
+If the same development version is already installed, uninstall it before installing the rebuilt package. This is necessary because the package version may remain unchanged between local builds:
+
+```powershell
+dotnet tool uninstall --global FlowEngineNet.Tool
+dotnet tool install --global FlowEngineNet.Tool --add-source $packageDirectory --ignore-failed-sources
+```
+
+The installed package is the local build; these commands do not publish it to NuGet. To remove the command later, run `dotnet tool uninstall --global FlowEngineNet.Tool`. If `flow` is not found immediately after installation, open a new terminal and confirm that the standard .NET tools directory is present in `PATH`.
+
 For a complete local release candidate, run `eng/build-release-artifacts.ps1`. It performs two independent package builds, normalizes unsigned NuGet ZIP metadata, requires byte-for-byte agreement, generates CycloneDX 1.5 and SHA-256 evidence, validates the package structure and installs the final package from a local-only source. The resulting files stay under `artifacts/release/` and are not uploaded or published. See [local release artifacts](release-artifacts.md).
 
 `eng/invoke-release-dry-run.ps1` validates the checked-in version/tag plan and adds unsigned in-toto/SLSA provenance without creating a tag or release. CI builds one canonical candidate on Ubuntu, retains it for one day, and passes that exact `.nupkg` to isolated Ubuntu and Windows validators. `eng/verify-release-artifacts.ps1` checks its hashes and runs the installed CLI; the final comparison rejects a different revision, SDK, identity or package hash. Nothing is sent to a package feed.

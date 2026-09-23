@@ -234,6 +234,7 @@ internal sealed class SpectreCliMenuView : ICliMenuView
     private readonly IAnsiConsole _console;
     private readonly CliTextCatalog _text;
     private readonly bool _useColor;
+    private bool _mainMenuShown;
 
     public SpectreCliMenuView(
         TextWriter output,
@@ -290,6 +291,15 @@ internal sealed class SpectreCliMenuView : ICliMenuView
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(model);
+        if (_mainMenuShown)
+        {
+            _console.Clear();
+        }
+        else
+        {
+            _mainMenuShown = true;
+        }
+
         var choices = model.Groups
             .Select(group => new MenuDisplayChoice<CliMenuMainSelection>(
                 group.Title,
@@ -315,6 +325,7 @@ internal sealed class SpectreCliMenuView : ICliMenuView
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(group);
+        _console.Clear();
         var choices = group.Commands
             .Select(command => new MenuDisplayChoice<CliMenuCommandSelection>(
                 $"{command.Name} - {_text.Get(command.TitleResourceKey)}",
@@ -340,6 +351,7 @@ internal sealed class SpectreCliMenuView : ICliMenuView
         CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(details);
+        _console.Clear();
         var grid = new Grid();
         grid.AddColumn(new GridColumn().NoWrap().PadRight(2));
         grid.AddColumn();
