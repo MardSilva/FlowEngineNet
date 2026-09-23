@@ -821,6 +821,47 @@ public sealed class FlowCliIntegrationTests
         Assert.DoesNotContain("\u001b[", result.Output, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData("en-US", "Usage:", "File effects:")]
+    [InlineData("pt-BR", "Uso:", "Efeitos nos arquivos:")]
+    public async Task DetailedHelp_IsLocalizedAndDoesNotExecuteCommand(
+        string language,
+        string usageHeading,
+        string effectsHeading)
+    {
+        var application = FlowCliApplication.CreateDefault();
+        var direct = await RunAsync(application, ["--language", language, "help", "import"]);
+        var option = await RunAsync(application, ["--language", language, "import", "--help"]);
+
+        Assert.Equal(0, direct.ExitCode);
+        Assert.Equal(0, option.ExitCode);
+        Assert.Equal(direct.Output, option.Output);
+        Assert.Empty(direct.Error);
+        Assert.Contains("flow import <book.epub>", direct.Output, StringComparison.Ordinal);
+        Assert.Contains(usageHeading, direct.Output, StringComparison.Ordinal);
+        Assert.Contains(effectsHeading, direct.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("\u001b[", direct.Output, StringComparison.Ordinal);
+        Assert.Contains("--legal-use", (await RunAsync(
+            application,
+            ["--language", language, "help", "epub-qualify"])).Output,
+            StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("en-US", "No help is available")]
+    [InlineData("pt-BR", "Não há ajuda")]
+    public async Task DetailedHelp_ReportsUnknownCommand(string language, string expectedMessage)
+    {
+        var result = await RunAsync(
+            FlowCliApplication.CreateDefault(),
+            ["--language", language, "help", "unknown"]);
+
+        Assert.Equal(1, result.ExitCode);
+        Assert.Empty(result.Output);
+        Assert.StartsWith("FLOWCLI_UNKNOWN_HELP_COMMAND:", result.Error, StringComparison.Ordinal);
+        Assert.Contains(expectedMessage, result.Error, StringComparison.Ordinal);
+    }
+
     [Fact]
     public async Task LocalizedHelpBannerAndErrors_PreserveCommandsAndDiagnosticCodes()
     {

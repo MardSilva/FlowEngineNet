@@ -314,4 +314,25 @@ public sealed class CliCommandParserTests
                 .Error,
             StringComparison.Ordinal);
     }
+
+    [Theory]
+    [InlineData("help", "import")]
+    [InlineData("import", "--help")]
+    [InlineData("render", "-h")]
+    public void Parse_SupportsDetailedHelpWithoutRequiredArguments(string first, string second)
+    {
+        var result = _parser.Parse([first, second]);
+
+        var command = Assert.IsType<HelpCommand>(result.Command);
+        Assert.Equal(first == "help" ? second : first, command.CommandName);
+    }
+
+    [Fact]
+    public void Parse_RejectsHelpForUnknownCommandWithStableDiagnostic()
+    {
+        var result = _parser.Parse(["help", "unknown"]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("FLOWCLI_UNKNOWN_HELP_COMMAND", result.Diagnostic!.Code);
+    }
 }

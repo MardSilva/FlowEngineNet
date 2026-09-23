@@ -10,6 +10,17 @@
 
 `--banner` exibe um cabeçalho ASCII no estilo FIGlet. `--no-color` explicita saída simples para scripts e terminais limitados. Essas opções não alteram arquivos, hashes nem relatórios.
 
+## Ajuda específica por comando
+
+`flow help` mantém a lista compacta de comandos. Para consultar os detalhes tipados de um comando, use uma destas formas:
+
+```text
+flow help <comando>
+flow <comando> --help
+```
+
+A ajuda detalhada informa finalidade, uso, argumentos posicionais, opções obrigatórias e opcionais, exemplos seguros, efeitos nos arquivos, observações de segurança e códigos de saída relevantes. Todos os comandos públicos têm textos em en-US e pt-BR. A ajuda é resolvida antes dos argumentos obrigatórios, por isso a operação descrita não é iniciada e nenhuma saída é criada. Um comando de ajuda desconhecido retorna `FLOWCLI_UNKNOWN_HELP_COMMAND` e código `1`.
+
 ## Comandos
 
 ```text

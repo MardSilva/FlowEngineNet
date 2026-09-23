@@ -36,6 +36,17 @@ Every stable EPUB, document-validation and Flow JSON diagnostic code currently h
 
 `--banner` prints an optional FIGlet-style ASCII heading. The CLI emits plain text by default and does not require ANSI colors; `--no-color` makes that contract explicit for scripts, redirected output and limited terminals. These presentation options do not affect generated files, canonical bytes or hashes.
 
+## Command-specific help
+
+`flow help` keeps the compact command list. Use either form below for the typed details of one command:
+
+```text
+flow help <command>
+flow <command> --help
+```
+
+The detailed view shows purpose, usage, positional arguments, required and optional options, safe examples, file effects, safety notes, and relevant exit codes. It is available for every public command in en-US and pt-BR. Help is resolved before required command arguments, so asking for it never starts the described operation or creates output. An unknown help target returns `FLOWCLI_UNKNOWN_HELP_COMMAND` and exit code `1`.
+
 ## Commands
 
 ```text

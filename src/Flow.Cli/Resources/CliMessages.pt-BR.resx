@@ -9,6 +9,7 @@
   <data name="ErrorLanguageValue" xml:space="preserve"><value>O idioma '{0}' não é aceito. Use en-US ou pt-BR.</value></data>
   <data name="ErrorUnknownGlobalOption" xml:space="preserve"><value>Opção global desconhecida: '{0}'. Execute 'flow help' para consultar o uso.</value></data>
   <data name="ErrorUnknownCommand" xml:space="preserve"><value>Comando desconhecido: '{0}'. Execute 'flow help' para consultar o uso.</value></data>
+  <data name="ErrorUnknownHelpCommand" xml:space="preserve"><value>Não há ajuda para o comando desconhecido '{0}'. Execute 'flow help' para listar os comandos.</value></data>
   <data name="ErrorUsage" xml:space="preserve"><value>Uso: {0}</value></data>
   <data name="ErrorUnknownOption" xml:space="preserve"><value>Opção desconhecida de {0}: '{1}'. {2}</value></data>
   <data name="ErrorInvalidWidth" xml:space="preserve"><value>--width deve ser um número finito maior que zero.</value></data>
@@ -58,7 +59,122 @@
   <data name="HelpHash" xml:space="preserve"><value>  flow hash &lt;documento&gt;                        Calcula o hash SHA-256 canônico.</value></data>
   <data name="HelpRenderHtml" xml:space="preserve"><value>  flow render &lt;documento&gt; --html &lt;saída&gt; --width &lt;n&gt; --height &lt;n&gt;</value></data>
   <data name="HelpRenderBook" xml:space="preserve"><value>  flow render &lt;documento&gt; --html-book &lt;diretório&gt; [--ui-language &lt;auto|en|pt-PT|pt-BR&gt;]</value></data>
+  <data name="HelpSpecific" xml:space="preserve"><value>Execute 'flow help &lt;comando&gt;' ou 'flow &lt;comando&gt; --help' para ver os detalhes do comando.</value></data>
   <data name="HelpExitCodes" xml:space="preserve"><value>Códigos de saída: 0 operação concluída, 1 falha de comando/entrada/E/S, 2 falha de validação semântica ou qualificação automática, 130 cancelamento.</value></data>
+  <data name="CommandHelpHeading" xml:space="preserve"><value>{0}: {1}</value></data>
+  <data name="CommandHelpUsage" xml:space="preserve"><value>Uso:</value></data>
+  <data name="CommandHelpArguments" xml:space="preserve"><value>Argumentos:</value></data>
+  <data name="CommandHelpOptions" xml:space="preserve"><value>Opções:</value></data>
+  <data name="CommandHelpExamples" xml:space="preserve"><value>Exemplos:</value></data>
+  <data name="CommandHelpFileEffects" xml:space="preserve"><value>Efeitos nos arquivos:</value></data>
+  <data name="CommandHelpSecurity" xml:space="preserve"><value>Segurança:</value></data>
+  <data name="CommandHelpExitCodes" xml:space="preserve"><value>Códigos de saída:</value></data>
+  <data name="CommandHelpEntry" xml:space="preserve"><value>  {0} [{1}]  {2}</value></data>
+  <data name="CommandHelpExitCodeEntry" xml:space="preserve"><value>  {0}  {1}</value></data>
+  <data name="CommandHelpRequired" xml:space="preserve"><value>obrigatório</value></data>
+  <data name="CommandHelpOptional" xml:space="preserve"><value>opcional</value></data>
+  <data name="CommandHelpConditional" xml:space="preserve"><value>obrigatório no modo escolhido</value></data>
+  <data name="CommandExitCode_0" xml:space="preserve"><value>A operação foi concluída.</value></data>
+  <data name="CommandExitCode_1" xml:space="preserve"><value>O comando, a entrada ou a operação de arquivo falhou.</value></data>
+  <data name="CommandExitCode_2" xml:space="preserve"><value>A validação ou a qualificação automática não foi aprovada.</value></data>
+  <data name="CommandExitCode_130" xml:space="preserve"><value>A operação foi cancelada.</value></data>
+  <data name="CommandArgument_Command" xml:space="preserve"><value>Comando cuja ajuda detalhada será exibida.</value></data>
+  <data name="CommandArgument_FlowOutput" xml:space="preserve"><value>Destino .flow.json; o padrão é sample.flow.json.</value></data>
+  <data name="CommandArgument_Epub" xml:space="preserve"><value>Arquivo EPUB local e sem DRM que será lido.</value></data>
+  <data name="CommandArgument_EpubDirectory" xml:space="preserve"><value>Diretório local privado onde a busca recursiva por EPUBs será feita.</value></data>
+  <data name="CommandArgument_Qualification" xml:space="preserve"><value>Relatório existente de qualificação privada.</value></data>
+  <data name="CommandArgument_CorpusManifest" xml:space="preserve"><value>Manifesto versionado do corpus.</value></data>
+  <data name="CommandArgument_Destination" xml:space="preserve"><value>Destino associado ao lock da execução.</value></data>
+  <data name="CommandArgument_FlowDocument" xml:space="preserve"><value>Documento .flow.json existente.</value></data>
+  <data name="CommandOption_OutputFlow" xml:space="preserve"><value>Define o destino .flow.json; sem esta opção, o título importado determina o nome.</value></data>
+  <data name="CommandOption_DiagnosticsJson" xml:space="preserve"><value>Grava todos os diagnósticos não canônicos da importação.</value></data>
+  <data name="CommandOption_FidelityReport" xml:space="preserve"><value>Grava o relatório não canônico de fidelidade.</value></data>
+  <data name="CommandOption_MetadataJson" xml:space="preserve"><value>Grava metadados da origem que não fazem parte do documento Flow canônico.</value></data>
+  <data name="CommandOption_ProcessingJson" xml:space="preserve"><value>Grava métricas não canônicas de processamento.</value></data>
+  <data name="CommandOption_SourceMapJson" xml:space="preserve"><value>Grava o mapa não canônico entre EPUB e Flow.</value></data>
+  <data name="CommandOption_JsonReport" xml:space="preserve"><value>Grava o relatório JSON determinístico do comando.</value></data>
+  <data name="CommandOption_OutputCatalog" xml:space="preserve"><value>Define o destino do catálogo neutro do inventário.</value></data>
+  <data name="CommandOption_RepositoryRoot" xml:space="preserve"><value>Identifica o limite do repositório usado nas verificações de caminho.</value></data>
+  <data name="CommandOption_Force" xml:space="preserve"><value>Permite substituir somente uma saída existente reconhecida como segura.</value></data>
+  <data name="CommandOption_Report" xml:space="preserve"><value>Define o destino do relatório JSON.</value></data>
+  <data name="CommandOption_LegalUse" xml:space="preserve"><value>Declara que o chamador tem autorização para processar a publicação.</value></data>
+  <data name="CommandOption_DrmFree" xml:space="preserve"><value>Declara que a publicação não está protegida por DRM.</value></data>
+  <data name="CommandOption_Resume" xml:space="preserve"><value>Recupera somente uma execução interrompida reconhecida e reinicia pela entrada verificada.</value></data>
+  <data name="CommandOption_QualificationSha256" xml:space="preserve"><value>Vincula a operação aos bytes exatos do relatório de qualificação.</value></data>
+  <data name="CommandOption_OutputMatrix" xml:space="preserve"><value>Define o destino da matriz privada de diferenças.</value></data>
+  <data name="CommandOption_Qualification" xml:space="preserve"><value>Seleciona o relatório privado de qualificação usado como evidência.</value></data>
+  <data name="CommandOption_OutputDirectory" xml:space="preserve"><value>Define o diretório de saída.</value></data>
+  <data name="CommandOption_UiLanguage" xml:space="preserve"><value>Seleciona os textos de interface gerados pelo renderer sem traduzir o conteúdo do livro.</value></data>
+  <data name="CommandOption_ExternalRoot" xml:space="preserve"><value>Define a raiz permitida para publicações externas do corpus.</value></data>
+  <data name="CommandOption_Baseline" xml:space="preserve"><value>Compara os resultados com um baseline já revisado; nunca aceita um baseline novo.</value></data>
+  <data name="CommandOption_CandidateId" xml:space="preserve"><value>Define o identificador neutro e estável do candidato.</value></data>
+  <data name="CommandOption_Sha256" xml:space="preserve"><value>Vincula a operação aos bytes exatos do EPUB de origem.</value></data>
+  <data name="CommandOption_Repetitions" xml:space="preserve"><value>Define pelo menos duas execuções completas do gate.</value></data>
+  <data name="CommandOption_IncludeEnvironment" xml:space="preserve"><value>Adiciona observações de ambiente e memória marcadas como não determinísticas.</value></data>
+  <data name="CommandOption_ExecutionId" xml:space="preserve"><value>Confirma a identidade exata de 128 bits informada por execution-status.</value></data>
+  <data name="CommandOption_Html" xml:space="preserve"><value>Seleciona a saída HTML standalone.</value></data>
+  <data name="CommandOption_Width" xml:space="preserve"><value>Define a largura lógica positiva do viewport para o HTML standalone.</value></data>
+  <data name="CommandOption_Height" xml:space="preserve"><value>Define a altura lógica positiva do viewport para o HTML standalone.</value></data>
+  <data name="CommandOption_HtmlBook" xml:space="preserve"><value>Seleciona um diretório de livro HTML com vários arquivos.</value></data>
+  <data name="CommandEffect_None" xml:space="preserve"><value>Não lê documentos nem cria ou altera arquivos.</value></data>
+  <data name="CommandEffect_Sample" xml:space="preserve"><value>Grava o .flow.json de referência e substitui esse destino se ele já existir.</value></data>
+  <data name="CommandEffect_Import" xml:space="preserve"><value>Grava o .flow.json de forma atômica e somente os relatórios opcionais solicitados.</value></data>
+  <data name="CommandEffect_EpubInspect" xml:space="preserve"><value>Lê o EPUB; só grava um relatório JSON quando --json é informado.</value></data>
+  <data name="CommandEffect_Inventory" xml:space="preserve"><value>Lê os EPUBs sem alterá-los e grava um catálogo neutro.</value></data>
+  <data name="CommandEffect_Qualification" xml:space="preserve"><value>Lê os EPUBs elegíveis e grava um relatório de qualificação sem caminhos.</value></data>
+  <data name="CommandEffect_Matrix" xml:space="preserve"><value>Lê as evidências existentes sem reabrir EPUBs e grava uma matriz privada.</value></data>
+  <data name="CommandEffect_InventoryReview" xml:space="preserve"><value>Cria pacotes de revisão e checklists no diretório de saída escolhido.</value></data>
+  <data name="CommandEffect_Corpus" xml:space="preserve"><value>Lê as entradas do corpus e grava um relatório de qualificação.</value></data>
+  <data name="CommandEffect_EpubQualify" xml:space="preserve"><value>Lê o EPUB repetidas vezes e grava um relatório do gate automático.</value></data>
+  <data name="CommandEffect_EpubReview" xml:space="preserve"><value>Cria pacotes mobile e desktop, página de revisão, checklist e manifesto.</value></data>
+  <data name="CommandEffect_ExecutionStatus" xml:space="preserve"><value>Não altera o destino consultado; --json pode gravar um relatório de status separado.</value></data>
+  <data name="CommandEffect_ExecutionClean" xml:space="preserve"><value>Remove ou restaura somente artefatos transacionais reconhecidos; arquivos alheios são preservados.</value></data>
+  <data name="CommandEffect_ReadOnly" xml:space="preserve"><value>Lê o documento e não cria ou altera arquivos.</value></data>
+  <data name="CommandEffect_Render" xml:space="preserve"><value>Grava um arquivo HTML standalone ou um diretório de livro HTML com vários arquivos.</value></data>
+  <data name="CommandSecurity_Epub" xml:space="preserve"><value>O processamento tem limites, não executa scripts, não carrega URLs externas nem contorna DRM.</value></data>
+  <data name="CommandSecurity_PrivateCorpus" xml:space="preserve"><value>A identidade e os caminhos das fontes privadas devem ficar fora do repositório e das evidências neutras persistidas.</value></data>
+  <data name="CommandSecurity_Force" xml:space="preserve"><value>--force só atua sobre uma saída existente reconhecida.</value></data>
+  <data name="CommandSecurity_ForceResume" xml:space="preserve"><value>--force e --resume mantêm as verificações existentes de lock, reconhecimento e escrita atômica.</value></data>
+  <data name="CommandSecurity_Declarations" xml:space="preserve"><value>--legal-use e --drm-free são declarações explícitas do chamador; o Flow nunca as presume.</value></data>
+  <data name="CommandSecurity_HashBinding" xml:space="preserve"><value>O SHA-256 informado deve corresponder exatamente à evidência ou publicação.</value></data>
+  <data name="CommandSecurity_CorpusManifest" xml:space="preserve"><value>Somente fontes admitidas pelo manifesto e pelos limites do repositório são abertas.</value></data>
+  <data name="CommandSecurity_ExecutionStatus" xml:space="preserve"><value>A consulta de status não adquire o destino para escrita.</value></data>
+  <data name="CommandSecurity_ExecutionClean" xml:space="preserve"><value>A limpeza exige o ID exato da execução, lock exclusivo e nomes de artefatos reconhecidos.</value></data>
+  <data name="CommandSecurity_Render" xml:space="preserve"><value>Diretórios arbitrários existentes, raízes, reparse points e diretórios que contêm a origem não são substituídos.</value></data>
+  <data name="Command_help_Title" xml:space="preserve"><value>Exibir a ajuda dos comandos</value></data>
+  <data name="Command_help_Description" xml:space="preserve"><value>Exibe a lista geral ou a ajuda detalhada de um comando sem executá-lo.</value></data>
+  <data name="Command_sample_Title" xml:space="preserve"><value>Criar o documento de exemplo</value></data>
+  <data name="Command_sample_Description" xml:space="preserve"><value>Cria o livro Flow de referência usado nos exemplos e smoke tests.</value></data>
+  <data name="Command_import_Title" xml:space="preserve"><value>Importar um EPUB</value></data>
+  <data name="Command_import_Description" xml:space="preserve"><value>Converte o conteúdo semântico suportado de um EPUB local para .flow.json.</value></data>
+  <data name="Command_epub_inspect_Title" xml:space="preserve"><value>Inspecionar a estrutura de um EPUB</value></data>
+  <data name="Command_epub_inspect_Description" xml:space="preserve"><value>Examina container, pacote, manifest, spine, navegação e recursos sem importar um documento Flow.</value></data>
+  <data name="Command_epub_inventory_Title" xml:space="preserve"><value>Inventariar um diretório privado de EPUBs</value></data>
+  <data name="Command_epub_inventory_Description" xml:space="preserve"><value>Cria um catálogo local neutro sem persistir identidade editorial nem caminhos físicos.</value></data>
+  <data name="Command_epub_inventory_qualify_Title" xml:space="preserve"><value>Qualificar um inventário privado de EPUBs</value></data>
+  <data name="Command_epub_inventory_qualify_Description" xml:space="preserve"><value>Executa duas vezes a pipeline completa do Flow para cada candidato neutro elegível.</value></data>
+  <data name="Command_epub_inventory_matrix_Title" xml:space="preserve"><value>Classificar evidências privadas de qualificação</value></data>
+  <data name="Command_epub_inventory_matrix_Description" xml:space="preserve"><value>Classifica um relatório existente sem reabrir as publicações de origem.</value></data>
+  <data name="Command_epub_inventory_review_Title" xml:space="preserve"><value>Gerar pacotes privados de revisão</value></data>
+  <data name="Command_epub_inventory_review_Description" xml:space="preserve"><value>Cria material neutro de revisão mobile e desktop para os candidatos qualificados.</value></data>
+  <data name="Command_corpus_Title" xml:space="preserve"><value>Executar o corpus público</value></data>
+  <data name="Command_corpus_Description" xml:space="preserve"><value>Executa a qualificação offline repetida de um manifesto versionado do corpus.</value></data>
+  <data name="Command_epub_qualify_Title" xml:space="preserve"><value>Executar o gate de publicação grande</value></data>
+  <data name="Command_epub_qualify_Description" xml:space="preserve"><value>Executa verificações automáticas repetidas de um EPUB sem atribuir resultado à revisão humana.</value></data>
+  <data name="Command_epub_review_Title" xml:space="preserve"><value>Gerar um pacote de revisão assistida</value></data>
+  <data name="Command_epub_review_Description" xml:space="preserve"><value>Cria material representativo para mobile e desktop, além de um checklist humano separado.</value></data>
+  <data name="Command_execution_status_Title" xml:space="preserve"><value>Consultar o estado de uma execução local</value></data>
+  <data name="Command_execution_status_Description" xml:space="preserve"><value>Informa o estado do lock e os artefatos transacionais reconhecidos sem alterar o destino.</value></data>
+  <data name="Command_execution_clean_Title" xml:space="preserve"><value>Limpar uma execução interrompida</value></data>
+  <data name="Command_execution_clean_Description" xml:space="preserve"><value>Limpa somente resíduos transacionais reconhecidos e vinculados ao ID informado.</value></data>
+  <data name="Command_inspect_Title" xml:space="preserve"><value>Inspecionar um documento Flow</value></data>
+  <data name="Command_inspect_Description" xml:space="preserve"><value>Exibe identidade, metadados, contagens semânticas, âncoras, assets e disponibilidade de apresentação.</value></data>
+  <data name="Command_validate_Title" xml:space="preserve"><value>Validar um documento Flow</value></data>
+  <data name="Command_validate_Description" xml:space="preserve"><value>Verifica as invariantes semânticas e exibe todos os diagnósticos de validação.</value></data>
+  <data name="Command_hash_Title" xml:space="preserve"><value>Calcular o hash de um documento Flow</value></data>
+  <data name="Command_hash_Description" xml:space="preserve"><value>Calcula o hash SHA-256 canônico e informa o perfil de canonicalização.</value></data>
+  <data name="Command_render_Title" xml:space="preserve"><value>Renderizar um documento Flow</value></data>
+  <data name="Command_render_Description" xml:space="preserve"><value>Cria um HTML standalone para um viewport lógico ou um pacote de livro HTML com vários arquivos.</value></data>
   <data name="LabelReportJson" xml:space="preserve"><value>Relatório JSON: {0}</value></data>
   <data name="LabelInspection" xml:space="preserve"><value>Inspeção EPUB: {0}</value></data>
   <data name="LabelStatus" xml:space="preserve"><value>Estado: {0}</value></data>

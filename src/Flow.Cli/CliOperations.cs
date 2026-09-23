@@ -99,7 +99,7 @@ public sealed class CliOperations
 
         return command switch
         {
-            HelpCommand => await ShowHelpAsync(output, text).ConfigureAwait(false),
+            HelpCommand help => await ShowHelpAsync(help, output, text).ConfigureAwait(false),
             SampleCommand sample => await CreateSampleAsync(sample, output, text, cancellationToken).ConfigureAwait(false),
             ImportEpubCommand import => await ImportEpubAsync(import, output, error, text, cancellationToken)
                 .ConfigureAwait(false),
@@ -147,8 +147,19 @@ public sealed class CliOperations
         };
     }
 
-    private static async Task<int> ShowHelpAsync(TextWriter output, CliTextCatalog text)
+    private static async Task<int> ShowHelpAsync(HelpCommand command, TextWriter output, CliTextCatalog text)
     {
+        if (command.CommandName is not null)
+        {
+            if (!CliCommandCatalog.TryGet(command.CommandName, out var descriptor))
+            {
+                throw new CliOperationException("ErrorUnknownHelpCommand", command.CommandName);
+            }
+
+            await CliCommandHelpWriter.WriteAsync(descriptor, output, text).ConfigureAwait(false);
+            return 0;
+        }
+
         foreach (var key in new[]
                  {
                      "HelpTitle", "HelpWarning", "HelpGlobalOptions", "HelpLanguage", "HelpBanner", "HelpNoColor",
@@ -160,7 +171,8 @@ public sealed class CliOperations
                      "HelpCorpus1", "HelpCorpus2", "HelpEpubQualify1", "HelpEpubQualify2", "HelpEpubQualify3",
                      "HelpEpubReview1", "HelpEpubReview2", "HelpEpubReview3", "HelpOutputPolicy",
                      "HelpExecutionStatus", "HelpExecutionClean",
-                     "HelpInspect", "HelpValidate", "HelpHash", "HelpRenderHtml", "HelpRenderBook", "HelpExitCodes",
+                     "HelpInspect", "HelpValidate", "HelpHash", "HelpRenderHtml", "HelpRenderBook", "HelpSpecific",
+                     "HelpExitCodes",
                  })
         {
             await output.WriteLineAsync(text.Get(key)).ConfigureAwait(false);

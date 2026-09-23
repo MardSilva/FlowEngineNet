@@ -5,7 +5,7 @@ namespace Flow.Cli;
 
 public abstract record CliCommand;
 
-public sealed record HelpCommand : CliCommand;
+public sealed record HelpCommand(string? CommandName = null) : CliCommand;
 
 public sealed record SampleCommand(string OutputPath) : CliCommand;
 
