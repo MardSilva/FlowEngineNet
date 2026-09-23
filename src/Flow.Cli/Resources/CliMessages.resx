@@ -84,6 +84,8 @@
   <data name="CommandHelpOptional" xml:space="preserve"><value>optional</value></data>
   <data name="CommandHelpConditional" xml:space="preserve"><value>required by the selected mode</value></data>
   <data name="MenuTitle" xml:space="preserve"><value>Choose an area</value></data>
+  <data name="MenuWelcomeDescription" xml:space="preserve"><value>Flow Engine is an experimental .NET engine for semantic documents. It inspects EPUB publications and imports supported content into .flow.json without tying the document to pages or a single renderer.</value></data>
+  <data name="MenuWelcomeReadOnly" xml:space="preserve"><value>This menu explains the available workflows before you use their direct commands. At this stage, it does not run operations.</value></data>
   <data name="MenuNavigationHint" xml:space="preserve"><value>Use the arrow keys and Enter. Press Esc to cancel.</value></data>
   <data name="MenuMoreChoices" xml:space="preserve"><value>Move up or down to see more choices.</value></data>
   <data name="MenuBack" xml:space="preserve"><value>Back</value></data>

@@ -15,25 +15,29 @@ public sealed class CliMenuTests
     }
 
     [Theory]
-    [InlineData("en-US", "EPUB books", "book.epub", "File effects")]
-    [InlineData("pt-BR", "Livros EPUB", "book.epub", "Efeitos nos arquivos")]
+    [InlineData("en-US", "EPUB books", "book.epub", "File effects", "does not run operations")]
+    [InlineData("pt-BR", "Livros EPUB", "book.epub", "Efeitos nos arquivos", "não executa operações")]
     public void ModelAndDetailsReuseLocalizedCatalog(
         string culture,
         string epubGroupTitle,
         string requiredInput,
-        string effectsHeading)
+        string effectsHeading,
+        string readOnlyNotice)
     {
         var text = new CliTextCatalog(culture);
         var model = CliMenuModel.Create(text);
         var epubGroup = model.Groups.Single(group => group.Group == CliCommandGroup.EpubBooks);
         var import = epubGroup.Commands.Single(command => command.Name == "import");
         var details = CliMenuDetails.Create(import, text);
+        var welcome = CliMenuWelcome.Create(text);
 
         Assert.Equal(epubGroupTitle, epubGroup.Title);
         Assert.Contains(details.RequiredInputs, input => input.Contains(requiredInput, StringComparison.Ordinal));
         Assert.False(string.IsNullOrWhiteSpace(details.FileEffects));
         Assert.NotEmpty(details.SecurityNotes);
         Assert.Equal(effectsHeading, text.Get("MenuDetailsOutputs"));
+        Assert.Contains(".flow.json", welcome.Description, StringComparison.Ordinal);
+        Assert.Contains(readOnlyNotice, welcome.ReadOnlyNotice, StringComparison.Ordinal);
         Assert.DoesNotContain(model.Groups.SelectMany(group => group.Commands), command => command.Name == "menu");
         Assert.DoesNotContain(model.Groups.SelectMany(group => group.Commands), command => command.Name == "help");
     }
@@ -54,6 +58,9 @@ public sealed class CliMenuTests
         Assert.Equal(2, view.CommandSelectionCount);
         var details = Assert.Single(view.ShownDetails);
         Assert.Equal("import", details.CommandName);
+        var welcome = Assert.Single(view.ShownWelcome);
+        Assert.Contains("semantic documents", welcome.Description, StringComparison.Ordinal);
+        Assert.Contains("does not run operations", welcome.ReadOnlyNotice, StringComparison.Ordinal);
         Assert.Contains("Interactive menu closed", output.ToString(), StringComparison.Ordinal);
     }
 
@@ -168,6 +175,16 @@ public sealed class CliMenuTests
 
         public List<CliMenuDetails> ShownDetails { get; } = [];
 
+        public List<CliMenuWelcome> ShownWelcome { get; } = [];
+
+        public Task ShowWelcomeAsync(
+            CliMenuWelcome welcome,
+            CancellationToken cancellationToken)
+        {
+            ShownWelcome.Add(welcome);
+            return Task.CompletedTask;
+        }
+
         public Task<CliMenuMainSelection> SelectGroupAsync(
             CliMenuModel model,
             CancellationToken cancellationToken)
@@ -203,6 +220,10 @@ public sealed class CliMenuTests
 
     private sealed class CancellingMenuView : ICliMenuView
     {
+        public Task ShowWelcomeAsync(
+            CliMenuWelcome welcome,
+            CancellationToken cancellationToken) => Task.CompletedTask;
+
         public Task<CliMenuMainSelection> SelectGroupAsync(
             CliMenuModel model,
             CancellationToken cancellationToken) =>

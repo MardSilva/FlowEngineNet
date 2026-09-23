@@ -13,6 +13,23 @@ internal sealed record CliMenuGroup(
     string Title,
     ImmutableArray<CliCommandDescriptor> Commands);
 
+internal sealed record CliMenuWelcome(
+    string Title,
+    string Description,
+    string ReadOnlyNotice,
+    string ExperimentalWarning)
+{
+    public static CliMenuWelcome Create(CliTextCatalog text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        return new CliMenuWelcome(
+            text.Get("HelpTitle"),
+            text.Get("MenuWelcomeDescription"),
+            text.Get("MenuWelcomeReadOnly"),
+            text.Get("HelpWarning"));
+    }
+}
+
 internal sealed record CliMenuModel(ImmutableArray<CliMenuGroup> Groups)
 {
     public static CliMenuModel Create(CliTextCatalog text)
@@ -108,6 +125,10 @@ internal sealed record CliMenuCommandSelection(
 
 internal interface ICliMenuView
 {
+    public Task ShowWelcomeAsync(
+        CliMenuWelcome welcome,
+        CancellationToken cancellationToken);
+
     public Task<CliMenuMainSelection> SelectGroupAsync(
         CliMenuModel model,
         CancellationToken cancellationToken);
@@ -143,6 +164,7 @@ internal sealed class CliMenuController(ICliMenuView view)
         ArgumentNullException.ThrowIfNull(text);
 
         var model = CliMenuModel.Create(text);
+        await _view.ShowWelcomeAsync(CliMenuWelcome.Create(text), cancellationToken).ConfigureAwait(false);
         while (true)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -229,6 +251,38 @@ internal sealed class SpectreCliMenuView : ICliMenuView
             Interactive = InteractionSupport.Yes,
             Out = new CliAnsiConsoleOutput(output, presentation.Width),
         });
+    }
+
+    public Task ShowWelcomeAsync(
+        CliMenuWelcome welcome,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(welcome);
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var content = new Rows(
+            new Text(welcome.Description),
+            new Text(string.Empty),
+            new Text(welcome.ReadOnlyNotice),
+            new Text(string.Empty),
+            new Markup(_useColor
+                ? $"[yellow]{CliMarkup.EscapeExternal(welcome.ExperimentalWarning)}[/]"
+                : CliMarkup.EscapeExternal(welcome.ExperimentalWarning)));
+        var panel = new Panel(content)
+        {
+            Border = BoxBorder.Rounded,
+            Expand = true,
+            Header = new PanelHeader(CliMarkup.EscapeExternal(welcome.Title)),
+            Padding = new Padding(1, 0, 1, 0),
+        };
+        if (_useColor)
+        {
+            panel.BorderStyle = new Style(Color.DeepSkyBlue1);
+        }
+
+        _console.Write(panel);
+        _console.WriteLine();
+        return Task.CompletedTask;
     }
 
     public async Task<CliMenuMainSelection> SelectGroupAsync(

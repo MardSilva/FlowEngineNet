@@ -84,6 +84,8 @@
   <data name="CommandHelpOptional" xml:space="preserve"><value>opcional</value></data>
   <data name="CommandHelpConditional" xml:space="preserve"><value>obrigatório no modo escolhido</value></data>
   <data name="MenuTitle" xml:space="preserve"><value>Escolha uma área</value></data>
+  <data name="MenuWelcomeDescription" xml:space="preserve"><value>O Flow Engine é um motor .NET experimental para documentos semânticos. Ele inspeciona publicações EPUB e importa o conteúdo suportado para .flow.json, sem prender o documento a páginas ou a um único renderer.</value></data>
+  <data name="MenuWelcomeReadOnly" xml:space="preserve"><value>Este menu explica os fluxos disponíveis antes do uso dos comandos diretos. Nesta etapa, ele não executa operações.</value></data>
   <data name="MenuNavigationHint" xml:space="preserve"><value>Use as setas e Enter. Pressione Esc para cancelar.</value></data>
   <data name="MenuMoreChoices" xml:space="preserve"><value>Mova para cima ou para baixo para ver mais opções.</value></data>
   <data name="MenuBack" xml:space="preserve"><value>Voltar</value></data>

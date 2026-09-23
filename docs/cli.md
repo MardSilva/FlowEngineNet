@@ -38,7 +38,7 @@ Every stable EPUB, document-validation and Flow JSON diagnostic code currently h
 
 ## Interactive command preview
 
-`flow menu` opens a keyboard-driven command catalog on an interactive terminal. Use the arrow keys and Enter to choose a category or command. Each command preview shows its purpose, direct syntax, required inputs, file effects and safety notes. `Back` returns to the previous level, `Exit` closes the menu, and Esc cancels it. Ctrl+C keeps the established cancellation behavior and exit code `130`.
+`flow menu` opens with a short introduction to the project, its EPUB-to-Flow workflow and the experimental status of the current format. The blue welcome panel appears once per session, before the keyboard-driven command catalog. Use the arrow keys and Enter to choose a category or command. Each command preview shows its purpose, direct syntax, required inputs, file effects and safety notes. `Back` returns to the previous level, `Exit` closes the menu, and Esc cancels it. Ctrl+C keeps the established cancellation behavior and exit code `130`.
 
 The menu is read-only at this stage: choosing a command displays information and never runs the operation. Redirected input or output, captured output and unsupported terminals are refused with `FLOWCLI_MENU_REQUIRES_INTERACTIVE`; use `flow help` and the equivalent direct command in automation. `--no-color` and `NO_COLOR` keep the interactive layout while removing color.
 

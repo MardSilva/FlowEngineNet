@@ -12,7 +12,7 @@
 
 ## Prévia interativa dos comandos
 
-`flow menu` abre um catálogo navegável pelo teclado em um terminal interativo. Use as setas e Enter para escolher uma categoria ou um comando. Cada prévia informa finalidade, sintaxe direta, entradas obrigatórias, efeitos nos arquivos e observações de segurança. `Voltar` retorna ao nível anterior, `Sair` fecha o menu e Esc cancela a navegação. Ctrl+C conserva o comportamento de cancelamento e o código de saída `130`.
+`flow menu` começa com uma apresentação curta do projeto, do fluxo entre EPUB e Flow e do estado experimental do formato atual. O painel azul aparece uma vez por sessão, antes do catálogo navegável pelo teclado. Use as setas e Enter para escolher uma categoria ou um comando. Cada prévia informa finalidade, sintaxe direta, entradas obrigatórias, efeitos nos arquivos e observações de segurança. `Voltar` retorna ao nível anterior, `Sair` fecha o menu e Esc cancela a navegação. Ctrl+C conserva o comportamento de cancelamento e o código de saída `130`.
 
 Nesta etapa, o menu serve somente para consulta: escolher um comando exibe suas informações, mas não executa a operação. Entrada ou saída redirecionada, captura de saída e terminais sem suporte são recusados com `FLOWCLI_MENU_REQUIRES_INTERACTIVE`; em automação, use `flow help` e o comando direto equivalente. `--no-color` e `NO_COLOR` mantêm a organização interativa, sem cores.
 
