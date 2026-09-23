@@ -1,8 +1,9 @@
 {
   "format": "flow-cli-release-plan-0.1",
   "packageId": "FlowEngineNet.Tool",
-  "packageVersion": "0.2.0-alpha.1",
-  "tag": "v0.2.0-alpha.1",
+  "packageVersion": "0.2.0-alpha.2",
+  "tag": "v0.2.0-alpha.2",
   "channel": "prerelease",
-  "publication": "disabled"
+  "publication": "disabled",
+  "githubRelease": "draft-only"
 }

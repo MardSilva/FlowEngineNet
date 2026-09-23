@@ -802,7 +802,7 @@ public sealed class FlowCliIntegrationTests
         var result = await RunAsync(FlowCliApplication.CreateDefault(), ["help"]);
 
         Assert.Equal(0, result.ExitCode);
-        Assert.Contains("0.2.0-alpha.1 (experimental)", result.Output, StringComparison.Ordinal);
+        Assert.Contains($"{CliProductInfo.Version} (experimental)", result.Output, StringComparison.Ordinal);
         Assert.Contains("Getting started", result.Output, StringComparison.Ordinal);
         Assert.Contains("EPUB books", result.Output, StringComparison.Ordinal);
         Assert.Contains("Flow documents", result.Output, StringComparison.Ordinal);

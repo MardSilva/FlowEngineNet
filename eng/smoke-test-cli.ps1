@@ -170,7 +170,7 @@ try {
 
     $plainHelp = Invoke-InstalledFlow -Arguments @('--plain', 'help')
     Assert-NoAnsi -Name 'plain help' -Text $plainHelp
-    if ($plainHelp.IndexOf('Flow Engine .NET 0.2.0-alpha.1', [System.StringComparison]::Ordinal) -lt 0 -or
+    if ($plainHelp.IndexOf("Flow Engine .NET $packageVersion", [System.StringComparison]::Ordinal) -lt 0 -or
         $plainHelp.IndexOf('Commands:', [System.StringComparison]::Ordinal) -lt 0) {
         throw 'Installed CLI plain help did not report the expected identity and command catalog.'
     }

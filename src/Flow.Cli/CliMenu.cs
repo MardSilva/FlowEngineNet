@@ -25,7 +25,7 @@ internal sealed record CliMenuWelcome(
     {
         ArgumentNullException.ThrowIfNull(text);
         return new CliMenuWelcome(
-            text.Get("HelpTitle"),
+            text.Format("HelpTitle", CliProductInfo.Version),
             text.Get("MenuWelcomeDescription"),
             text.Get("MenuWelcomeReadOnly"),
             text.Get("HelpWarning"));

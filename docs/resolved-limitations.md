@@ -154,6 +154,12 @@ The earlier flat help output now comes from the same typed command catalog used 
 
 The presentation layer detects redirection and terminal capabilities, honors `--no-color` and `NO_COLOR`, and provides `--plain` for an explicit accessible fallback. Cancellation, unexpected input termination, rendering failures, and normal completion restore terminal state. Automated coverage does not replace an external accessibility audit, which remains a documented limitation.
 
+### Version proposal and guarded draft release
+
+CI can now derive a release candidate from versioned feature or release branch names and compare it with the MSBuild package version and checked-in release plan. The suggestion is read-only. A separate workflow can create a draft GitHub Release only after manual confirmation and repeated Windows/Linux validation from synchronized `main` or `release/<version>`.
+
+NuGet publication and automatic public releases remain disabled. Draft review, environment protection and eventual publication are explicit repository-owner decisions.
+
 ### Generated interface localization
 
 Human-readable CLI framing and review material now use resource catalogs for `en-US` and `pt-BR`. The HTML-book package also resolves generated interface text to English, `pt-PT` or `pt-BR` without translating authored content. Commands, JSON fields and diagnostic codes remain invariant.

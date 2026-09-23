@@ -165,6 +165,32 @@ public sealed class CliMenuTests
     }
 
     [Fact]
+    public async Task RichAssistantScreenClearsVisibleContentAndScrollbackBeforeRendering()
+    {
+        using var output = new StringWriter();
+        var view = new SpectreCliMenuView(
+            output,
+            new CliTextCatalog("en-US"),
+            new CliPresentationProfile(
+                CliPresentationMode.Rich,
+                IsInteractive: true,
+                UseColor: false,
+                Width: 80));
+
+        await view.ShowSummaryAsync(
+            new CliAssistantSummary(
+                "Summary",
+                [("Source", "book.epub")],
+                []),
+            CancellationToken.None);
+
+        var rendered = output.ToString();
+        Assert.Contains("\u001b[2J", rendered, StringComparison.Ordinal);
+        Assert.Contains("\u001b[3J", rendered, StringComparison.Ordinal);
+        Assert.Contains("Summary", rendered, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ApplicationRefusesMenuWhenOnlyInputIsRedirected()
     {
         using var output = new StringWriter();

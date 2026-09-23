@@ -39,7 +39,7 @@ internal sealed record CliGeneralHelpModel(
             .ToImmutableArray();
 
         return new CliGeneralHelpModel(
-            text.Get("HelpTitle"),
+            text.Format("HelpTitle", CliProductInfo.Version),
             text.Get("HelpWarning"),
             text.Get("HelpGlobalOptions"),
             [

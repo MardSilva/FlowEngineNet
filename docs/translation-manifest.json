@@ -6,7 +6,7 @@
     {
       "source": "README.md",
       "translation": "README.pt-BR.md",
-      "sourceSha256": "4C2766A5B4DAC8ADD7D417A32FB005C0C38EBB585B8993BA2155D2B5BAAC8A02"
+      "sourceSha256": "314163999FB6205C5038FAA6210BA3A2AC7894C483DBC53FDA1FB9D651235F7B"
     },
     {
       "source": "docs/0.1-release-review.md",
@@ -86,12 +86,12 @@
     {
       "source": "docs/known-limitations.md",
       "translation": "docs/pt-BR/known-limitations.md",
-      "sourceSha256": "107AF61EF435C349C88717EBBBB119AF53190AFFDB385075C0BFB63E207B5840"
+      "sourceSha256": "377D22A0F6A9161EDF9B0A77C05AECA17F5D426A0AE86DE422673CCC5B212910"
     },
     {
       "source": "docs/release-artifacts.md",
       "translation": "docs/pt-BR/release-artifacts.md",
-      "sourceSha256": "9AE1A74305B60741AD018615806F035CAE1063D8D0E8C22354183317622D136C"
+      "sourceSha256": "7A2F9BF23D803D94F197FB3284DF6EA18DF0347764340C94A40C2EDFB4E80BC8"
     },
     {
       "source": "docs/research-findings.md",
@@ -101,7 +101,7 @@
     {
       "source": "docs/resolved-limitations.md",
       "translation": "docs/pt-BR/resolved-limitations.md",
-      "sourceSha256": "97E5D952394D19DF984A5BE6A46DE652F0F98282FDCCC951B43A5D88142D7080"
+      "sourceSha256": "44D99EA8F8DCA753A9339F765706414F536D2F81EA5EE3220A8EB64744688BF8"
     },
     {
       "source": "docs/roadmap.md",
@@ -121,7 +121,7 @@
     {
       "source": "samples/SampleBook/README.md",
       "translation": "samples/SampleBook/README.pt-BR.md",
-      "sourceSha256": "4D1C9F32C2AE01AFD515123AF8DA4FD411668F3DABDE75B0829751365C8D03B9"
+      "sourceSha256": "B5DC98A6DCD8D30E187F21F071429D0CB951BF33C8910D6A9DFF7D2B1909F3FC"
     }
   ]
 }

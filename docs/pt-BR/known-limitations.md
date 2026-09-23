@@ -14,7 +14,7 @@ Mudanças de comportamento devem classificar a fronteira como resolvida, reduzid
 - O projeto fixa .NET SDK 10.0.401. A CLI depende de runtime .NET 10 compatível; não há instalador assinado nem pacote self-contained.
 - Reprodutibilidade cobre duas builds normalizadas no builder Ubuntu canônico e a instalação do mesmo candidato em Ubuntu/Windows. Não prova igualdade entre compiladores independentes, macOS ou outros SDKs. Assinatura futura terá de ocorrer depois da normalização.
 - O SBOM não cobre SDK, host, Actions, dependências só de teste ou bibliotecas do sistema. A proveniência local não é assinada e não alega nível SLSA, transparência ou identidade confiável.
-- O dry-run não cria tag, GitHub Release ou publicação NuGet. Upgrade, rollback e revogação ainda não foram definidos.
+- Proposta e dry-run não publicam no NuGet nem tornam uma GitHub Release pública. Um workflow separado e manual pode criar um draft depois da validação Windows/Linux, mas o rascunho, a intenção de tag e os artefatos não assinados ainda exigem revisão humana. Upgrade, rollback, revogação e recuperação de publicação acidental não foram definidos.
 
 ## Modelo semântico
 

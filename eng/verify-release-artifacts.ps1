@@ -140,7 +140,8 @@ if ($plan.format -ne 'flow-cli-release-plan-0.1' -or
     $plan.packageId -ne $manifest.packageId -or
     $plan.packageVersion -ne $manifest.packageVersion -or
     $plan.tag -ne ('v' + $manifest.packageVersion) -or
-    $plan.publication -ne 'disabled') {
+    $plan.publication -ne 'disabled' -or
+    $plan.githubRelease -ne 'draft-only') {
     throw 'The canonical release does not match the checked-in release plan.'
 }
 

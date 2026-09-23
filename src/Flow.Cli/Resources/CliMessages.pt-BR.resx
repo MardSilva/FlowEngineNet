@@ -23,7 +23,7 @@
   <data name="ErrorCancelled" xml:space="preserve"><value>A operação foi cancelada; nenhuma saída final parcial foi mantida.</value></data>
   <data name="ErrorOperationFailed" xml:space="preserve"><value>A operação falhou: {0}</value></data>
   <data name="ErrorMenuRequiresInteractive" xml:space="preserve"><value>'flow menu' exige entrada e saída interativas com suporte do terminal. Use 'flow help' e execute diretamente o comando equivalente.</value></data>
-  <data name="HelpTitle" xml:space="preserve"><value>Flow Engine .NET 0.2.0-alpha.1 (experimental)</value></data>
+  <data name="HelpTitle" xml:space="preserve"><value>Flow Engine .NET {0} (experimental)</value></data>
   <data name="HelpWarning" xml:space="preserve"><value>O formato .flow.json e todas as APIs 0.x ainda podem mudar.</value></data>
   <data name="HelpGlobalOptions" xml:space="preserve"><value>Opções globais:</value></data>
   <data name="HelpLanguage" xml:space="preserve"><value>  --language &lt;en-US|pt-BR&gt;                  Escolhe o idioma da saída; o fallback é en-US.</value></data>
