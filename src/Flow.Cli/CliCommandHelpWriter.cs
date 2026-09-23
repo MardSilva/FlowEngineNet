@@ -27,7 +27,7 @@ internal static class CliCommandHelpWriter
                 await output.WriteLineAsync(text.Format(
                     "CommandHelpEntry",
                     argument.Syntax,
-                    text.Get(RequirementKey(argument.Requirement)),
+                    text.Get(CliRequirementResources.GetKey(argument.Requirement)),
                     text.Get(argument.DescriptionResourceKey))).ConfigureAwait(false);
             }
         }
@@ -41,7 +41,7 @@ internal static class CliCommandHelpWriter
                 await output.WriteLineAsync(text.Format(
                     "CommandHelpEntry",
                     option.Syntax,
-                    text.Get(RequirementKey(option.Requirement)),
+                    text.Get(CliRequirementResources.GetKey(option.Requirement)),
                     text.Get(option.DescriptionResourceKey))).ConfigureAwait(false);
             }
         }
@@ -83,12 +83,4 @@ internal static class CliCommandHelpWriter
             await output.WriteLineAsync($"  {entry}").ConfigureAwait(false);
         }
     }
-
-    private static string RequirementKey(CliRequirement requirement) => requirement switch
-    {
-        CliRequirement.Required => "CommandHelpRequired",
-        CliRequirement.Optional => "CommandHelpOptional",
-        CliRequirement.Conditional => "CommandHelpConditional",
-        _ => throw new ArgumentOutOfRangeException(nameof(requirement), requirement, null),
-    };
 }

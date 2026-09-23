@@ -10,6 +10,7 @@ public sealed class CliCommandParser
     private static readonly IReadOnlyDictionary<string, Func<IReadOnlyList<string>, CommandParseResult>> Parsers =
         new Dictionary<string, Func<IReadOnlyList<string>, CommandParseResult>>(StringComparer.Ordinal)
         {
+            ["menu"] = ParseMenu,
             ["sample"] = ParseSample,
             ["import"] = ParseImport,
             ["epub-inspect"] = ParseEpubInspect,
@@ -86,6 +87,11 @@ public sealed class CliCommandParser
                 "ErrorUnknownCommand",
                 arguments[0]);
     }
+
+    private static CommandParseResult ParseMenu(IReadOnlyList<string> arguments) =>
+        arguments.Count == 1
+            ? CommandParseResult.Success(new MenuCommand())
+            : CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", "flow menu");
 
     private static CommandParseResult ParseImport(IReadOnlyList<string> arguments)
     {

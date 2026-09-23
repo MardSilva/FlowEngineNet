@@ -7,6 +7,9 @@ public abstract record CliCommand;
 
 public sealed record HelpCommand(string? CommandName = null) : CliCommand;
 
+/// <summary>Requests the read-only interactive command browser.</summary>
+public sealed record MenuCommand : CliCommand;
+
 public sealed record SampleCommand(string OutputPath) : CliCommand;
 
 public sealed record ImportEpubCommand(

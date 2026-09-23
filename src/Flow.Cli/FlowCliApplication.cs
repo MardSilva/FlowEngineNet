@@ -11,17 +11,52 @@ public sealed class FlowCliApplication
 {
     private readonly CliCommandParser _parser;
     private readonly CliOperations _operations;
+    private readonly IFlowTerminal _terminal;
+    private readonly IEnvironmentVariables _environment;
+    private readonly ICliMenu _menu;
 
     public FlowCliApplication(CliCommandParser parser, CliOperations operations)
+        : this(
+            parser,
+            operations,
+            new SystemFlowTerminal(),
+            new SystemEnvironmentVariables(),
+            new SpectreCliMenu())
+    {
+    }
+
+    internal FlowCliApplication(
+        CliCommandParser parser,
+        CliOperations operations,
+        IFlowTerminal terminal,
+        IEnvironmentVariables environment,
+        ICliMenu menu)
     {
         ArgumentNullException.ThrowIfNull(parser);
         ArgumentNullException.ThrowIfNull(operations);
+        ArgumentNullException.ThrowIfNull(terminal);
+        ArgumentNullException.ThrowIfNull(environment);
+        ArgumentNullException.ThrowIfNull(menu);
         _parser = parser;
         _operations = operations;
+        _terminal = terminal;
+        _environment = environment;
+        _menu = menu;
     }
 
     /// <summary>Creates the default local command composition.</summary>
     public static FlowCliApplication CreateDefault() =>
+        CreateDefault(new SystemFlowTerminal(), new SystemEnvironmentVariables());
+
+    internal static FlowCliApplication CreateDefault(
+        IFlowTerminal terminal,
+        IEnvironmentVariables environment) =>
+        CreateDefault(terminal, environment, new SpectreCliMenu());
+
+    internal static FlowCliApplication CreateDefault(
+        IFlowTerminal terminal,
+        IEnvironmentVariables environment,
+        ICliMenu menu) =>
         new(
             new CliCommandParser(),
             new CliOperations(
@@ -31,7 +66,10 @@ public sealed class FlowCliApplication
                 new DocumentValidator(),
                 new Sha256DocumentIntegrityService(new FlowDocumentCanonicalizer()),
                 new AdaptiveLayoutEngine(),
-                new HtmlDocumentRenderer()));
+                new HtmlDocumentRenderer()),
+            terminal,
+            environment,
+            menu);
 
     /// <summary>Runs one command without taking ownership of the supplied writers.</summary>
     public async Task<int> RunAsync(
@@ -58,6 +96,7 @@ public sealed class FlowCliApplication
 
         var invocation = invocationResult.Options!;
         var text = new CliTextCatalog(invocation.CultureName);
+        var presentation = CliPresentationPolicy.Resolve(invocation, _terminal, output, _environment);
         if (invocation.ShowBanner)
         {
             await output.WriteLineAsync(CliBanner.Text).ConfigureAwait(false);
@@ -72,7 +111,28 @@ public sealed class FlowCliApplication
 
         try
         {
-            return await _operations.ExecuteAsync(parseResult.Command!, output, error, text, cancellationToken)
+            if (parseResult.Command is MenuCommand)
+            {
+                if (presentation.Mode != CliPresentationMode.Rich || !presentation.IsInteractive)
+                {
+                    await error.WriteLineAsync(text.Diagnostic(
+                            CliMenuDiagnosticCodes.RequiresInteractiveTerminal,
+                            "ErrorMenuRequiresInteractive"))
+                        .ConfigureAwait(false);
+                    return 1;
+                }
+
+                return await _menu.RunAsync(output, text, presentation, cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            return await _operations.ExecuteAsync(
+                    parseResult.Command!,
+                    output,
+                    error,
+                    text,
+                    presentation,
+                    cancellationToken)
                 .ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)

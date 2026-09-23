@@ -803,21 +803,27 @@ public sealed class FlowCliIntegrationTests
 
         Assert.Equal(0, result.ExitCode);
         Assert.Contains("0.2.0-alpha.1 (experimental)", result.Output, StringComparison.Ordinal);
-        Assert.Contains("flow import <book.epub>", result.Output, StringComparison.Ordinal);
-        Assert.Contains("--metadata-json <metadata.json>", result.Output, StringComparison.Ordinal);
-        Assert.Contains("--processing-json <processing.json>", result.Output, StringComparison.Ordinal);
-        Assert.Contains("--source-map-json <source-map.json>", result.Output, StringComparison.Ordinal);
-        Assert.Contains("flow epub-inspect <book.epub>", result.Output, StringComparison.Ordinal);
-        Assert.Contains("flow epub-inventory-matrix <qualification.json>", result.Output, StringComparison.Ordinal);
-        Assert.Contains("flow corpus <manifest.json>", result.Output, StringComparison.Ordinal);
-        Assert.Contains("flow epub-qualify <book.epub>", result.Output, StringComparison.Ordinal);
-        Assert.Contains("flow epub-review <book.epub>", result.Output, StringComparison.Ordinal);
-        Assert.Contains("flow execution-status <destination>", result.Output, StringComparison.Ordinal);
-        Assert.Contains("flow execution-clean <destination>", result.Output, StringComparison.Ordinal);
-        Assert.Contains("flow validate <document>", result.Output, StringComparison.Ordinal);
-        Assert.Contains("Exit codes: 0 completed operation, 1 command/input/I/O failure, 2 semantic validation or automatic qualification failure, 130 cancellation.", result.Output, StringComparison.Ordinal);
+        Assert.Contains("Getting started", result.Output, StringComparison.Ordinal);
+        Assert.Contains("EPUB books", result.Output, StringComparison.Ordinal);
+        Assert.Contains("Flow documents", result.Output, StringComparison.Ordinal);
+        Assert.Contains("Corpus and quality", result.Output, StringComparison.Ordinal);
+        Assert.Contains("Maintenance", result.Output, StringComparison.Ordinal);
+        Assert.Contains("  import", result.Output, StringComparison.Ordinal);
+        Assert.Contains("  epub-inspect", result.Output, StringComparison.Ordinal);
+        Assert.Contains("  epub-inventory-matrix", result.Output, StringComparison.Ordinal);
+        Assert.Contains("  corpus", result.Output, StringComparison.Ordinal);
+        Assert.Contains("  epub-qualify", result.Output, StringComparison.Ordinal);
+        Assert.Contains("  epub-review", result.Output, StringComparison.Ordinal);
+        Assert.Contains("  execution-status", result.Output, StringComparison.Ordinal);
+        Assert.Contains("  execution-clean", result.Output, StringComparison.Ordinal);
+        Assert.Contains("  validate", result.Output, StringComparison.Ordinal);
+        Assert.Contains("Exit codes: 0 completed operation", result.Output, StringComparison.Ordinal);
+        Assert.Contains("automatic qualification failure, 130 cancellation.", result.Output, StringComparison.Ordinal);
         Assert.Contains("--language <en-US|pt-BR>", result.Output, StringComparison.Ordinal);
         Assert.Contains("--banner", result.Output, StringComparison.Ordinal);
+        Assert.Contains("flow help <command>", result.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("<book.epub>", result.Output, StringComparison.Ordinal);
+        Assert.DoesNotContain("--qualification-sha256", result.Output, StringComparison.Ordinal);
         Assert.DoesNotContain("\u001b[", result.Output, StringComparison.Ordinal);
     }
 
@@ -875,7 +881,8 @@ public sealed class FlowCliIntegrationTests
         Assert.Contains("Flow Engine .NET", help.Output, StringComparison.Ordinal);
         Assert.Contains("Opções globais:", help.Output, StringComparison.Ordinal);
         Assert.Contains("Comandos:", help.Output, StringComparison.Ordinal);
-        Assert.Contains("flow import", help.Output, StringComparison.Ordinal);
+        Assert.Contains("Livros EPUB", help.Output, StringComparison.Ordinal);
+        Assert.Contains("  import", help.Output, StringComparison.Ordinal);
         Assert.DoesNotContain("\u001b[", help.Output, StringComparison.Ordinal);
 
         Assert.Equal(1, portugueseError.ExitCode);

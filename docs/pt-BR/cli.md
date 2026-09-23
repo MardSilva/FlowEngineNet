@@ -8,11 +8,19 @@
 
 `--language <en-US|pt-BR>` escolhe os textos para pessoas. Sem a opção, a CLI usa `en-US`. Comandos, opções, caminhos, campos serializados e códigos diagnósticos não mudam. Em `pt-BR`, a CLI mostra um resumo traduzido e conserva o detalhe técnico original.
 
-`--banner` exibe um cabeçalho ASCII no estilo FIGlet. `--no-color` explicita saída simples para scripts e terminais limitados. Essas opções não alteram arquivos, hashes nem relatórios.
+`--banner` exibe um cabeçalho ASCII no estilo FIGlet. Em um terminal interativo com suporte a ANSI, a CLI pode usar uma apresentação mais rica e ajustada à largura disponível. Saídas redirecionadas ou capturadas e terminais sem ANSI recebem texto simples e determinístico. `--no-color` retira as cores sem abrir mão do espaçamento e da hierarquia do modo interativo. Essas opções não alteram arquivos, hashes nem relatórios.
+
+## Prévia interativa dos comandos
+
+`flow menu` abre um catálogo navegável pelo teclado em um terminal interativo. Use as setas e Enter para escolher uma categoria ou um comando. Cada prévia informa finalidade, sintaxe direta, entradas obrigatórias, efeitos nos arquivos e observações de segurança. `Voltar` retorna ao nível anterior, `Sair` fecha o menu e Esc cancela a navegação. Ctrl+C conserva o comportamento de cancelamento e o código de saída `130`.
+
+Nesta etapa, o menu serve somente para consulta: escolher um comando exibe suas informações, mas não executa a operação. Entrada ou saída redirecionada, captura de saída e terminais sem suporte são recusados com `FLOWCLI_MENU_REQUIRES_INTERACTIVE`; em automação, use `flow help` e o comando direto equivalente. `--no-color` e `NO_COLOR` mantêm a organização interativa, sem cores.
 
 ## Ajuda específica por comando
 
-`flow help` mantém a lista compacta de comandos. Para consultar os detalhes tipados de um comando, use uma destas formas:
+`flow help` organiza o catálogo em cinco grupos fixos: Início, Livros EPUB, Documentos Flow, Corpus e qualidade e Manutenção. A visão geral mostra apenas o nome e um resumo de cada comando, portanto as assinaturas longas não prejudicam a leitura nem em terminais com 80 colunas. Em um terminal interativo estreito, o resumo fica abaixo do comando; quando há espaço, ambos aparecem lado a lado. O modo simples preserva a mesma informação sem sequências ANSI, bordas ou controle do cursor.
+
+Para consultar todos os detalhes tipados de um comando, use uma destas formas:
 
 ```text
 flow help <comando>
@@ -24,6 +32,7 @@ A ajuda detalhada informa finalidade, uso, argumentos posicionais, opções obri
 ## Comandos
 
 ```text
+flow menu
 flow sample [output]
 flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>] [--fidelity-report <fidelity.json>]
 flow epub-inspect <book.epub> [--json <report.json>]

@@ -34,11 +34,19 @@ flow [--language <en-US|pt-BR>] [--banner] [--no-color] <command>
 
 Every stable EPUB, document-validation and Flow JSON diagnostic code currently has a `pt-BR` summary. The CLI prints the original technical detail immediately afterward, so paths, IDs, rejected values and parser messages are not lost. A code introduced without a catalog entry falls back to its original message. This localization affects only terminal text: diagnostic and inspection JSON remains deterministic and independent of `--language`.
 
-`--banner` prints an optional FIGlet-style ASCII heading. The CLI emits plain text by default and does not require ANSI colors; `--no-color` makes that contract explicit for scripts, redirected output and limited terminals. These presentation options do not affect generated files, canonical bytes or hashes.
+`--banner` prints an optional FIGlet-style ASCII heading. On an interactive terminal with ANSI support, the CLI can use a richer layout that adapts to the available width. Redirected output, captured output and terminals without ANSI support receive deterministic plain text instead. `--no-color` removes color without discarding the spacing and hierarchy of the interactive layout. These presentation options do not affect generated files, canonical bytes or hashes.
+
+## Interactive command preview
+
+`flow menu` opens a keyboard-driven command catalog on an interactive terminal. Use the arrow keys and Enter to choose a category or command. Each command preview shows its purpose, direct syntax, required inputs, file effects and safety notes. `Back` returns to the previous level, `Exit` closes the menu, and Esc cancels it. Ctrl+C keeps the established cancellation behavior and exit code `130`.
+
+The menu is read-only at this stage: choosing a command displays information and never runs the operation. Redirected input or output, captured output and unsupported terminals are refused with `FLOWCLI_MENU_REQUIRES_INTERACTIVE`; use `flow help` and the equivalent direct command in automation. `--no-color` and `NO_COLOR` keep the interactive layout while removing color.
 
 ## Command-specific help
 
-`flow help` keeps the compact command list. Use either form below for the typed details of one command:
+`flow help` presents the command catalog in five stable groups: Getting started, EPUB books, Flow documents, Corpus and quality, and Maintenance. The general view shows only each command name and a short summary, so long signatures remain readable even in an 80-column terminal. Narrow interactive terminals stack summaries below command names; wider terminals place them side by side. The plain variant carries the same information without ANSI sequences, borders or cursor control.
+
+Use either form below for the complete typed details of one command:
 
 ```text
 flow help <command>
@@ -50,6 +58,7 @@ The detailed view shows purpose, usage, positional arguments, required and optio
 ## Commands
 
 ```text
+flow menu
 flow sample [output]
 flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>] [--fidelity-report <fidelity.json>]
 flow epub-inspect <book.epub> [--json <report.json>]

@@ -22,13 +22,22 @@
   <data name="ErrorInvalidQualificationSha256" xml:space="preserve"><value>--qualification-sha256 deve conter exatamente 64 caracteres hexadecimais.</value></data>
   <data name="ErrorCancelled" xml:space="preserve"><value>A operação foi cancelada; nenhuma saída final parcial foi mantida.</value></data>
   <data name="ErrorOperationFailed" xml:space="preserve"><value>A operação falhou: {0}</value></data>
+  <data name="ErrorMenuRequiresInteractive" xml:space="preserve"><value>'flow menu' exige entrada e saída interativas com suporte do terminal. Use 'flow help' e execute diretamente o comando equivalente.</value></data>
   <data name="HelpTitle" xml:space="preserve"><value>Flow Engine .NET 0.2.0-alpha.1 (experimental)</value></data>
   <data name="HelpWarning" xml:space="preserve"><value>O formato .flow.json e todas as APIs 0.x ainda podem mudar.</value></data>
   <data name="HelpGlobalOptions" xml:space="preserve"><value>Opções globais:</value></data>
   <data name="HelpLanguage" xml:space="preserve"><value>  --language &lt;en-US|pt-BR&gt;                  Escolhe o idioma da saída; o fallback é en-US.</value></data>
   <data name="HelpBanner" xml:space="preserve"><value>  --banner                                      Exibe o cabeçalho ASCII opcional no estilo FIGlet.</value></data>
   <data name="HelpNoColor" xml:space="preserve"><value>  --no-color                                    Mantém a saída simples; cores ANSI nunca são obrigatórias.</value></data>
+  <data name="HelpLanguageDescription" xml:space="preserve"><value>Escolhe o idioma da saída; o fallback é en-US.</value></data>
+  <data name="HelpBannerDescription" xml:space="preserve"><value>Exibe o cabeçalho ASCII opcional no estilo FIGlet.</value></data>
+  <data name="HelpNoColorDescription" xml:space="preserve"><value>Desativa as cores sem alterar os dados do comando.</value></data>
   <data name="HelpCommands" xml:space="preserve"><value>Comandos:</value></data>
+  <data name="HelpGroup_Start" xml:space="preserve"><value>Início</value></data>
+  <data name="HelpGroup_EpubBooks" xml:space="preserve"><value>Livros EPUB</value></data>
+  <data name="HelpGroup_FlowDocuments" xml:space="preserve"><value>Documentos Flow</value></data>
+  <data name="HelpGroup_CorpusQuality" xml:space="preserve"><value>Corpus e qualidade</value></data>
+  <data name="HelpGroup_Maintenance" xml:space="preserve"><value>Manutenção</value></data>
   <data name="HelpSample" xml:space="preserve"><value>  flow sample [saída]                          Cria o livro .flow.json de referência.</value></data>
   <data name="HelpImport1" xml:space="preserve"><value>  flow import &lt;livro.epub&gt; [--output &lt;livro.flow.json&gt;] [--diagnostics-json &lt;relatório.json&gt;] [--fidelity-report &lt;fidelidade.json&gt;]</value></data>
   <data name="HelpImport2" xml:space="preserve"><value>    [--metadata-json &lt;metadados.json&gt;] [--processing-json &lt;processamento.json&gt;] [--source-map-json &lt;mapa.json&gt;]</value></data>
@@ -74,6 +83,25 @@
   <data name="CommandHelpRequired" xml:space="preserve"><value>obrigatório</value></data>
   <data name="CommandHelpOptional" xml:space="preserve"><value>opcional</value></data>
   <data name="CommandHelpConditional" xml:space="preserve"><value>obrigatório no modo escolhido</value></data>
+  <data name="MenuTitle" xml:space="preserve"><value>Escolha uma área</value></data>
+  <data name="MenuNavigationHint" xml:space="preserve"><value>Use as setas e Enter. Pressione Esc para cancelar.</value></data>
+  <data name="MenuMoreChoices" xml:space="preserve"><value>Mova para cima ou para baixo para ver mais opções.</value></data>
+  <data name="MenuBack" xml:space="preserve"><value>Voltar</value></data>
+  <data name="MenuExit" xml:space="preserve"><value>Sair</value></data>
+  <data name="MenuCancelled" xml:space="preserve"><value>Menu interativo cancelado. Nenhuma operação foi executada.</value></data>
+  <data name="MenuExited" xml:space="preserve"><value>Menu interativo fechado. Nenhuma operação foi executada.</value></data>
+  <data name="MenuCommandTitle" xml:space="preserve"><value>Escolha um comando para consultar</value></data>
+  <data name="MenuDetailsTitle" xml:space="preserve"><value>Prévia do comando: {0}</value></data>
+  <data name="MenuDetailsDescription" xml:space="preserve"><value>Finalidade</value></data>
+  <data name="MenuDetailsUsage" xml:space="preserve"><value>Comando direto</value></data>
+  <data name="MenuDetailsInputs" xml:space="preserve"><value>Entradas obrigatórias</value></data>
+  <data name="MenuDetailsOutputs" xml:space="preserve"><value>Efeitos nos arquivos</value></data>
+  <data name="MenuDetailsSecurity" xml:space="preserve"><value>Observações de segurança</value></data>
+  <data name="MenuNoRequiredInputs" xml:space="preserve"><value>Nenhuma entrada obrigatória.</value></data>
+  <data name="MenuNoSecurityNotes" xml:space="preserve"><value>Nenhuma observação adicional de segurança.</value></data>
+  <data name="MenuDetailInputEntry" xml:space="preserve"><value>{0} [{1}]: {2}</value></data>
+  <data name="MenuReturnFromDetails" xml:space="preserve"><value>Voltar à lista de comandos</value></data>
+  <data name="MenuDetailsPrompt" xml:space="preserve"><value>Depois de consultar o comando</value></data>
   <data name="CommandExitCode_0" xml:space="preserve"><value>A operação foi concluída.</value></data>
   <data name="CommandExitCode_1" xml:space="preserve"><value>O comando, a entrada ou a operação de arquivo falhou.</value></data>
   <data name="CommandExitCode_2" xml:space="preserve"><value>A validação ou a qualificação automática não foi aprovada.</value></data>
@@ -143,6 +171,8 @@
   <data name="CommandSecurity_Render" xml:space="preserve"><value>Diretórios arbitrários existentes, raízes, reparse points e diretórios que contêm a origem não são substituídos.</value></data>
   <data name="Command_help_Title" xml:space="preserve"><value>Exibir a ajuda dos comandos</value></data>
   <data name="Command_help_Description" xml:space="preserve"><value>Exibe a lista geral ou a ajuda detalhada de um comando sem executá-lo.</value></data>
+  <data name="Command_menu_Title" xml:space="preserve"><value>Navegar pelo menu interativo de comandos</value></data>
+  <data name="Command_menu_Description" xml:space="preserve"><value>Mostra prévias localizadas dos comandos sem executar operações.</value></data>
   <data name="Command_sample_Title" xml:space="preserve"><value>Criar o documento de exemplo</value></data>
   <data name="Command_sample_Description" xml:space="preserve"><value>Cria o livro Flow de referência usado nos exemplos e smoke tests.</value></data>
   <data name="Command_import_Title" xml:space="preserve"><value>Importar um EPUB</value></data>

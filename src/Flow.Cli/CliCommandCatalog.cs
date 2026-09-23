@@ -11,11 +11,35 @@ internal enum CliCommandGroup
     Maintenance,
 }
 
+internal static class CliCommandGroupResources
+{
+    public static string GetTitleKey(CliCommandGroup group) => group switch
+    {
+        CliCommandGroup.Start => "HelpGroup_Start",
+        CliCommandGroup.EpubBooks => "HelpGroup_EpubBooks",
+        CliCommandGroup.FlowDocuments => "HelpGroup_FlowDocuments",
+        CliCommandGroup.CorpusQuality => "HelpGroup_CorpusQuality",
+        CliCommandGroup.Maintenance => "HelpGroup_Maintenance",
+        _ => throw new ArgumentOutOfRangeException(nameof(group), group, null),
+    };
+}
+
 internal enum CliRequirement
 {
     Optional,
     Required,
     Conditional,
+}
+
+internal static class CliRequirementResources
+{
+    public static string GetKey(CliRequirement requirement) => requirement switch
+    {
+        CliRequirement.Required => "CommandHelpRequired",
+        CliRequirement.Optional => "CommandHelpOptional",
+        CliRequirement.Conditional => "CommandHelpConditional",
+        _ => throw new ArgumentOutOfRangeException(nameof(requirement), requirement, null),
+    };
 }
 
 internal sealed record CliArgumentDescriptor(
@@ -65,6 +89,19 @@ internal static class CliCommandCatalog
             "CommandEffect_None",
             [],
             ExitCodes(0, 1),
+            availableInMenu: false),
+        Command(
+            CliCommandGroup.Start,
+            "menu",
+            "Command_menu_Title",
+            "Command_menu_Description",
+            "flow menu",
+            [],
+            [],
+            ["flow menu"],
+            "CommandEffect_None",
+            [],
+            ExitCodes(0, 1, 130),
             availableInMenu: false),
         Command(
             CliCommandGroup.Start,

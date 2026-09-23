@@ -82,7 +82,8 @@ public sealed class CliOperations
         TextWriter output,
         TextWriter error,
         CancellationToken cancellationToken = default)
-        => await ExecuteAsync(command, output, error, new CliTextCatalog(), cancellationToken).ConfigureAwait(false);
+        => await ExecuteAsync(command, output, error, new CliTextCatalog(), CliPresentationProfile.Plain(), cancellationToken)
+            .ConfigureAwait(false);
 
     /// <summary>Executes a parsed command with the selected human-readable output catalog.</summary>
     public async Task<int> ExecuteAsync(
@@ -91,15 +92,26 @@ public sealed class CliOperations
         TextWriter error,
         CliTextCatalog text,
         CancellationToken cancellationToken = default)
+        => await ExecuteAsync(command, output, error, text, CliPresentationProfile.Plain(), cancellationToken)
+            .ConfigureAwait(false);
+
+    internal async Task<int> ExecuteAsync(
+        CliCommand command,
+        TextWriter output,
+        TextWriter error,
+        CliTextCatalog text,
+        CliPresentationProfile presentation,
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
         ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(presentation);
 
         return command switch
         {
-            HelpCommand help => await ShowHelpAsync(help, output, text).ConfigureAwait(false),
+            HelpCommand help => await ShowHelpAsync(help, output, text, presentation).ConfigureAwait(false),
             SampleCommand sample => await CreateSampleAsync(sample, output, text, cancellationToken).ConfigureAwait(false),
             ImportEpubCommand import => await ImportEpubAsync(import, output, error, text, cancellationToken)
                 .ConfigureAwait(false),
@@ -147,7 +159,11 @@ public sealed class CliOperations
         };
     }
 
-    private static async Task<int> ShowHelpAsync(HelpCommand command, TextWriter output, CliTextCatalog text)
+    private static async Task<int> ShowHelpAsync(
+        HelpCommand command,
+        TextWriter output,
+        CliTextCatalog text,
+        CliPresentationProfile presentation)
     {
         if (command.CommandName is not null)
         {
@@ -160,23 +176,7 @@ public sealed class CliOperations
             return 0;
         }
 
-        foreach (var key in new[]
-                 {
-                     "HelpTitle", "HelpWarning", "HelpGlobalOptions", "HelpLanguage", "HelpBanner", "HelpNoColor",
-                     "HelpCommands", "HelpSample", "HelpImport1", "HelpImport2", "HelpImport3", "HelpEpubInspect",
-                     "HelpEpubInventory1", "HelpEpubInventory2",
-                     "HelpEpubInventoryQualify1", "HelpEpubInventoryQualify2",
-                     "HelpEpubInventoryMatrix1", "HelpEpubInventoryMatrix2",
-                     "HelpEpubInventoryReview1", "HelpEpubInventoryReview2", "HelpEpubInventoryReview3",
-                     "HelpCorpus1", "HelpCorpus2", "HelpEpubQualify1", "HelpEpubQualify2", "HelpEpubQualify3",
-                     "HelpEpubReview1", "HelpEpubReview2", "HelpEpubReview3", "HelpOutputPolicy",
-                     "HelpExecutionStatus", "HelpExecutionClean",
-                     "HelpInspect", "HelpValidate", "HelpHash", "HelpRenderHtml", "HelpRenderBook", "HelpSpecific",
-                     "HelpExitCodes",
-                 })
-        {
-            await output.WriteLineAsync(text.Get(key)).ConfigureAwait(false);
-        }
+        await CliGeneralHelpWriter.WriteAsync(output, text, presentation).ConfigureAwait(false);
 
         return 0;
     }
