@@ -32,6 +32,7 @@
   <data name="HelpLanguageDescription" xml:space="preserve"><value>Escolhe o idioma da saída; o fallback é en-US.</value></data>
   <data name="HelpBannerDescription" xml:space="preserve"><value>Exibe o cabeçalho ASCII opcional no estilo FIGlet.</value></data>
   <data name="HelpNoColorDescription" xml:space="preserve"><value>Desativa as cores sem alterar os dados do comando.</value></data>
+  <data name="HelpPlainDescription" xml:space="preserve"><value>Força uma saída simples, sem cores, animações, controle de cursor nem caracteres de desenho.</value></data>
   <data name="HelpCommands" xml:space="preserve"><value>Comandos:</value></data>
   <data name="HelpGroup_Start" xml:space="preserve"><value>Início</value></data>
   <data name="HelpGroup_EpubBooks" xml:space="preserve"><value>Livros EPUB</value></data>
@@ -589,4 +590,136 @@
   <data name="Diagnostic_FLOW_JSON_INVALID_DOCUMENT" xml:space="preserve"><value>O JSON Flow não descreve um documento válido.</value></data>
   <data name="Diagnostic_FLOW_JSON_UNSUPPORTED_FORMAT" xml:space="preserve"><value>O formato do JSON Flow não é suportado.</value></data>
   <data name="Diagnostic_FLOW_JSON_UNSUPPORTED_NODE" xml:space="preserve"><value>O JSON Flow contém um nó não suportado.</value></data>
+  <data name="MenuAdvancedTitle" xml:space="preserve"><value>Avançado</value></data>
+  <data name="AdvancedIntroduction" xml:space="preserve"><value>Finalidade: {0}&#xA;&#xA;Custo esperado: {1}</value></data>
+  <data name="AdvancedTitle_epub-inventory" xml:space="preserve"><value>Inventário privado de EPUBs</value></data>
+  <data name="AdvancedPurpose_epub-inventory" xml:space="preserve"><value>Descobre arquivos EPUB locais e grava um catálogo neutro, sem identidade editorial nem caminhos de origem.</value></data>
+  <data name="AdvancedCost_epub-inventory" xml:space="preserve"><value>Lê todos os EPUBs do diretório e calcula hashes. Não importa nem renderiza os livros.</value></data>
+  <data name="AdvancedWarning_epub-inventory" xml:space="preserve"><value>O catálogo é uma evidência neutra; não representa qualificação nem avaliação jurídica.</value></data>
+  <data name="AdvancedTitle_epub-inventory-qualify" xml:space="preserve"><value>Qualificação do inventário privado</value></data>
+  <data name="AdvancedPurpose_epub-inventory-qualify" xml:space="preserve"><value>Executa repetidamente o pipeline completo do Flow para cada candidato elegível de um diretório privado.</value></data>
+  <data name="AdvancedCost_epub-inventory-qualify" xml:space="preserve"><value>Pode demorar e consumir bastante CPU, memória e E/S de disco. A falha de um candidato não interrompe os demais.</value></data>
+  <data name="AdvancedWarning_epub-inventory-qualify" xml:space="preserve"><value>A qualificação automática não substitui a revisão humana nem certifica uma publicação.</value></data>
+  <data name="AdvancedTitle_epub-inventory-matrix" xml:space="preserve"><value>Matriz privada de diferenças</value></data>
+  <data name="AdvancedPurpose_epub-inventory-matrix" xml:space="preserve"><value>Classifica evidências neutras de qualificação depois de conferir o SHA-256 esperado.</value></data>
+  <data name="AdvancedCost_epub-inventory-matrix" xml:space="preserve"><value>Lê um relatório de qualificação e grava uma matriz. Não reabre nem reprocessa os EPUBs de origem.</value></data>
+  <data name="AdvancedWarning_epub-inventory-matrix" xml:space="preserve"><value>Aproximações, perdas, defeitos da origem, erros do Flow e revisões humanas pendentes continuam explícitos.</value></data>
+  <data name="AdvancedTitle_epub-inventory-review" xml:space="preserve"><value>Pacotes de revisão do corpus privado</value></data>
+  <data name="AdvancedPurpose_epub-inventory-review" xml:space="preserve"><value>Gera material de revisão mobile e desktop para os candidatos representados por uma qualificação verificada.</value></data>
+  <data name="AdvancedCost_epub-inventory-review" xml:space="preserve"><value>Pode criar árvores grandes de diretórios e renderizar vários livros.</value></data>
+  <data name="AdvancedWarning_epub-inventory-review" xml:space="preserve"><value>O checklist gerado registra o trabalho de revisão; nenhum item é aprovado automaticamente.</value></data>
+  <data name="AdvancedTitle_corpus" xml:space="preserve"><value>Corpus público versionado</value></data>
+  <data name="AdvancedPurpose_corpus" xml:space="preserve"><value>Executa o manifesto offline do corpus e pode compará-lo com um baseline aceito.</value></data>
+  <data name="AdvancedCost_corpus" xml:space="preserve"><value>Processa todas as publicações configuradas. O tempo e o uso de recursos dependem do tamanho do corpus.</value></data>
+  <data name="AdvancedWarning_corpus" xml:space="preserve"><value>Um baseline novo nunca é aceito automaticamente, e falhas individuais continuam visíveis no relatório.</value></data>
+  <data name="AdvancedTitle_epub-qualify" xml:space="preserve"><value>Gate de publicação grande</value></data>
+  <data name="AdvancedPurpose_epub-qualify" xml:space="preserve"><value>Executa verificações automáticas repetidas de um EPUB identificado e grava as evidências técnicas do gate.</value></data>
+  <data name="AdvancedCost_epub-qualify" xml:space="preserve"><value>Importa, valida, serializa, organiza e renderiza a publicação pelo menos duas vezes. Livros grandes podem levar vários minutos.</value></data>
+  <data name="AdvancedWarning_epub-qualify" xml:space="preserve"><value>O gate produz evidência técnica, não uma certificação. A revisão humana continua separada e ainda pode ser necessária.</value></data>
+  <data name="AdvancedTitle_epub-review" xml:space="preserve"><value>Pacote de revisão de publicação grande</value></data>
+  <data name="AdvancedPurpose_epub-review" xml:space="preserve"><value>Cria amostras mobile e desktop e um checklist humano para um candidato verificado.</value></data>
+  <data name="AdvancedCost_epub-review" xml:space="preserve"><value>Reprocessa e renderiza a publicação e pode criar um diretório de saída grande.</value></data>
+  <data name="AdvancedWarning_epub-review" xml:space="preserve"><value>O pacote auxilia a revisão; não presume aprovação, permissão legal nem ausência de DRM.</value></data>
+  <data name="AdvancedTitle_execution-status" xml:space="preserve"><value>Inspeção do estado de execução</value></data>
+  <data name="AdvancedPurpose_execution-status" xml:space="preserve"><value>Consulta o lock local e os resíduos transacionais reconhecidos de um destino sem adquiri-lo para escrita.</value></data>
+  <data name="AdvancedCost_execution-status" xml:space="preserve"><value>É uma leitura local pequena. O relatório JSON só é gravado quando solicitado.</value></data>
+  <data name="AdvancedWarning_execution-status" xml:space="preserve"><value>O estado descreve evidências locais reconhecidas e, sozinho, não autoriza uma limpeza.</value></data>
+  <data name="AdvancedTitle_execution-clean" xml:space="preserve"><value>Limpeza segura de execução</value></data>
+  <data name="AdvancedPurpose_execution-clean" xml:space="preserve"><value>Limpa somente resíduos transacionais reconhecidos para um destino e um ID de execução exato.</value></data>
+  <data name="AdvancedCost_execution-clean" xml:space="preserve"><value>Altera o estado local e pode restaurar um backup reconhecido. Arquivos alheios ou ambíguos são preservados.</value></data>
+  <data name="AdvancedWarning_execution-clean" xml:space="preserve"><value>A limpeza elimina artefatos temporários reconhecidos. Confira com atenção o destino e o ID da execução.</value></data>
+  <data name="AdvancedPromptSourceDirectory" xml:space="preserve"><value>Diretório privado que contém os arquivos EPUB</value></data>
+  <data name="AdvancedPromptCatalogOutput" xml:space="preserve"><value>Caminho de destino do catálogo neutro do inventário</value></data>
+  <data name="AdvancedPromptRepositoryRoot" xml:space="preserve"><value>Raiz absoluta do repositório usada nas verificações de caminho</value></data>
+  <data name="AdvancedPromptQualificationOutput" xml:space="preserve"><value>Caminho de destino do relatório de qualificação</value></data>
+  <data name="AdvancedPromptQualificationReport" xml:space="preserve"><value>Relatório de qualificação existente</value></data>
+  <data name="AdvancedPromptQualificationHash" xml:space="preserve"><value>SHA-256 esperado do relatório de qualificação</value></data>
+  <data name="AdvancedPromptMatrixOutput" xml:space="preserve"><value>Caminho de destino da matriz de diferenças</value></data>
+  <data name="AdvancedPromptReviewOutput" xml:space="preserve"><value>Diretório absoluto de destino do material de revisão</value></data>
+  <data name="AdvancedPromptCorpusManifest" xml:space="preserve"><value>Manifesto versionado existente do corpus</value></data>
+  <data name="AdvancedPromptCorpusReport" xml:space="preserve"><value>Caminho de destino do relatório do corpus</value></data>
+  <data name="AdvancedPromptExternalRoot" xml:space="preserve"><value>Raiz externa que contém as publicações do corpus</value></data>
+  <data name="AdvancedPromptBaseline" xml:space="preserve"><value>Relatório de baseline aceito existente</value></data>
+  <data name="AdvancedPromptSourceEpub" xml:space="preserve"><value>Arquivo EPUB local e sem DRM</value></data>
+  <data name="AdvancedPromptCandidateId" xml:space="preserve"><value>ID tipado do candidato</value></data>
+  <data name="AdvancedPromptSourceHash" xml:space="preserve"><value>SHA-256 esperado do EPUB de origem</value></data>
+  <data name="AdvancedPromptGateReport" xml:space="preserve"><value>Caminho de destino do relatório do gate</value></data>
+  <data name="AdvancedPromptRepetitions" xml:space="preserve"><value>Número de repetições (2 ou mais)</value></data>
+  <data name="AdvancedPromptExecutionDestination" xml:space="preserve"><value>Destino associado ao lock da execução</value></data>
+  <data name="AdvancedPromptStatusOutput" xml:space="preserve"><value>Caminho de destino do relatório JSON de estado, sem caminhos privados</value></data>
+  <data name="AdvancedPromptExecutionId" xml:space="preserve"><value>ID de execução hexadecimal exato, com 32 caracteres</value></data>
+  <data name="AdvancedSummarySourceDirectory" xml:space="preserve"><value>Diretório de origem</value></data>
+  <data name="AdvancedSummaryCatalogOutput" xml:space="preserve"><value>Catálogo</value></data>
+  <data name="AdvancedSummaryRepositoryRoot" xml:space="preserve"><value>Raiz do repositório</value></data>
+  <data name="AdvancedSummaryReport" xml:space="preserve"><value>Relatório</value></data>
+  <data name="AdvancedSummaryQualificationReport" xml:space="preserve"><value>Relatório de qualificação</value></data>
+  <data name="AdvancedSummaryExpectedHash" xml:space="preserve"><value>SHA-256 esperado</value></data>
+  <data name="AdvancedSummaryMatrixOutput" xml:space="preserve"><value>Matriz de diferenças</value></data>
+  <data name="AdvancedSummaryReviewOutput" xml:space="preserve"><value>Diretório de revisão</value></data>
+  <data name="AdvancedSummaryCorpusManifest" xml:space="preserve"><value>Manifesto do corpus</value></data>
+  <data name="AdvancedSummaryExternalRoot" xml:space="preserve"><value>Raiz externa do corpus</value></data>
+  <data name="AdvancedSummaryBaseline" xml:space="preserve"><value>Baseline aceito</value></data>
+  <data name="AdvancedSummarySourceEpub" xml:space="preserve"><value>EPUB de origem</value></data>
+  <data name="AdvancedSummaryCandidateId" xml:space="preserve"><value>ID do candidato</value></data>
+  <data name="AdvancedSummaryRepetitions" xml:space="preserve"><value>Repetições</value></data>
+  <data name="AdvancedSummaryExecutionDestination" xml:space="preserve"><value>Destino da execução</value></data>
+  <data name="AdvancedSummaryStatusOutput" xml:space="preserve"><value>Relatório de estado</value></data>
+  <data name="AdvancedSummaryExecutionId" xml:space="preserve"><value>ID da execução</value></data>
+  <data name="AdvancedSummaryUiLanguage" xml:space="preserve"><value>Idioma da interface de revisão</value></data>
+  <data name="AdvancedSummaryLegalUse" xml:space="preserve"><value>Declaração de uso legal</value></data>
+  <data name="AdvancedSummaryDrmFree" xml:space="preserve"><value>Declaração de ausência de DRM</value></data>
+  <data name="AdvancedSummaryIncludeEnvironment" xml:space="preserve"><value>Observações do ambiente</value></data>
+  <data name="AdvancedSummaryForce" xml:space="preserve"><value>Permitir substituição reconhecida</value></data>
+  <data name="AdvancedSummaryResume" xml:space="preserve"><value>Retomar interrupção reconhecida</value></data>
+  <data name="AdvancedSummaryTitle" xml:space="preserve"><value>Revise a operação avançada</value></data>
+  <data name="AdvancedOptionalFieldPrompt" xml:space="preserve"><value>Configurar o valor opcional: {0}?</value></data>
+  <data name="AdvancedYes" xml:space="preserve"><value>Sim</value></data>
+  <data name="AdvancedNo" xml:space="preserve"><value>Não</value></data>
+  <data name="AdvancedIncludeEnvironmentPrompt" xml:space="preserve"><value>Incluir observações não determinísticas do ambiente?</value></data>
+  <data name="AdvancedForcePrompt" xml:space="preserve"><value>Permitir substituição segundo a política segura existente de --force?</value></data>
+  <data name="AdvancedResumePrompt" xml:space="preserve"><value>Retomar uma execução interrompida e reconhecida?</value></data>
+  <data name="AdvancedLegalTitle" xml:space="preserve"><value>Declarações obrigatórias</value></data>
+  <data name="AdvancedLegalNotice" xml:space="preserve"><value>As próximas duas respostas são declarações feitas por você. O Flow não consegue verificar permissão legal nem a presença de DRM, e a confirmação final da execução não substitui nenhuma delas.</value></data>
+  <data name="AdvancedLegalUsePrompt" xml:space="preserve"><value>Você declara expressamente que possui autorização para processar estas publicações?</value></data>
+  <data name="AdvancedDrmFreePrompt" xml:space="preserve"><value>Você declara expressamente que estas publicações não possuem DRM?</value></data>
+  <data name="AdvancedDeclareLegalUse" xml:space="preserve"><value>Declaro expressamente que possuo autorização legal</value></data>
+  <data name="AdvancedDeclareDrmFree" xml:space="preserve"><value>Declaro expressamente que as publicações não possuem DRM</value></data>
+  <data name="AdvancedDoNotDeclare" xml:space="preserve"><value>Cancelar; não faço esta declaração</value></data>
+  <data name="AdvancedDeclaredExplicitly" xml:space="preserve"><value>Declarado expressamente nesta sessão</value></data>
+  <data name="AdvancedForceWarning" xml:space="preserve"><value>--force não permite substituir dados arbitrários ou não reconhecidos.</value></data>
+  <data name="AdvancedInvalidValue" xml:space="preserve"><value>O valor não segue o formato tipado exigido pelo comando.</value></data>
+  <data name="AdvancedInvalidPath" xml:space="preserve"><value>Informe um caminho local válido.</value></data>
+  <data name="AdvancedExistingFileRequired" xml:space="preserve"><value>Informe um arquivo local comum e existente, não um diretório nem um ponto de redirecionamento.</value></data>
+  <data name="AdvancedExistingDirectoryRequired" xml:space="preserve"><value>Informe um diretório local comum e existente, não um ponto de redirecionamento.</value></data>
+  <data name="AdvancedCleanupConfirmationTitle" xml:space="preserve"><value>Confirmação reforçada da limpeza</value></data>
+  <data name="AdvancedCleanupConfirmationNotice" xml:space="preserve"><value>Esta operação altera o estado local. Digite novamente o ID exato mostrado no resumo; depois haverá uma confirmação normal da execução.</value></data>
+  <data name="AdvancedCleanupRepeatIdPrompt" xml:space="preserve"><value>Digite novamente o ID de execução exato, com 32 caracteres</value></data>
+  <data name="AdvancedCleanupIdMismatch" xml:space="preserve"><value>O ID de execução não corresponde. Nenhum resíduo foi limpo.</value></data>
+  <data name="ProgressWaiting" xml:space="preserve"><value>Preparando a operação</value></data>
+  <data name="ProgressStarted" xml:space="preserve"><value>[INÍCIO] {0}</value></data>
+  <data name="ProgressRunning" xml:space="preserve"><value>[EM ANDAMENTO] {0}</value></data>
+  <data name="ProgressCompleted" xml:space="preserve"><value>[CONCLUÍDO] {0}</value></data>
+  <data name="ProgressFailed" xml:space="preserve"><value>[FALHA] {0}</value></data>
+  <data name="ProgressPhasePreparing" xml:space="preserve"><value>Preparando a operação</value></data>
+  <data name="ProgressPhaseInspecting" xml:space="preserve"><value>Inspecionando o documento</value></data>
+  <data name="ProgressPhaseImporting" xml:space="preserve"><value>Importando o EPUB</value></data>
+  <data name="ProgressPhaseValidating" xml:space="preserve"><value>Validando o documento Flow</value></data>
+  <data name="ProgressPhaseHashing" xml:space="preserve"><value>Calculando o hash canônico</value></data>
+  <data name="ProgressPhaseRendering" xml:space="preserve"><value>Renderizando o documento</value></data>
+  <data name="ProgressPhaseProcessingCorpus" xml:space="preserve"><value>Processando as evidências do corpus</value></data>
+  <data name="ProgressPhaseMaintainingExecution" xml:space="preserve"><value>Processando o estado local da execução</value></data>
+  <data name="ProgressPhaseWriting" xml:space="preserve"><value>Gravando a saída</value></data>
+  <data name="AssistantResultSucceeded" xml:space="preserve"><value>Concluído com sucesso</value></data>
+  <data name="AssistantResultFailed" xml:space="preserve"><value>Concluído com falha</value></data>
+  <data name="AssistantResultStatus" xml:space="preserve"><value>Estado</value></data>
+  <data name="AssistantResultExitCode" xml:space="preserve"><value>Código de saída</value></data>
+  <data name="AssistantResultDuration" xml:space="preserve"><value>Duração</value></data>
+  <data name="AssistantResultDurationValue" xml:space="preserve"><value>{0:0.###} ms</value></data>
+  <data name="AssistantResultFileCount" xml:space="preserve"><value>Arquivos gravados</value></data>
+  <data name="AssistantResultOutputCount" xml:space="preserve"><value>Linhas de resultado</value></data>
+  <data name="AssistantResultDiagnosticCount" xml:space="preserve"><value>Linhas de diagnóstico</value></data>
+  <data name="AssistantResultOutputTitle" xml:space="preserve"><value>Resultado da operação</value></data>
+  <data name="AssistantResultDiagnosticsTitle" xml:space="preserve"><value>Diagnósticos</value></data>
+  <data name="ErrorInteractiveInputUnavailable" xml:space="preserve"><value>A entrada interativa terminou ou deixou de estar disponível. Nenhuma escolha foi presumida. Use 'flow help' e execute diretamente o comando equivalente.</value></data>
+  <data name="ErrorPresentationFailed" xml:space="preserve"><value>A apresentação interativa falhou e foi encerrada com segurança: {0}</value></data>
 </root>

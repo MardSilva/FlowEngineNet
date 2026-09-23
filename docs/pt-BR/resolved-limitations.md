@@ -86,6 +86,12 @@ Corpus, gate e revisão assistida saíram de APIs internas para comandos localiz
 
 A CLI pode ser empacotada como `FlowEngineNet.Tool`, instalada isoladamente e exercitada em Windows e Linux. Um builder Ubuntu cria o candidato normalizado canônico, checksums, SBOM e manifesto; ambos os sistemas validam o mesmo pacote. Publicação, assinatura, macOS e builders independentes continuam fora.
 
+### Experiência rica opcional da CLI
+
+A ajuda antes linear agora usa o mesmo catálogo tipado da ajuda específica e do menu opcional por teclado. Os assistentes chamam o parser e as operações existentes para EPUB, documentos Flow, renderização, corpus, gate e manutenção. Terminais compatíveis recebem ajuda responsiva, fases de progresso explícitas e painéis de resultado; comandos diretos e saída redirecionada continuam em texto Plain estável.
+
+A apresentação detecta redirecionamento e capacidades do terminal, respeita `--no-color` e `NO_COLOR` e oferece `--plain` como fallback explícito. Cancelamento, fim inesperado da entrada, falha de desenho e conclusão normal restauram o estado do terminal. Essa cobertura automatizada não substitui uma auditoria externa de acessibilidade.
+
 ### Localização da interface gerada
 
 CLI e material de revisão usam recursos `en-US`/`pt-BR`; o livro HTML também resolve `en`, `pt-PT` ou `pt-BR`. Comandos, JSON e diagnósticos permanecem invariáveis. O texto do livro nunca é traduzido.

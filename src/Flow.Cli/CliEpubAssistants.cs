@@ -43,11 +43,34 @@ internal sealed record CliAssistantSummary(
 
 internal sealed record CliMenuExecutionResult(
     int ExitCode,
-    ImmutableArray<string> WrittenFiles);
+    ImmutableArray<string> WrittenFiles,
+    TimeSpan Duration = default,
+    ImmutableArray<string> OutputLines = default,
+    ImmutableArray<string> DiagnosticLines = default);
 
 internal delegate Task<CliMenuExecutionResult> CliMenuCommandExecutor(
     CliCommand command,
+    ICliOperationProgress? progress,
     CancellationToken cancellationToken);
+
+internal interface ICliProgressAssistantView
+{
+    public Task<CliMenuExecutionResult> ExecuteCommandAsync(
+        CliCommand command,
+        CliMenuCommandExecutor executor,
+        CancellationToken cancellationToken);
+}
+
+internal static class CliAssistantExecution
+{
+    public static Task<CliMenuExecutionResult> ExecuteAsync(
+        ICliAssistantView view,
+        CliCommand command,
+        CliMenuCommandExecutor executor,
+        CancellationToken cancellationToken) => view is ICliProgressAssistantView progressView
+        ? progressView.ExecuteCommandAsync(command, executor, cancellationToken)
+        : executor(command, null, cancellationToken);
+}
 
 internal interface ICliAssistantView
 {
@@ -314,7 +337,12 @@ internal sealed class CliEpubAssistant(
             return false;
         }
 
-        var result = await _executor(command, cancellationToken).ConfigureAwait(false);
+        var result = await CliAssistantExecution.ExecuteAsync(
+                _view,
+                command,
+                _executor,
+                cancellationToken)
+            .ConfigureAwait(false);
         await _view.ShowExecutionResultAsync(result, cancellationToken).ConfigureAwait(false);
         await _view.WaitForReturnAsync(cancellationToken).ConfigureAwait(false);
         return true;

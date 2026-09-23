@@ -127,7 +127,7 @@ public sealed class CliDocumentAssistantTests
         var assistant = new CliDocumentAssistant(
             view,
             new CliTextCatalog("en-US"),
-            (_, _) =>
+            (_, _, _) =>
             {
                 executions++;
                 return Task.FromResult(new CliMenuExecutionResult(0, []));

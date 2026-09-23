@@ -53,7 +53,7 @@ CI builds the canonical candidate once on Ubuntu after the Windows/Linux source 
 
 The SBOM is derived from the packaged `flow.deps.json`, not from a manually maintained component list. It describes the CLI and the Flow runtime assemblies shipped inside the `.nupkg`, including their dependency relationships, package version, target framework, deployment type and MIT license declaration for project components.
 
-`Flow.Cli` uses `Spectre.Console` 0.57.2 as its presentation dependency. No domain project references it. `Spectre.Console` and its runtime companion `Spectre.Console.Ansi` are distributed under the MIT license; the release script requires each component to appear once in the generated SBOM and records the license explicitly. The current foundation does not change command output: rich help and interactive menus remain separate later increments.
+`Flow.Cli` uses `Spectre.Console` 0.57.2 for Rich help, menus, guided assistants, progress, and result panels. No domain project references it. `Spectre.Console` and its runtime companion `Spectre.Console.Ansi` are distributed under the MIT license; the release script requires each component to appear once in the generated SBOM and records the license explicitly. Plain and redirected output do not depend on ANSI, cursor movement, or Unicode drawing characters.
 
 The package is framework-dependent. The .NET runtime and SDK are prerequisites rather than bundled components, so they do not appear as shipped SBOM components. Test-only NuGet packages are also absent because they are not distributed with the CLI.
 
@@ -66,7 +66,11 @@ Before promoting the staged directory, the script checks:
 - the runtime dependency graph used to build the SBOM;
 - CycloneDX structure and dependency references;
 - every entry in `SHA256SUMS`;
-- installation from a local-only NuGet source and execution of `flow help`.
+- installation from a local-only NuGet source and execution of the deterministic CLI smoke suite.
+
+The installed-package smoke covers Plain general and command-specific help, the `pt-BR` catalog, ANSI-free redirected output, Spectre.Console dependency resolution, safe menu refusal without an interactive terminal, and representative existing document commands. It does not drive real keyboard navigation in CI; menu navigation is covered through the abstract console in unit and integration tests.
+
+The final CLI-experience audit packed the branch base (`1dc44e9`) and the completed working tree on the same Windows host, with the pinned SDK, Release configuration, and `ContinuousIntegrationBuild=true`. The `.nupkg` changed from 870,714 to 1,485,053 bytes: an increase of 614,339 bytes (70.56%). Most of that boundary is the optional presentation implementation and the packaged Spectre.Console runtime assemblies. This is a same-host development measurement, not a permanent package-size budget or a cross-platform reproducibility claim.
 
 The package is then uninstalled from the isolated tool directory. The script never changes the user's global tool list, contacts a package feed or publishes an artifact. The dry-run also checks that an existing expected tag points to the source revision; an absent tag is valid because this stage never creates it.
 

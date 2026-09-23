@@ -3,6 +3,20 @@ namespace Flow.Cli.Tests;
 public sealed class CliCommandCatalogTests
 {
     [Fact]
+    public void EnglishAndPortugueseResourceCatalogsHaveTheSameNonEmptyKeys()
+    {
+        var resourceManager = new System.Resources.ResourceManager(
+            "Flow.Cli.Resources.CliMessages",
+            typeof(CliTextCatalog).Assembly);
+        var english = ReadResources(resourceManager, CliTextCatalog.DefaultCultureName);
+        var portuguese = ReadResources(resourceManager, CliTextCatalog.PortugueseBrazilCultureName);
+
+        Assert.Equal(english.Keys.Order(StringComparer.Ordinal), portuguese.Keys.Order(StringComparer.Ordinal));
+        Assert.All(english, static entry => Assert.False(string.IsNullOrWhiteSpace(entry.Value), entry.Key));
+        Assert.All(portuguese, static entry => Assert.False(string.IsNullOrWhiteSpace(entry.Value), entry.Key));
+    }
+
+    [Fact]
     public void CatalogMatchesEveryPublicParserCommand()
     {
         var catalogNames = CliCommandCatalog.All.Select(static command => command.Name).Order().ToArray();
@@ -77,5 +91,21 @@ public sealed class CliCommandCatalogTests
             Assert.Contains(text.Get(command.TitleResourceKey), help, StringComparison.Ordinal);
             Assert.Contains(text.Get(command.FileEffectsResourceKey), help, StringComparison.Ordinal);
         }
+    }
+
+    private static Dictionary<string, string> ReadResources(
+        System.Resources.ResourceManager resourceManager,
+        string cultureName)
+    {
+        var culture = System.Globalization.CultureInfo.GetCultureInfo(cultureName);
+        var resourceSet = resourceManager.GetResourceSet(culture, createIfNotExists: true, tryParents: false)
+            ?? throw new InvalidOperationException($"Resource catalog not found: {cultureName}");
+
+        return resourceSet
+            .Cast<System.Collections.DictionaryEntry>()
+            .ToDictionary(
+                static entry => (string)entry.Key,
+                static entry => entry.Value as string ?? string.Empty,
+                StringComparer.Ordinal);
     }
 }

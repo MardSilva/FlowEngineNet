@@ -18,13 +18,29 @@ public sealed class CliMenuTests
     public void InteractiveAssistantsAreLimitedToDeliveredWorkflows()
     {
         Assert.Equal(
-            ["epub-inspect", "hash", "import", "inspect", "render", "validate"],
+            [
+                "corpus",
+                "epub-inspect",
+                "epub-inventory",
+                "epub-inventory-matrix",
+                "epub-inventory-qualify",
+                "epub-inventory-review",
+                "epub-qualify",
+                "epub-review",
+                "execution-clean",
+                "execution-status",
+                "hash",
+                "import",
+                "inspect",
+                "render",
+                "validate",
+            ],
             CliCommandCatalog.All
                 .Where(command => CliMenuController.SupportsAssistant(command.Name))
                 .Select(static command => command.Name)
                 .Order(StringComparer.Ordinal)
                 .ToArray());
-        Assert.False(CliMenuController.SupportsAssistant("execution-clean"));
+        Assert.False(CliMenuController.SupportsAssistant("sample"));
     }
 
     [Theory]
@@ -53,6 +69,13 @@ public sealed class CliMenuTests
         Assert.Contains(readOnlyNotice, welcome.ReadOnlyNotice, StringComparison.Ordinal);
         Assert.DoesNotContain(model.Groups.SelectMany(group => group.Commands), command => command.Name == "menu");
         Assert.DoesNotContain(model.Groups.SelectMany(group => group.Commands), command => command.Name == "help");
+        var advanced = model.Groups.Single(group => group.Group is null);
+        Assert.Equal(text.Get("MenuAdvancedTitle"), advanced.Title);
+        Assert.Equal(9, advanced.Commands.Length);
+        Assert.All(
+            advanced.Commands,
+            command => Assert.True(
+                command.Group is CliCommandGroup.CorpusQuality or CliCommandGroup.Maintenance));
     }
 
     [Fact]

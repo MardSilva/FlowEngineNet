@@ -9,6 +9,9 @@ public sealed record CliInvocationOptions(
 {
     /// <summary>Gets whether the caller explicitly disabled ANSI color.</summary>
     public bool NoColor { get; init; }
+
+    /// <summary>Gets whether the caller explicitly requested simple, non-interactive output.</summary>
+    public bool ForcePlain { get; init; }
 }
 
 /// <summary>Parses global output options without changing command syntax.</summary>
@@ -22,6 +25,7 @@ public static class CliInvocationOptionsParser
         var languageSpecified = false;
         var showBanner = false;
         var noColor = false;
+        var forcePlain = false;
         var index = 0;
         while (index < arguments.Count && arguments[index].StartsWith("-", StringComparison.Ordinal))
         {
@@ -48,7 +52,7 @@ public static class CliInvocationOptionsParser
                             "FLOWCLI_USAGE",
                             "ErrorOptionRequiresValue",
                             option,
-                            "flow [--language <en-US|pt-BR>] [--banner] [--no-color] <command>");
+                            "flow [--language <en-US|pt-BR>] [--banner] [--no-color] [--plain] <command>");
                     }
 
                     if (!CliTextCatalog.TryNormalizeCulture(arguments[index], out cultureName))
@@ -70,7 +74,11 @@ public static class CliInvocationOptionsParser
                     noColor = true;
                     index++;
                     break;
-                case "--banner" or "--no-color":
+                case "--plain" when !forcePlain:
+                    forcePlain = true;
+                    index++;
+                    break;
+                case "--banner" or "--no-color" or "--plain":
                     return CliInvocationOptionsParseResult.Failure(
                         "FLOWCLI_DUPLICATE_OPTION",
                         "ErrorDuplicateOption",
@@ -88,6 +96,7 @@ public static class CliInvocationOptionsParser
             new CliInvocationOptions(cultureName, showBanner, UseColor: false, commandArguments)
             {
                 NoColor = noColor,
+                ForcePlain = forcePlain,
             });
     }
 }

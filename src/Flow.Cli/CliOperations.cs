@@ -110,7 +110,45 @@ public sealed class CliOperations
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(presentation);
 
-        return command switch
+        if (observer is null)
+        {
+            return await ExecuteCoreAsync().ConfigureAwait(false);
+        }
+
+        var (phase, messageResourceKey) = CliOperationProgressPlan.For(command);
+        observer.Progress(new CliOperationProgressUpdate(
+            phase,
+            CliOperationProgressState.Started,
+            messageResourceKey,
+            completedUnits: 0,
+            totalUnits: 1));
+        try
+        {
+            var exitCode = await ExecuteCoreAsync().ConfigureAwait(false);
+            observer.Progress(new CliOperationProgressUpdate(
+                phase,
+                CliOperationProgressState.Completed,
+                messageResourceKey,
+                completedUnits: 1,
+                totalUnits: 1));
+            return exitCode;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            observer.Progress(new CliOperationProgressUpdate(
+                phase,
+                CliOperationProgressState.Failed,
+                messageResourceKey,
+                completedUnits: 0,
+                totalUnits: 1));
+            throw;
+        }
+
+        async Task<int> ExecuteCoreAsync() => command switch
         {
             HelpCommand help => await ShowHelpAsync(help, output, text, presentation).ConfigureAwait(false),
             SampleCommand sample => await CreateSampleAsync(sample, output, text, cancellationToken).ConfigureAwait(false),

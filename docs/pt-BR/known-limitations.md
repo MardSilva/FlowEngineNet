@@ -72,13 +72,14 @@ Mudanças de comportamento devem classificar a fronteira como resolvida, reduzid
 
 ## CLI e operações
 
-- A CLI cobre documentos, EPUB, corpus, gate e revisão, mas não assinatura/verificação, PDF, paginação, Reader, switches completos de preferência ou batch interativo.
+- A CLI cobre documentos, EPUB, corpus, gate e revisão, mas não assinatura/verificação, PDF, paginação, Reader, switches completos de preferência ou revisão humana em lote. O menu é opcional e não funciona com streams redirecionados nem em modo Plain; automação e terminais limitados usam os comandos diretos equivalentes.
 - Textos humanos têm `en-US` e `pt-BR`; detalhes técnicos originais continuam em inglês depois do resumo. JSON e códigos são invariáveis.
 - Operações transacionais usam `--force`, `--resume` e lock por destino. Filesystems remotos que ignoram exclusão do .NET não são suportados.
 - `execution-clean` remove somente artefatos reconhecidos com UUID exato; não repara sidecars inválidos nem escolhe backups ambíguos.
 - O UUID é correlação local, não autenticação. Quem altera o diretório pode alterar seus artefatos.
 - CI cobre Windows e Linux, não macOS ou runtimes alternativos.
-- O smoke test usa feed local e pacote framework-dependent; não testa publicação, assinatura, upgrade, instalação global ou todos os comandos.
+- A interface rica tem testes para largura variável, supressão de cores, ausência de ANSI/cursor/Unicode, cancelamento, redirecionamento e texto bidirecional ou semelhante a markup. Ainda não houve auditoria externa com leitores de tela, tecnologias assistivas ou uma matriz ampla de hosts. `--plain` é o fallback explícito; isso não equivale a certificação de acessibilidade.
+- O smoke test usa feed local e pacote framework-dependent. Ele cobre ajuda Plain, localização, dependências de apresentação, recusa segura do menu não interativo e um fluxo pequeno de documentos, mas não testa publicação, assinatura, upgrade, instalação global, EPUB real, navegação real pelo teclado ou todos os comandos.
 
 ## Fora do escopo
 

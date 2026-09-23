@@ -46,6 +46,7 @@ internal sealed record CliGeneralHelpModel(
                 new("--language <en-US|pt-BR>", text.Get("HelpLanguageDescription")),
                 new("--banner", text.Get("HelpBannerDescription")),
                 new("--no-color", text.Get("HelpNoColorDescription")),
+                new("--plain", text.Get("HelpPlainDescription")),
             ],
             text.Get("HelpCommands"),
             groups,
@@ -255,13 +256,26 @@ internal static class CliGeneralHelpWriter
     }
 }
 
-internal sealed class CliAnsiConsoleOutput(TextWriter writer, int width) : IAnsiConsoleOutput
+internal sealed class CliAnsiConsoleOutput : IAnsiConsoleOutput
 {
-    public TextWriter Writer { get; } = writer ?? throw new ArgumentNullException(nameof(writer));
+    private readonly Func<int> _width;
+
+    public CliAnsiConsoleOutput(TextWriter writer, int width)
+        : this(writer, () => width)
+    {
+    }
+
+    public CliAnsiConsoleOutput(TextWriter writer, Func<int> width)
+    {
+        Writer = writer ?? throw new ArgumentNullException(nameof(writer));
+        _width = width ?? throw new ArgumentNullException(nameof(width));
+    }
+
+    public TextWriter Writer { get; }
 
     public bool IsTerminal => true;
 
-    public int Width { get; } = width;
+    public int Width => _width();
 
     public int Height => 25;
 

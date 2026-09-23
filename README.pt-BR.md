@@ -75,14 +75,20 @@ O CI executa restore, formatação, documentação, build, testes e smoke test d
 
 ## Início rápido da CLI
 
-Comandos, opções, campos JSON e códigos diagnósticos permanecem em inglês. A opção global `--language` muda apenas os textos para pessoas. Os catálogos atuais são `en-US` e `pt-BR`; sem a opção, a CLI usa `en-US`.
+Comandos, opções, campos JSON e códigos diagnósticos permanecem em inglês. A opção global `--language` muda apenas os textos apresentados às pessoas. Os catálogos atuais são `en-US` e `pt-BR`; sem a opção, a CLI usa `en-US`.
 
 ```powershell
 dotnet run --project src/Flow.Cli -- --language pt-BR --banner help
 dotnet run --project src/Flow.Cli -- --language en-US --no-color help
+dotnet run --project src/Flow.Cli -- --plain help import
+dotnet run --project src/Flow.Cli -- --language pt-BR --banner menu
 ```
 
-As opções globais aparecem antes do comando. `--banner` exibe o cabeçalho ASCII opcional e não altera arquivos gerados, bytes canônicos ou hashes.
+Em um terminal interativo compatível, `help` usa uma apresentação rica e responsiva. `menu` abre os assistentes opcionais com navegação pelo teclado. `flow help <comando>` e `flow <comando> --help` mostram o contrato completo de um comando. O menu chama os mesmos comandos tipados; ele não substitui o uso direto nem a automação.
+
+As opções globais aparecem antes do comando. `--plain` força texto determinístico, sem cor, animação, movimento do cursor ou caracteres de moldura. É a opção indicada para leitores de tela e terminais limitados. `--no-color` e `NO_COLOR` mantêm a organização da interface rica, mas retiram as cores. Saída redirecionada e terminais sem os recursos necessários usam Plain automaticamente. Essas escolhas mudam somente a apresentação no terminal, nunca documentos, relatórios, bytes canônicos ou hashes.
+
+`--banner` exibe o cabeçalho ASCII opcional e pode acompanhar qualquer operação.
 
 ### Importar um EPUB
 

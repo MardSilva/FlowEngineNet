@@ -47,6 +47,19 @@ public sealed class CliPresentationPolicyTests
     }
 
     [Fact]
+    public void Resolve_KeepsRichOutputWhenOnlyErrorStreamIsRedirected()
+    {
+        using var output = new StringWriter();
+        var terminal = new FakeTerminal(output) { IsErrorRedirected = true };
+
+        var profile = CliPresentationPolicy.Resolve(
+            Invocation(), terminal, output, new FakeEnvironment());
+
+        Assert.Equal(CliPresentationMode.Rich, profile.Mode);
+        Assert.True(profile.IsInteractive);
+    }
+
+    [Fact]
     public void Resolve_UsesPlainProfileForNonConsoleWriter()
     {
         using var consoleOutput = new StringWriter();
@@ -85,6 +98,47 @@ public sealed class CliPresentationPolicyTests
 
         Assert.Equal(CliPresentationMode.Rich, profile.Mode);
         Assert.False(profile.UseColor);
+    }
+
+    [Fact]
+    public void Resolve_ExplicitPlainTakesPrecedenceOverRichCapabilitiesAndNoColor()
+    {
+        using var output = new StringWriter();
+        var terminal = new FakeTerminal(output);
+
+        var profile = CliPresentationPolicy.Resolve(
+            Invocation(noColor: true, forcePlain: true),
+            terminal,
+            output,
+            new FakeEnvironment());
+
+        Assert.Equal(CliPresentationMode.Plain, profile.Mode);
+        Assert.True(profile.IsInteractive);
+        Assert.False(profile.UseColor);
+        Assert.False(profile.UseUnicode);
+        Assert.False(profile.CanControlCursor);
+    }
+
+    [Theory]
+    [InlineData(false, true)]
+    [InlineData(true, false)]
+    public void Resolve_UsesPlainWhenCursorOrUnicodeSupportIsUnavailable(
+        bool supportsCursor,
+        bool supportsUnicode)
+    {
+        using var output = new StringWriter();
+        var terminal = new FakeTerminal(output)
+        {
+            SupportsCursorControl = supportsCursor,
+            SupportsUnicode = supportsUnicode,
+        };
+
+        var profile = CliPresentationPolicy.Resolve(
+            Invocation(), terminal, output, new FakeEnvironment());
+
+        Assert.Equal(CliPresentationMode.Plain, profile.Mode);
+        Assert.False(profile.UseUnicode);
+        Assert.False(profile.CanControlCursor);
     }
 
     [Theory]
@@ -161,10 +215,11 @@ public sealed class CliPresentationPolicyTests
             await new SystemFlowTerminal().ReadKeyAsync(cancellation.Token));
     }
 
-    private static CliInvocationOptions Invocation(bool noColor = false) =>
+    private static CliInvocationOptions Invocation(bool noColor = false, bool forcePlain = false) =>
         new(CliTextCatalog.DefaultCultureName, ShowBanner: false, UseColor: false, CommandArguments: [])
         {
             NoColor = noColor,
+            ForcePlain = forcePlain,
         };
 
     private sealed class FakeEnvironment : IEnvironmentVariables
@@ -183,6 +238,10 @@ public sealed class CliPresentationPolicyTests
         public bool IsErrorRedirected { get; init; }
 
         public bool SupportsAnsi { get; init; } = true;
+
+        public bool SupportsCursorControl { get; init; } = true;
+
+        public bool SupportsUnicode { get; init; } = true;
 
         public int Width { get; init; } = 80;
 

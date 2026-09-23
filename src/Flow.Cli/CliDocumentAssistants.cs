@@ -305,7 +305,12 @@ internal sealed class CliDocumentAssistant(
             return false;
         }
 
-        var result = await _executor(command, cancellationToken).ConfigureAwait(false);
+        var result = await CliAssistantExecution.ExecuteAsync(
+                _view,
+                command,
+                _executor,
+                cancellationToken)
+            .ConfigureAwait(false);
         await _view.ShowExecutionResultAsync(result, cancellationToken).ConfigureAwait(false);
         await _view.WaitForReturnAsync(cancellationToken).ConfigureAwait(false);
         return true;

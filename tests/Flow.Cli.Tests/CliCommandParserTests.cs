@@ -171,14 +171,24 @@ public sealed class CliCommandParserTests
     public void InvocationOptions_RecognizeLanguageBannerAndPlainOutput()
     {
         var result = CliInvocationOptionsParser.Parse(
-            ["--language", "pt-BR", "--banner", "--no-color", "inspect", "book.flow.json"]);
+            ["--language", "pt-BR", "--banner", "--no-color", "--plain", "inspect", "book.flow.json"]);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("pt-BR", result.Options!.CultureName);
         Assert.True(result.Options.ShowBanner);
         Assert.True(result.Options.NoColor);
+        Assert.True(result.Options.ForcePlain);
         Assert.False(result.Options.UseColor);
         Assert.Equal(["inspect", "book.flow.json"], result.Options.CommandArguments);
+    }
+
+    [Fact]
+    public void InvocationOptions_RejectDuplicatePlainOption()
+    {
+        var result = CliInvocationOptionsParser.Parse(["--plain", "--plain", "help"]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("FLOWCLI_DUPLICATE_OPTION", result.DiagnosticCode);
     }
 
     [Theory]

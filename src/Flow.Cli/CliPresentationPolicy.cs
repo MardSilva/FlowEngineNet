@@ -11,12 +11,20 @@ internal sealed record CliPresentationProfile(
     CliPresentationMode Mode,
     bool IsInteractive,
     bool UseColor,
-    int Width)
+    int Width,
+    bool UseUnicode = true,
+    bool CanControlCursor = true)
 {
     public const int DefaultWidth = 80;
 
     public static CliPresentationProfile Plain() =>
-        new(CliPresentationMode.Plain, IsInteractive: false, UseColor: false, DefaultWidth);
+        new(
+            CliPresentationMode.Plain,
+            IsInteractive: false,
+            UseColor: false,
+            DefaultWidth,
+            UseUnicode: false,
+            CanControlCursor: false);
 }
 
 /// <summary>Selects a conservative presentation profile for the current invocation.</summary>
@@ -42,6 +50,8 @@ internal static class CliPresentationPolicy
             var outputRedirected = terminal.IsOutputRedirected;
             var ownsOutput = terminal.IsConsoleOutput(output);
             var supportsAnsi = terminal.SupportsAnsi;
+            var supportsCursor = terminal.SupportsCursorControl;
+            var supportsUnicode = terminal.SupportsUnicode;
             var width = terminal.GetWidth();
             if (width <= 0)
             {
@@ -50,13 +60,15 @@ internal static class CliPresentationPolicy
 
             width = Math.Clamp(width, MinimumWidth, MaximumWidth);
             var interactive = !inputRedirected && !outputRedirected && ownsOutput;
-            if (!interactive || !supportsAnsi)
+            if (invocation.ForcePlain || !interactive || !supportsAnsi || !supportsCursor || !supportsUnicode)
             {
                 return new CliPresentationProfile(
                     CliPresentationMode.Plain,
                     interactive,
                     UseColor: false,
-                    width);
+                    width,
+                    UseUnicode: false,
+                    CanControlCursor: false);
             }
 
             var noColor = invocation.NoColor || environment.Get("NO_COLOR") is not null;
@@ -64,7 +76,9 @@ internal static class CliPresentationPolicy
                 CliPresentationMode.Rich,
                 IsInteractive: true,
                 UseColor: !noColor,
-                width);
+                width,
+                UseUnicode: true,
+                CanControlCursor: true);
         }
         catch (Exception exception) when (exception is IOException
                                           or InvalidOperationException

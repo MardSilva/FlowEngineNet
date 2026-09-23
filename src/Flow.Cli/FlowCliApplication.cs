@@ -1,3 +1,6 @@
+using System.Collections.Immutable;
+using System.Diagnostics;
+using System.Globalization;
 using Flow.Documents;
 using Flow.Epub;
 using Flow.Layout;
@@ -51,7 +54,7 @@ public sealed class FlowCliApplication
     internal static FlowCliApplication CreateDefault(
         IFlowTerminal terminal,
         IEnvironmentVariables environment) =>
-        CreateDefault(terminal, environment, new SpectreCliMenu());
+        CreateDefault(terminal, environment, new SpectreCliMenu(terminal));
 
     internal static FlowCliApplication CreateDefault(
         IFlowTerminal terminal,
@@ -81,6 +84,23 @@ public sealed class FlowCliApplication
         ArgumentNullException.ThrowIfNull(arguments);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
+
+        try
+        {
+            return await RunCoreAsync(arguments, output, error, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _terminal.RestoreTerminalState();
+        }
+    }
+
+    private async Task<int> RunCoreAsync(
+        IReadOnlyList<string> arguments,
+        TextWriter output,
+        TextWriter error,
+        CancellationToken cancellationToken)
+    {
 
         var invocationResult = CliInvocationOptionsParser.Parse(arguments);
         var invocationText = new CliTextCatalog(invocationResult.Options?.CultureName);
@@ -122,14 +142,34 @@ public sealed class FlowCliApplication
                     return 1;
                 }
 
-                return await _menu.RunAsync(
-                        output,
-                        error,
-                        text,
-                        presentation,
-                        ExecuteMenuCommandAsync,
-                        cancellationToken)
-                    .ConfigureAwait(false);
+                try
+                {
+                    return await _menu.RunAsync(
+                            output,
+                            error,
+                            text,
+                            presentation,
+                            ExecuteMenuCommandAsync,
+                            cancellationToken)
+                        .ConfigureAwait(false);
+                }
+                catch (EndOfStreamException)
+                {
+                    await error.WriteLineAsync(text.Diagnostic(
+                            CliTerminalErrorCodes.InteractiveInputUnavailable,
+                            "ErrorInteractiveInputUnavailable"))
+                        .ConfigureAwait(false);
+                    return 1;
+                }
+                catch (InvalidOperationException exception)
+                {
+                    await error.WriteLineAsync(text.Diagnostic(
+                            CliMenuDiagnosticCodes.PresentationFailed,
+                            "ErrorPresentationFailed",
+                            exception.Message))
+                        .ConfigureAwait(false);
+                    return 1;
+                }
             }
 
             return await _operations.ExecuteAsync(
@@ -177,21 +217,25 @@ public sealed class FlowCliApplication
 
         async Task<CliMenuExecutionResult> ExecuteMenuCommandAsync(
             CliCommand command,
+            ICliOperationProgress? progress,
             CancellationToken token)
         {
-            var observer = new CliMenuOperationObserver();
+            using var operationOutput = new StringWriter(CultureInfo.InvariantCulture);
+            using var operationError = new StringWriter(CultureInfo.InvariantCulture);
+            var observer = new CliMenuOperationObserver(progress);
+            var started = Stopwatch.GetTimestamp();
+            var exitCode = 1;
             try
             {
-                var exitCode = await _operations.ExecuteAsync(
+                exitCode = await _operations.ExecuteAsync(
                         command,
-                        output,
-                        error,
+                        operationOutput,
+                        operationError,
                         text,
-                        presentation,
+                        CliPresentationProfile.Plain(),
                         token,
                         observer)
                     .ConfigureAwait(false);
-                return new CliMenuExecutionResult(exitCode, observer.WrittenFiles);
             }
             catch (OperationCanceledException) when (token.IsCancellationRequested)
             {
@@ -199,38 +243,56 @@ public sealed class FlowCliApplication
             }
             catch (FlowSerializationException exception)
             {
-                await error.WriteLineAsync(
+                await operationError.WriteLineAsync(
                         $"{exception.Code}: {text.DiagnosticMessage(exception.Code, exception.Message)}")
                     .ConfigureAwait(false);
-                return new CliMenuExecutionResult(1, observer.WrittenFiles);
             }
             catch (CliOperationException exception)
             {
-                await error.WriteLineAsync(text.Diagnostic(
+                await operationError.WriteLineAsync(text.Diagnostic(
                         "FLOWCLI_OPERATION_FAILED",
                         exception.ResourceKey,
                         exception.Arguments.ToArray()))
                     .ConfigureAwait(false);
-                return new CliMenuExecutionResult(1, observer.WrittenFiles);
             }
             catch (Exception exception) when (exception is IOException
                                               or UnauthorizedAccessException
                                               or ArgumentException
                                               or NotSupportedException)
             {
-                await error.WriteLineAsync(
+                await operationError.WriteLineAsync(
                         text.Diagnostic("FLOWCLI_OPERATION_FAILED", "ErrorOperationFailed", exception.Message))
                     .ConfigureAwait(false);
-                return new CliMenuExecutionResult(1, observer.WrittenFiles);
             }
+
+            var outputLines = SplitLines(operationOutput.ToString());
+            var diagnosticLines = SplitLines(operationError.ToString());
+            if (progress is null)
+            {
+                await output.WriteAsync(operationOutput.ToString()).ConfigureAwait(false);
+                await error.WriteAsync(operationError.ToString()).ConfigureAwait(false);
+            }
+
+            return new CliMenuExecutionResult(
+                exitCode,
+                observer.WrittenFiles,
+                Stopwatch.GetElapsedTime(started),
+                outputLines,
+                diagnosticLines);
         }
+
+        static ImmutableArray<string> SplitLines(string value) =>
+            [.. value.Replace("\r\n", "\n", StringComparison.Ordinal)
+                .Replace('\r', '\n')
+                .Split('\n', StringSplitOptions.RemoveEmptyEntries)];
     }
 
-    private sealed class CliMenuOperationObserver : ICliOperationObserver
+    private sealed class CliMenuOperationObserver(ICliOperationProgress? progress) : ICliOperationObserver
     {
         private readonly List<string> _writtenFiles = [];
+        private readonly ICliOperationProgress? _progress = progress;
 
-        public System.Collections.Immutable.ImmutableArray<string> WrittenFiles => [.. _writtenFiles];
+        public ImmutableArray<string> WrittenFiles => [.. _writtenFiles];
 
         public void FileWritten(string path)
         {
@@ -243,5 +305,7 @@ public sealed class FlowCliApplication
                 _writtenFiles.Add(fullPath);
             }
         }
+
+        public void Progress(CliOperationProgressUpdate update) => _progress?.Report(update);
     }
 }

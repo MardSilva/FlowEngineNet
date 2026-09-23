@@ -7,10 +7,11 @@ namespace Flow.Cli;
 internal static class CliMenuDiagnosticCodes
 {
     public const string RequiresInteractiveTerminal = "FLOWCLI_MENU_REQUIRES_INTERACTIVE";
+    public const string PresentationFailed = "FLOWCLI_PRESENTATION_FAILED";
 }
 
 internal sealed record CliMenuGroup(
-    CliCommandGroup Group,
+    CliCommandGroup? Group,
     string Title,
     ImmutableArray<CliCommandDescriptor> Commands);
 
@@ -37,15 +38,23 @@ internal sealed record CliMenuModel(ImmutableArray<CliMenuGroup> Groups)
     {
         ArgumentNullException.ThrowIfNull(text);
 
-        return new CliMenuModel(
-        [
-            .. Enum.GetValues<CliCommandGroup>()
+        var commonGroups = Enum.GetValues<CliCommandGroup>()
+            .Where(group => group is not CliCommandGroup.CorpusQuality and not CliCommandGroup.Maintenance)
                 .Select(group => new CliMenuGroup(
                     group,
                     text.Get(CliCommandGroupResources.GetTitleKey(group)),
                     [.. CliCommandCatalog.All.Where(command =>
                         command.Group == group && command.AvailableInInteractiveMenu)]))
-                .Where(group => !group.Commands.IsEmpty),
+                .Where(group => !group.Commands.IsEmpty);
+        var advancedCommands = CliCommandCatalog.All
+            .Where(command => command.AvailableInInteractiveMenu
+                && command.Group is CliCommandGroup.CorpusQuality or CliCommandGroup.Maintenance)
+            .ToImmutableArray();
+
+        return new CliMenuModel(
+        [
+            .. commonGroups,
+            new CliMenuGroup(null, text.Get("MenuAdvancedTitle"), advancedCommands),
         ]);
     }
 }
@@ -178,11 +187,14 @@ internal sealed class CliMenuController
         RunAsync(
             output,
             text,
-            static (_, _) => throw new InvalidOperationException("No command executor was configured."),
+            static (_, _, _) => throw new InvalidOperationException("No command executor was configured."),
             cancellationToken);
 
     internal static bool SupportsAssistant(string commandName) =>
-        commandName is "import" or "epub-inspect" or "inspect" or "validate" or "hash" or "render";
+        commandName is "import" or "epub-inspect" or "inspect" or "validate" or "hash" or "render"
+            or "epub-inventory" or "epub-inventory-qualify" or "epub-inventory-matrix"
+            or "epub-inventory-review" or "corpus" or "epub-qualify" or "epub-review"
+            or "execution-status" or "execution-clean";
 
     public async Task<int> RunAsync(
         TextWriter output,
@@ -251,9 +263,15 @@ internal sealed class CliMenuController
                             .RunAsync(command.Name, cancellationToken)
                             .ConfigureAwait(false);
                     }
-                    else
+                    else if (command.Name is "inspect" or "validate" or "hash" or "render")
                     {
                         await new CliDocumentAssistant(_assistantView, text, executor)
+                            .RunAsync(command.Name, cancellationToken)
+                            .ConfigureAwait(false);
+                    }
+                    else
+                    {
+                        await new CliAdvancedAssistant(_assistantView, text, executor)
                             .RunAsync(command.Name, cancellationToken)
                             .ConfigureAwait(false);
                     }
@@ -296,8 +314,10 @@ internal sealed class CliMenuController
     }
 }
 
-internal sealed class SpectreCliMenu : ICliMenu
+internal sealed class SpectreCliMenu(IFlowTerminal? terminal = null) : ICliMenu
 {
+    private readonly IFlowTerminal _terminal = terminal ?? new SystemFlowTerminal();
+
     public Task<int> RunAsync(
         TextWriter output,
         TextWriter error,
@@ -306,12 +326,12 @@ internal sealed class SpectreCliMenu : ICliMenu
         CliMenuCommandExecutor executor,
         CancellationToken cancellationToken)
     {
-        var view = new SpectreCliMenuView(output, text, presentation);
+        var view = new SpectreCliMenuView(output, text, presentation, _terminal);
         return new CliMenuController(view, view).RunAsync(output, text, executor, cancellationToken);
     }
 }
 
-internal sealed class SpectreCliMenuView : ICliMenuView, ICliAssistantView
+internal sealed class SpectreCliMenuView : ICliMenuView, ICliAssistantView, ICliProgressAssistantView
 {
     private const int PageSize = 8;
     private readonly IAnsiConsole _console;
@@ -323,7 +343,8 @@ internal sealed class SpectreCliMenuView : ICliMenuView, ICliAssistantView
     public SpectreCliMenuView(
         TextWriter output,
         CliTextCatalog text,
-        CliPresentationProfile presentation)
+        CliPresentationProfile presentation,
+        IFlowTerminal? terminal = null)
     {
         ArgumentNullException.ThrowIfNull(output);
         _text = text ?? throw new ArgumentNullException(nameof(text));
@@ -334,8 +355,26 @@ internal sealed class SpectreCliMenuView : ICliMenuView, ICliAssistantView
             Ansi = AnsiSupport.Yes,
             ColorSystem = presentation.UseColor ? ColorSystemSupport.Standard : ColorSystemSupport.NoColors,
             Interactive = InteractionSupport.Yes,
-            Out = new CliAnsiConsoleOutput(output, presentation.Width),
+            Out = terminal is null
+                ? new CliAnsiConsoleOutput(output, presentation.Width)
+                : new CliAnsiConsoleOutput(output, () => SafeWidth(terminal, presentation.Width)),
         });
+    }
+
+    private static int SafeWidth(IFlowTerminal terminal, int fallback)
+    {
+        try
+        {
+            return Math.Clamp(terminal.GetWidth(), 20, 500);
+        }
+        catch (Exception exception) when (exception is IOException
+                                          or InvalidOperationException
+                                          or NotSupportedException
+                                          or PlatformNotSupportedException
+                                          or System.Security.SecurityException)
+        {
+            return fallback;
+        }
     }
 
     public Task ShowWelcomeAsync(
@@ -600,17 +639,71 @@ internal sealed class SpectreCliMenuView : ICliMenuView, ICliAssistantView
     {
         cancellationToken.ThrowIfCancellationRequested();
         _console.WriteLine();
-        var rows = new List<IRenderable>
-        {
+        var outputLines = result.OutputLines.IsDefault ? [] : result.OutputLines;
+        var diagnosticLines = result.DiagnosticLines.IsDefault ? [] : result.DiagnosticLines;
+        var succeeded = result.ExitCode == 0;
+        var statusText = _text.Get(succeeded ? "AssistantResultSucceeded" : "AssistantResultFailed");
+        var statusSymbol = succeeded ? "[OK]" : "[ERROR]";
+        var table = new Table()
+            .NoBorder()
+            .HideHeaders()
+            .AddColumn(new TableColumn(string.Empty).NoWrap())
+            .AddColumn(new TableColumn(string.Empty));
+        table.AddRow(
+            ResultLabel("AssistantResultStatus"),
             new Markup(_useColor
-                ? $"[bold {(result.ExitCode == 0 ? "green" : "red")}]"
-                  + $"{CliMarkup.EscapeExternal(_text.Format("AssistantExitCode", result.ExitCode))}[/]"
-                : $"[bold]{CliMarkup.EscapeExternal(_text.Format("AssistantExitCode", result.ExitCode))}[/]"),
-        };
-        rows.Add(new Text(result.WrittenFiles.IsEmpty
-            ? _text.Get("AssistantNoFilesWritten")
-            : _text.Get("AssistantFilesWritten")));
-        rows.AddRange(result.WrittenFiles.Select(static path => (IRenderable)new Text($"  {path}")));
+                ? $"[bold {(succeeded ? "green" : "red")}]{CliMarkup.EscapeExternal(statusSymbol)} "
+                  + $"{CliMarkup.EscapeExternal(statusText)}[/]"
+                : $"[bold]{CliMarkup.EscapeExternal(statusSymbol)} {CliMarkup.EscapeExternal(statusText)}[/]"));
+        table.AddRow(
+            ResultLabel("AssistantResultExitCode"),
+            new Text(result.ExitCode.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        table.AddRow(
+            ResultLabel("AssistantResultDuration"),
+            new Text(_text.Format("AssistantResultDurationValue", result.Duration.TotalMilliseconds)));
+        table.AddRow(
+            ResultLabel("AssistantResultFileCount"),
+            new Text(result.WrittenFiles.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        table.AddRow(
+            ResultLabel("AssistantResultOutputCount"),
+            new Text(outputLines.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+        table.AddRow(
+            ResultLabel("AssistantResultDiagnosticCount"),
+            new Text(diagnosticLines.Length.ToString(System.Globalization.CultureInfo.InvariantCulture)));
+
+        var rows = new List<IRenderable> { table };
+        if (!result.WrittenFiles.IsEmpty)
+        {
+            rows.Add(new Markup($"[bold]{CliMarkup.EscapeExternal(_text.Get("AssistantFilesWritten"))}[/]"));
+            rows.AddRange(result.WrittenFiles.Select(static path => (IRenderable)new Text($"  {path}")));
+        }
+
+        if (!outputLines.IsEmpty)
+        {
+            rows.Add(new Panel(new Text(string.Join(Environment.NewLine, outputLines)))
+            {
+                Header = new PanelHeader(CliMarkup.EscapeExternal(_text.Get("AssistantResultOutputTitle"))),
+                Border = BoxBorder.Rounded,
+                Expand = true,
+            });
+        }
+
+        if (!diagnosticLines.IsEmpty)
+        {
+            var diagnostics = new Panel(new Text(string.Join(Environment.NewLine, diagnosticLines)))
+            {
+                Header = new PanelHeader(CliMarkup.EscapeExternal(_text.Get("AssistantResultDiagnosticsTitle"))),
+                Border = BoxBorder.Rounded,
+                Expand = true,
+            };
+            if (_useColor)
+            {
+                diagnostics.BorderStyle = new Style(Color.Red);
+            }
+
+            rows.Add(diagnostics);
+        }
+
         _console.Write(new Panel(new Rows(rows))
         {
             Header = new PanelHeader(CliMarkup.EscapeExternal(_text.Get("AssistantResultTitle"))),
@@ -618,6 +711,34 @@ internal sealed class SpectreCliMenuView : ICliMenuView, ICliAssistantView
             Expand = true,
         });
         return Task.CompletedTask;
+    }
+
+    public Task<CliMenuExecutionResult> ExecuteCommandAsync(
+        CliCommand command,
+        CliMenuCommandExecutor executor,
+        CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(command);
+        ArgumentNullException.ThrowIfNull(executor);
+        _console.Clear();
+        return _console.Progress()
+            .AutoClear(true)
+            .HideCompleted(false)
+            .Columns(
+                new SpinnerColumn(),
+                new TaskDescriptionColumn(),
+                new ProgressBarColumn(),
+                new PercentageColumn())
+            .StartAsync(async context =>
+            {
+                var task = context.AddTask(
+                    CliMarkup.EscapeExternal(_text.Get("ProgressWaiting")),
+                    autoStart: true,
+                    maxValue: 1);
+                task.IsIndeterminate = true;
+                var progress = new SpectreOperationProgress(task, _text);
+                return await executor(command, progress, cancellationToken).ConfigureAwait(false);
+            });
     }
 
     public async Task WaitForReturnAsync(CancellationToken cancellationToken)
@@ -657,6 +778,49 @@ internal sealed class SpectreCliMenuView : ICliMenuView, ICliAssistantView
 
     private static string FormatAssistantChoice(CliAssistantChoice choice) =>
         choice.Description is null ? choice.Label : $"{choice.Label} - {choice.Description}";
+
+    private Markup ResultLabel(string resourceKey)
+    {
+        var label = CliMarkup.EscapeExternal(_text.Get(resourceKey));
+        return new Markup(_useColor ? $"[bold deepskyblue1]{label}[/]" : $"[bold]{label}[/]");
+    }
+
+    private sealed class SpectreOperationProgress(ProgressTask task, CliTextCatalog text) : ICliOperationProgress
+    {
+        private readonly ProgressTask _task = task ?? throw new ArgumentNullException(nameof(task));
+        private readonly CliTextCatalog _text = text ?? throw new ArgumentNullException(nameof(text));
+
+        public void Report(CliOperationProgressUpdate update)
+        {
+            ArgumentNullException.ThrowIfNull(update);
+            var stateKey = update.State switch
+            {
+                CliOperationProgressState.Started => "ProgressStarted",
+                CliOperationProgressState.Advanced => "ProgressRunning",
+                CliOperationProgressState.Completed => "ProgressCompleted",
+                CliOperationProgressState.Failed => "ProgressFailed",
+                _ => throw new ArgumentOutOfRangeException(nameof(update)),
+            };
+            _task.Description = CliMarkup.EscapeExternal(
+                _text.Format(stateKey, _text.Get(update.MessageResourceKey)));
+            if (update.TotalUnits.HasValue)
+            {
+                _task.IsIndeterminate = false;
+                _task.MaxValue = update.TotalUnits.Value;
+                _task.Value = update.CompletedUnits!.Value;
+            }
+            else if (update.State is CliOperationProgressState.Completed or CliOperationProgressState.Failed)
+            {
+                _task.IsIndeterminate = false;
+                _task.MaxValue = 1;
+                _task.Value = 1;
+            }
+            else
+            {
+                _task.IsIndeterminate = true;
+            }
+        }
+    }
 
     private sealed record MenuDisplayChoice<T>(string Label, T Value);
 

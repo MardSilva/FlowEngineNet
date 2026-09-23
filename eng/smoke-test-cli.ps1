@@ -101,24 +101,99 @@ try {
     }
 
     function Invoke-InstalledFlow {
-        param([Parameter(Mandatory)][string[]]$Arguments)
+        param(
+            [Parameter(Mandatory)][string[]]$Arguments,
+            [int]$ExpectedExitCode = 0
+        )
 
         $captured = & $flowExecutable @Arguments 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            throw "Installed Flow command failed ($LASTEXITCODE): flow $($Arguments -join ' ')`n$($captured -join [Environment]::NewLine)"
+        if ($LASTEXITCODE -ne $ExpectedExitCode) {
+            throw "Installed Flow command returned $LASTEXITCODE instead of $ExpectedExitCode`: flow $($Arguments -join ' ')`n$($captured -join [Environment]::NewLine)"
         }
 
         return $captured -join "`n"
     }
 
-    $help = Invoke-InstalledFlow -Arguments @('help')
-    if ($help.IndexOf('Flow Engine .NET 0.2.0-alpha.1', [System.StringComparison]::Ordinal) -lt 0) {
-        throw 'Installed CLI help did not report the expected experimental version.'
+    function Assert-NoAnsi {
+        param(
+            [Parameter(Mandatory)][string]$Name,
+            [Parameter(Mandatory)][string]$Text
+        )
+
+        if ($Text.Contains([char]27)) {
+            throw "Installed CLI emitted an ANSI escape in redirected $Name output."
+        }
     }
 
-    $portugueseHelp = Invoke-InstalledFlow -Arguments @('--language', 'pt-BR', 'help')
-    if ($portugueseHelp.IndexOf('Comandos:', [System.StringComparison]::Ordinal) -lt 0) {
+    Add-Type -AssemblyName System.IO.Compression.FileSystem
+    $packageArchive = [System.IO.Compression.ZipFile]::OpenRead($packagePath)
+    try {
+        $packageEntries = @($packageArchive.Entries.FullName)
+        foreach ($dependencyFile in @('Spectre.Console.dll', 'Spectre.Console.Ansi.dll')) {
+            if (-not ($packageEntries | Where-Object { $_.EndsWith("/$dependencyFile", [System.StringComparison]::Ordinal) })) {
+                throw "Installed CLI package does not contain its presentation dependency: $dependencyFile"
+            }
+        }
+
+        $depsEntry = $packageArchive.Entries |
+            Where-Object { $_.FullName.EndsWith('/flow.deps.json', [System.StringComparison]::Ordinal) } |
+            Select-Object -First 1
+        if ($null -eq $depsEntry) {
+            throw 'Installed CLI package does not contain flow.deps.json.'
+        }
+        $depsReader = [System.IO.StreamReader]::new($depsEntry.Open(), [System.Text.Encoding]::UTF8)
+        try {
+            $depsText = $depsReader.ReadToEnd()
+        }
+        finally {
+            $depsReader.Dispose()
+        }
+        foreach ($dependencyIdentity in @('Spectre.Console/0.57.2', 'Spectre.Console.Ansi/0.57.2')) {
+            if ($depsText.IndexOf('"' + $dependencyIdentity + '"', [System.StringComparison]::Ordinal) -lt 0) {
+                throw "Installed CLI runtime graph does not resolve $dependencyIdentity."
+            }
+        }
+    }
+    finally {
+        $packageArchive.Dispose()
+    }
+
+    $installedSpectreAssembly = Get-ChildItem -LiteralPath $toolDirectory -Filter 'Spectre.Console.dll' -File -Recurse |
+        Select-Object -First 1
+    if ($null -eq $installedSpectreAssembly) {
+        throw 'Spectre.Console.dll was not restored into the isolated tool installation.'
+    }
+    $spectreIdentity = [System.Reflection.AssemblyName]::GetAssemblyName($installedSpectreAssembly.FullName)
+    if ($spectreIdentity.Name -ne 'Spectre.Console') {
+        throw "Unexpected Spectre.Console assembly identity: $($spectreIdentity.FullName)"
+    }
+
+    $plainHelp = Invoke-InstalledFlow -Arguments @('--plain', 'help')
+    Assert-NoAnsi -Name 'plain help' -Text $plainHelp
+    if ($plainHelp.IndexOf('Flow Engine .NET 0.2.0-alpha.1', [System.StringComparison]::Ordinal) -lt 0 -or
+        $plainHelp.IndexOf('Commands:', [System.StringComparison]::Ordinal) -lt 0) {
+        throw 'Installed CLI plain help did not report the expected identity and command catalog.'
+    }
+
+    $specificHelp = Invoke-InstalledFlow -Arguments @('--plain', 'help', 'import')
+    Assert-NoAnsi -Name 'command help' -Text $specificHelp
+    if ($specificHelp.IndexOf('flow import <book.epub>', [System.StringComparison]::Ordinal) -lt 0 -or
+        $specificHelp.IndexOf('--fidelity-report', [System.StringComparison]::Ordinal) -lt 0) {
+        throw 'Installed CLI command-specific help is incomplete.'
+    }
+
+    $portugueseHelp = Invoke-InstalledFlow -Arguments @('--language', 'pt-BR', '--plain', 'help')
+    Assert-NoAnsi -Name 'pt-BR help' -Text $portugueseHelp
+    if ($portugueseHelp.IndexOf('Comandos:', [System.StringComparison]::Ordinal) -lt 0 -or
+        $portugueseHelp.IndexOf('Livros EPUB', [System.StringComparison]::Ordinal) -lt 0) {
         throw 'The installed tool did not load the pt-BR resource catalog.'
+    }
+
+    $menuRefusal = Invoke-InstalledFlow -Arguments @('menu') -ExpectedExitCode 1
+    Assert-NoAnsi -Name 'redirected menu refusal' -Text $menuRefusal
+    if ($menuRefusal.IndexOf('FLOWCLI_MENU_REQUIRES_INTERACTIVE', [System.StringComparison]::Ordinal) -lt 0 -or
+        $menuRefusal.IndexOf('flow help', [System.StringComparison]::Ordinal) -lt 0) {
+        throw 'Installed CLI did not refuse the menu safely without an interactive terminal.'
     }
 
     $documentPath = Join-Path $workDirectory 'sample.flow.json'
@@ -152,7 +227,21 @@ try {
         configuration = $Configuration
         packageSha256 = (Get-FileHash -LiteralPath $packagePath -Algorithm SHA256).Hash.ToLowerInvariant()
         packageOrigin = if ($null -eq $externalPackagePath) { 'built' } else { 'supplied' }
-        commands = @('help', 'help-pt-BR', 'sample', 'inspect', 'validate', 'hash', 'render-html')
+        presentationDependencies = @(
+            [ordered]@{ name = 'Spectre.Console'; version = '0.57.2' }
+            [ordered]@{ name = 'Spectre.Console.Ansi'; version = '0.57.2' }
+        )
+        commands = @(
+            'help-plain',
+            'help-import-plain',
+            'help-pt-BR-plain',
+            'menu-redirected-refusal',
+            'sample',
+            'inspect',
+            'validate',
+            'hash',
+            'render-html'
+        )
         status = 'passed'
     }
     $resultJson = $result | ConvertTo-Json -Depth 4
