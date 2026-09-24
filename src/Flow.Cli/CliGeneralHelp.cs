@@ -120,6 +120,8 @@ internal static class CliGeneralHelpWriter
             Ansi = presentation.UseColor ? AnsiSupport.Yes : AnsiSupport.No,
             ColorSystem = presentation.UseColor ? ColorSystemSupport.Standard : ColorSystemSupport.NoColors,
             Interactive = InteractionSupport.No,
+            // Keep CI environment detection from overriding the resolved presentation profile.
+            Enrichment = new ProfileEnrichment { UseDefaultEnrichers = false },
             Out = new CliAnsiConsoleOutput(output, presentation.Width),
         });
 
