@@ -14,7 +14,7 @@ Mudanças de comportamento devem classificar a fronteira como resolvida, reduzid
 - O projeto fixa .NET SDK 10.0.401. A CLI depende de runtime .NET 10 compatível; não há instalador assinado nem pacote self-contained.
 - Reprodutibilidade cobre duas builds normalizadas no builder Ubuntu canônico e a instalação do mesmo candidato em Ubuntu/Windows. Não prova igualdade entre compiladores independentes, macOS ou outros SDKs. Assinatura futura terá de ocorrer depois da normalização.
 - O SBOM não cobre SDK, host, Actions, dependências só de teste ou bibliotecas do sistema. A proveniência local não é assinada e não alega nível SLSA, transparência ou identidade confiável.
-- O dry-run não cria tag, GitHub Release ou publicação NuGet. Upgrade, rollback e revogação ainda não foram definidos.
+- Proposta e dry-run não publicam no NuGet nem tornam uma GitHub Release pública. Um workflow separado e manual pode criar um draft depois da validação Windows/Linux, mas o rascunho, a intenção de tag e os artefatos não assinados ainda exigem revisão humana. Upgrade, rollback, revogação e recuperação de publicação acidental não foram definidos.
 
 ## Modelo semântico
 
@@ -72,13 +72,14 @@ Mudanças de comportamento devem classificar a fronteira como resolvida, reduzid
 
 ## CLI e operações
 
-- A CLI cobre documentos, EPUB, corpus, gate e revisão, mas não assinatura/verificação, PDF, paginação, Reader, switches completos de preferência ou batch interativo.
+- A CLI cobre documentos, EPUB, corpus, gate e revisão, mas não assinatura/verificação, PDF, paginação, Reader, switches completos de preferência ou revisão humana em lote. O menu é opcional e não funciona com streams redirecionados nem em modo Plain; automação e terminais limitados usam os comandos diretos equivalentes.
 - Textos humanos têm `en-US` e `pt-BR`; detalhes técnicos originais continuam em inglês depois do resumo. JSON e códigos são invariáveis.
 - Operações transacionais usam `--force`, `--resume` e lock por destino. Filesystems remotos que ignoram exclusão do .NET não são suportados.
 - `execution-clean` remove somente artefatos reconhecidos com UUID exato; não repara sidecars inválidos nem escolhe backups ambíguos.
 - O UUID é correlação local, não autenticação. Quem altera o diretório pode alterar seus artefatos.
 - CI cobre Windows e Linux, não macOS ou runtimes alternativos.
-- O smoke test usa feed local e pacote framework-dependent; não testa publicação, assinatura, upgrade, instalação global ou todos os comandos.
+- A interface rica tem testes para largura variável, supressão de cores, ausência de ANSI/cursor/Unicode, cancelamento, redirecionamento e texto bidirecional ou semelhante a markup. Ainda não houve auditoria externa com leitores de tela, tecnologias assistivas ou uma matriz ampla de hosts. `--plain` é o fallback explícito; isso não equivale a certificação de acessibilidade.
+- O smoke test usa feed local e pacote framework-dependent. Ele cobre ajuda Plain, localização, dependências de apresentação, recusa segura do menu não interativo e um fluxo pequeno de documentos, mas não testa publicação, assinatura, upgrade, instalação global, EPUB real, navegação real pelo teclado ou todos os comandos.
 
 ## Fora do escopo
 

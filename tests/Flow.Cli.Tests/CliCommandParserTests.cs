@@ -171,13 +171,24 @@ public sealed class CliCommandParserTests
     public void InvocationOptions_RecognizeLanguageBannerAndPlainOutput()
     {
         var result = CliInvocationOptionsParser.Parse(
-            ["--language", "pt-BR", "--banner", "--no-color", "inspect", "book.flow.json"]);
+            ["--language", "pt-BR", "--banner", "--no-color", "--plain", "inspect", "book.flow.json"]);
 
         Assert.True(result.IsSuccess);
         Assert.Equal("pt-BR", result.Options!.CultureName);
         Assert.True(result.Options.ShowBanner);
+        Assert.True(result.Options.NoColor);
+        Assert.True(result.Options.ForcePlain);
         Assert.False(result.Options.UseColor);
         Assert.Equal(["inspect", "book.flow.json"], result.Options.CommandArguments);
+    }
+
+    [Fact]
+    public void InvocationOptions_RejectDuplicatePlainOption()
+    {
+        var result = CliInvocationOptionsParser.Parse(["--plain", "--plain", "help"]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("FLOWCLI_DUPLICATE_OPTION", result.DiagnosticCode);
     }
 
     [Theory]
@@ -312,5 +323,26 @@ public sealed class CliCommandParserTests
                 ["render", "book.flow.json", "--html-book", "book", "--ui-language", "en", "--ui-language", "pt-BR"])
                 .Error,
             StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData("help", "import")]
+    [InlineData("import", "--help")]
+    [InlineData("render", "-h")]
+    public void Parse_SupportsDetailedHelpWithoutRequiredArguments(string first, string second)
+    {
+        var result = _parser.Parse([first, second]);
+
+        var command = Assert.IsType<HelpCommand>(result.Command);
+        Assert.Equal(first == "help" ? second : first, command.CommandName);
+    }
+
+    [Fact]
+    public void Parse_RejectsHelpForUnknownCommandWithStableDiagnostic()
+    {
+        var result = _parser.Parse(["help", "unknown"]);
+
+        Assert.False(result.IsSuccess);
+        Assert.Equal("FLOWCLI_UNKNOWN_HELP_COMMAND", result.Diagnostic!.Code);
     }
 }

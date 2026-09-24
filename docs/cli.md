@@ -14,9 +14,27 @@ The help output identifies the CLI and `.flow.json` representation as experiment
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\eng\smoke-test-cli.ps1 -Configuration Release
 ```
 
-Use `pwsh` on PowerShell 7 or Linux. The script obtains the package identity from MSBuild, packs the current source, creates a NuGet configuration containing only that local package source, and installs it with `--tool-path`. It then verifies English and Brazilian Portuguese help, `sample`, `inspect`, `validate`, `hash`, and standalone HTML rendering through the installed launcher. Cleanup removes the isolated tool installation even when a command fails.
+Use `pwsh` on PowerShell 7 or Linux. The script obtains the package identity from MSBuild, packs the current source, creates a NuGet configuration containing only that local package source, and installs it with `--tool-path`. It verifies Plain general and command-specific help, the Brazilian Portuguese catalog, ANSI-free redirected output, the packaged Spectre.Console assemblies, safe menu refusal without an interactive terminal, and the `sample`, `inspect`, `validate`, `hash`, and standalone HTML commands. Cleanup removes the isolated tool installation even when a command fails.
 
 The deterministic summary is written to `artifacts/cli-smoke/smoke-result.json`; build products remain under the ignored `artifacts/` directory. The script requires the .NET 10 SDK selected by `global.json`. It does not publish, sign or install a machine-wide tool.
+
+There is no MSI or graphical installer yet. For local development, you can install the current build in your user profile as a global .NET tool:
+
+```powershell
+$packageDirectory = Join-Path $PWD "artifacts/local-tool"
+dotnet pack src/Flow.Cli/Flow.Cli.csproj --configuration Release --output $packageDirectory
+dotnet tool install --global FlowEngineNet.Tool --add-source $packageDirectory --ignore-failed-sources
+flow --language pt-BR --banner menu
+```
+
+If the same development version is already installed, uninstall it before installing the rebuilt package. This is necessary because the package version may remain unchanged between local builds:
+
+```powershell
+dotnet tool uninstall --global FlowEngineNet.Tool
+dotnet tool install --global FlowEngineNet.Tool --add-source $packageDirectory --ignore-failed-sources
+```
+
+The installed package is the local build; these commands do not publish it to NuGet. To remove the command later, run `dotnet tool uninstall --global FlowEngineNet.Tool`. If `flow` is not found immediately after installation, open a new terminal and confirm that the standard .NET tools directory is present in `PATH`.
 
 For a complete local release candidate, run `eng/build-release-artifacts.ps1`. It performs two independent package builds, normalizes unsigned NuGet ZIP metadata, requires byte-for-byte agreement, generates CycloneDX 1.5 and SHA-256 evidence, validates the package structure and installs the final package from a local-only source. The resulting files stay under `artifacts/release/` and are not uploaded or published. See [local release artifacts](release-artifacts.md).
 
@@ -27,18 +45,58 @@ For a complete local release candidate, run `eng/build-release-artifacts.ps1`. I
 Global options appear before the command:
 
 ```text
-flow [--language <en-US|pt-BR>] [--banner] [--no-color] <command>
+flow [--language <en-US|pt-BR>] [--banner] [--no-color] [--plain] <command>
 ```
 
 `--language` selects the resource catalog for human-readable terminal output. The initial catalogs are `en-US` and `pt-BR`. Omitting the option selects `en-US`; an unsupported value fails with `FLOWCLI_INVALID_VALUE` and an English fallback message. Commands, option names, paths, serialized fields and diagnostic codes do not change with the language.
 
 Every stable EPUB, document-validation and Flow JSON diagnostic code currently has a `pt-BR` summary. The CLI prints the original technical detail immediately afterward, so paths, IDs, rejected values and parser messages are not lost. A code introduced without a catalog entry falls back to its original message. This localization affects only terminal text: diagnostic and inspection JSON remains deterministic and independent of `--language`.
 
-`--banner` prints an optional FIGlet-style ASCII heading. The CLI emits plain text by default and does not require ANSI colors; `--no-color` makes that contract explicit for scripts, redirected output and limited terminals. These presentation options do not affect generated files, canonical bytes or hashes.
+`--banner` prints an optional FIGlet-style ASCII heading. On a compatible interactive terminal, the CLI can use a richer layout that reads the available width again between screens. Redirected output, captured output, terminals without ANSI or cursor control, and hosts without reliable Unicode support receive deterministic plain text instead. `--no-color` and `NO_COLOR` remove color without discarding the spacing and hierarchy of the Rich layout.
+
+`--plain` explicitly selects the simple presentation intended for screen readers, limited terminals, and predictable capture. It disables color, animation, cursor control, and box-drawing characters. Its precedence is: explicit `--plain`; automatic safety fallback; Rich mode with color disabled by `--no-color` or `NO_COLOR`; Rich mode with color. Presentation choices do not affect generated files, canonical bytes, reports, or hashes.
+
+## Interactive menu and guided assistants
+
+`flow menu` opens with a short introduction to the project, its EPUB-to-Flow workflow and the experimental status of the current format. The blue welcome panel appears once per session, before the keyboard-driven command catalog. Use the arrow keys and Enter to choose a category or command. Each command preview shows its purpose, direct syntax, required inputs, file effects and safety notes. `Back` returns to the previous level, `Exit` closes the menu, and Esc cancels it. Ctrl+C keeps the established cancellation behavior and exit code `130`.
+
+The `import` and `epub-inspect` previews also offer a guided assistant. Both validate that the source is an existing regular local `.epub` file, show a complete summary, and require explicit confirmation before running. Import can use the title-derived `.flow.json` destination or a custom path and can select diagnostics, fidelity, source-metadata, processing, and source-map reports. Inspection can optionally write its deterministic JSON report. Optional reports receive predictable names beside the EPUB.
+
+The `inspect`, `validate`, and `hash` previews accept an existing regular `.flow.json` and run without writing files. Their normal output remains visible and copyable, including the canonical hash and profile. `validate` still reports semantic failure with exit code `2` in the result panel.
+
+The `render` assistant supports standalone HTML with an explicit logical width and height, or the multi-file HTML book with `auto`, `en`, `pt-PT`, or `pt-BR` interface text. Before rendering, it shows normalized source and destination paths, whether the destination already exists, the selected output type, and the viewport or interface language. Confirmation does not bypass the direct command's replacement checks.
+
+All assistants call the same typed commands and operations as direct CLI use. Import reports and HTML book packages retain their existing atomic-write behavior; standalone HTML retains the current direct-render behavior. After execution, the menu shows the actual exit code and the outputs written by that operation. Empty text input or `:cancel` returns without writing, while Esc cancels selection lists. Ctrl+C returns `130`. An unexpected end of stdin returns `FLOWCLI_INTERACTIVE_INPUT_UNAVAILABLE` and never infers a choice. The terminal state is restored after success, failure, or cancellation.
+
+The menu is optional and requires a Rich interactive terminal. Redirected streams, `--plain`, unsupported cursor control, or an unsafe terminal profile are refused with `FLOWCLI_MENU_REQUIRES_INTERACTIVE`. `flow help` lists the same catalog, and every menu workflow shows its direct command before execution. Use that direct form for screen readers, automation, and limited terminals.
+
+Corpus, gate, and execution-maintenance assistants are grouped under **Advanced**. Each one explains its purpose and expected processing cost before collecting values, then shows normalized source, evidence, and destination paths in a final summary. They build the same typed command accepted by direct mode, so candidate IDs, expected SHA-256 values, `--force`, `--resume`, locks, and execution IDs keep their existing meaning.
+
+Operations that process private or individually supplied publications ask for the `--legal-use` and `--drm-free` declarations separately. Cancellation is the first choice for each declaration, and the later run confirmation cannot stand in for either one. The gate remains technical evidence rather than certification; failed or skipped candidates and pending human review remain visible in the normal reports. `execution-clean` additionally requires the exact 32-character execution ID to be entered twice before the normal confirmation. Cleanup still delegates to the existing policy and can act only on recognized destination-bound residues.
+
+During an interactive operation, the menu shows a localized progress area for the current typed phase. The current contract reports one real command unit, from not started to completed; it does not estimate pages, bytes, remaining time, or internal percentages that the operation cannot measure. Normal command output is buffered while the progress area is active, which prevents concurrent writes to the same terminal. Prompts resume only after that area has closed.
+
+The final panel shows a textual status and symbol, exit code, measured duration, file count, result-line count, and diagnostic-line count. Written paths, normal output, and diagnostics appear in separate sections. Color reinforces the status but is not required to read it. Diagnostic codes and messages are preserved verbatim. The progress contract also has a Plain writer that emits ordinary start and completion lines without ANSI or cursor control; direct commands and redirected automation keep their existing stable output.
+
+Terminal fallbacks are covered by automated tests for narrow and changing widths, missing ANSI/cursor/Unicode capabilities, redirected writers, `NO_COLOR`, `--no-color`, `--plain`, cancellation, end of input, accents, bidirectional text, and markup-like characters. The packaged CLI is validated on Windows and Linux by the repository workflow. Windows PowerShell and Command Prompt are supported only where the selected .NET SDK/runtime and global-tool launcher work. This is tested behavior, not a claim of accessibility conformance; no external screen-reader or accessibility audit has been completed.
+
+## Command-specific help
+
+`flow help` presents the command catalog in five stable groups: Getting started, EPUB books, Flow documents, Corpus and quality, and Maintenance. The general view shows only each command name and a short summary, so long signatures remain readable even in an 80-column terminal. Narrow interactive terminals stack summaries below command names; wider terminals place them side by side. The plain variant carries the same information without ANSI sequences, borders or cursor control.
+
+Use either form below for the complete typed details of one command:
+
+```text
+flow help <command>
+flow <command> --help
+```
+
+The detailed view shows purpose, usage, positional arguments, required and optional options, safe examples, file effects, safety notes, and relevant exit codes. It is available for every public command in en-US and pt-BR. Help is resolved before required command arguments, so asking for it never starts the described operation or creates output. An unknown help target returns `FLOWCLI_UNKNOWN_HELP_COMMAND` and exit code `1`.
 
 ## Commands
 
 ```text
+flow menu
 flow sample [output]
 flow import <book.epub> [--output <book.flow.json>] [--diagnostics-json <report.json>] [--fidelity-report <fidelity.json>]
 flow epub-inspect <book.epub> [--json <report.json>]

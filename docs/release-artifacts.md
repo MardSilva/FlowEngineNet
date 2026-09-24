@@ -21,7 +21,7 @@ The generated directory contains:
 
 ## Versioned release dry-run
 
-`eng/release-plan.json` is the checked-in release intent. It fixes the package ID, semantic version, expected `v<version>` tag and prerelease channel. Its publication field is `disabled`; the dry-run refuses any other value.
+`eng/release-plan.json` is the checked-in release intent. It fixes the package ID, semantic version, expected `v<version>` tag and prerelease channel. Package publication remains `disabled`, and GitHub release creation is restricted to `draft-only`; the validation scripts refuse broader policies.
 
 After building the local artifacts, run:
 
@@ -37,7 +37,13 @@ The dry-run adds:
 - `release-dry-run.json`, the version, expected tag, source state and validation outcome;
 - `release-evidence.json`, hashes binding the core artifacts to the provenance and dry-run report.
 
-No tag or GitHub Release is created. A local run does not upload anything. CI temporarily transfers the canonical candidate between its own jobs so Windows and Linux validate the exact same package; the artifact expires after one day and is never published to a package feed.
+The dry-run itself creates no tag or GitHub Release and uploads nothing. CI temporarily transfers the canonical candidate between its own jobs so Windows and Linux validate the exact same package; the ordinary CI artifact expires after one day and is never published to a package feed.
+
+## Version proposal and draft release
+
+`eng/get-release-proposal.ps1` recognizes `feature/<version>-<description>` and `release/<version>` for the supported `alpha`, `beta`, and `rc` prerelease sequence. It compares that proposal with the package version resolved by MSBuild and with `eng/release-plan.json`. The CI summary reports one of four states: candidate, ready for draft, version update required, or no proposal. This job has read-only repository permission and cannot create tags or releases.
+
+`.github/workflows/release.yml` is a separate manual workflow. It requires the exact planned version, a trusted `main` or `release/<version>` source, and the explicit `CREATE_DRAFT_RELEASE` choice. Windows and Ubuntu repeat formatting, documentation, build, tests, and installed-package smoke checks before Ubuntu rebuilds the deterministic artifacts and dry-run evidence. The final job uses the `draft-release` environment and `contents: write` only while creating a draft GitHub Release. It attaches the validated files but does not publish to NuGet or publish the GitHub Release. Repository administrators can add required reviewers to that environment.
 
 ## Reproducibility check
 
@@ -53,6 +59,8 @@ CI builds the canonical candidate once on Ubuntu after the Windows/Linux source 
 
 The SBOM is derived from the packaged `flow.deps.json`, not from a manually maintained component list. It describes the CLI and the Flow runtime assemblies shipped inside the `.nupkg`, including their dependency relationships, package version, target framework, deployment type and MIT license declaration for project components.
 
+`Flow.Cli` uses `Spectre.Console` 0.57.2 for Rich help, menus, guided assistants, progress, and result panels. No domain project references it. `Spectre.Console` and its runtime companion `Spectre.Console.Ansi` are distributed under the MIT license; the release script requires each component to appear once in the generated SBOM and records the license explicitly. Plain and redirected output do not depend on ANSI, cursor movement, or Unicode drawing characters.
+
 The package is framework-dependent. The .NET runtime and SDK are prerequisites rather than bundled components, so they do not appear as shipped SBOM components. Test-only NuGet packages are also absent because they are not distributed with the CLI.
 
 ## Validation
@@ -64,10 +72,14 @@ Before promoting the staged directory, the script checks:
 - the runtime dependency graph used to build the SBOM;
 - CycloneDX structure and dependency references;
 - every entry in `SHA256SUMS`;
-- installation from a local-only NuGet source and execution of `flow help`.
+- installation from a local-only NuGet source and execution of the deterministic CLI smoke suite.
+
+The installed-package smoke covers Plain general and command-specific help, the `pt-BR` catalog, ANSI-free redirected output, Spectre.Console dependency resolution, safe menu refusal without an interactive terminal, and representative existing document commands. It does not drive real keyboard navigation in CI; menu navigation is covered through the abstract console in unit and integration tests.
+
+The final CLI-experience audit packed the branch base (`1dc44e9`) and the completed working tree on the same Windows host, with the pinned SDK, Release configuration, and `ContinuousIntegrationBuild=true`. The `.nupkg` changed from 870,714 to 1,485,771 bytes: an increase of 615,057 bytes (70.64%). Most of that boundary is the optional presentation implementation and the packaged Spectre.Console runtime assemblies. This is a same-host development measurement, not a permanent package-size budget or a cross-platform reproducibility claim.
 
 The package is then uninstalled from the isolated tool directory. The script never changes the user's global tool list, contacts a package feed or publishes an artifact. The dry-run also checks that an existing expected tag points to the source revision; an absent tag is valid because this stage never creates it.
 
 ## Current boundary
 
-These files are unsigned local release candidates. The provenance is informative and self-consistent, but it is not signed, hosted by a transparency service or a claim of any SLSA build level. There is no public NuGet package, installer, upgrade test or long-term artifact retention policy yet. Do not distribute the contents of `artifacts/release` as a supported release.
+These files are unsigned release candidates. The provenance is informative and self-consistent, but it is not signed, hosted by a transparency service or a claim of any SLSA build level. There is no public NuGet package, installer, upgrade test or long-term artifact retention policy yet. A generated GitHub draft still needs human review before publication and must not be treated as a supported release.

@@ -82,7 +82,8 @@ public sealed class CliOperations
         TextWriter output,
         TextWriter error,
         CancellationToken cancellationToken = default)
-        => await ExecuteAsync(command, output, error, new CliTextCatalog(), cancellationToken).ConfigureAwait(false);
+        => await ExecuteAsync(command, output, error, new CliTextCatalog(), CliPresentationProfile.Plain(), cancellationToken)
+            .ConfigureAwait(false);
 
     /// <summary>Executes a parsed command with the selected human-readable output catalog.</summary>
     public async Task<int> ExecuteAsync(
@@ -91,19 +92,75 @@ public sealed class CliOperations
         TextWriter error,
         CliTextCatalog text,
         CancellationToken cancellationToken = default)
+        => await ExecuteAsync(command, output, error, text, CliPresentationProfile.Plain(), cancellationToken)
+            .ConfigureAwait(false);
+
+    internal async Task<int> ExecuteAsync(
+        CliCommand command,
+        TextWriter output,
+        TextWriter error,
+        CliTextCatalog text,
+        CliPresentationProfile presentation,
+        CancellationToken cancellationToken = default,
+        ICliOperationObserver? observer = null)
     {
         ArgumentNullException.ThrowIfNull(command);
         ArgumentNullException.ThrowIfNull(output);
         ArgumentNullException.ThrowIfNull(error);
         ArgumentNullException.ThrowIfNull(text);
+        ArgumentNullException.ThrowIfNull(presentation);
 
-        return command switch
+        if (observer is null)
         {
-            HelpCommand => await ShowHelpAsync(output, text).ConfigureAwait(false),
+            return await ExecuteCoreAsync().ConfigureAwait(false);
+        }
+
+        var (phase, messageResourceKey) = CliOperationProgressPlan.For(command);
+        observer.Progress(new CliOperationProgressUpdate(
+            phase,
+            CliOperationProgressState.Started,
+            messageResourceKey,
+            completedUnits: 0,
+            totalUnits: 1));
+        try
+        {
+            var exitCode = await ExecuteCoreAsync().ConfigureAwait(false);
+            observer.Progress(new CliOperationProgressUpdate(
+                phase,
+                CliOperationProgressState.Completed,
+                messageResourceKey,
+                completedUnits: 1,
+                totalUnits: 1));
+            return exitCode;
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch
+        {
+            observer.Progress(new CliOperationProgressUpdate(
+                phase,
+                CliOperationProgressState.Failed,
+                messageResourceKey,
+                completedUnits: 0,
+                totalUnits: 1));
+            throw;
+        }
+
+        async Task<int> ExecuteCoreAsync() => command switch
+        {
+            HelpCommand help => await ShowHelpAsync(help, output, text, presentation).ConfigureAwait(false),
             SampleCommand sample => await CreateSampleAsync(sample, output, text, cancellationToken).ConfigureAwait(false),
-            ImportEpubCommand import => await ImportEpubAsync(import, output, error, text, cancellationToken)
+            ImportEpubCommand import => await ImportEpubAsync(import, output, error, text, observer, cancellationToken)
                 .ConfigureAwait(false),
-            InspectEpubCommand inspectEpub => await InspectEpubAsync(inspectEpub, output, error, text, cancellationToken)
+            InspectEpubCommand inspectEpub => await InspectEpubAsync(
+                    inspectEpub,
+                    output,
+                    error,
+                    text,
+                    observer,
+                    cancellationToken)
                 .ConfigureAwait(false),
             InventoryEpubCommand inventory => await InventoryEpubAsync(inventory, output, error, text, cancellationToken)
                 .ConfigureAwait(false),
@@ -140,31 +197,37 @@ public sealed class CliOperations
             InspectCommand inspect => await InspectAsync(inspect, output, text, cancellationToken).ConfigureAwait(false),
             ValidateCommand validate => await ValidateAsync(validate, output, text, cancellationToken).ConfigureAwait(false),
             HashCommand hash => await HashAsync(hash, output, text, cancellationToken).ConfigureAwait(false),
-            RenderHtmlCommand render => await RenderHtmlAsync(render, output, text, cancellationToken).ConfigureAwait(false),
-            RenderHtmlBookCommand renderBook => await RenderHtmlBookAsync(renderBook, output, text, cancellationToken)
+            RenderHtmlCommand render => await RenderHtmlAsync(render, output, text, observer, cancellationToken)
+                .ConfigureAwait(false),
+            RenderHtmlBookCommand renderBook => await RenderHtmlBookAsync(
+                    renderBook,
+                    output,
+                    text,
+                    observer,
+                    cancellationToken)
                 .ConfigureAwait(false),
             _ => throw new ArgumentOutOfRangeException(nameof(command), command, "Unknown CLI command."),
         };
     }
 
-    private static async Task<int> ShowHelpAsync(TextWriter output, CliTextCatalog text)
+    private static async Task<int> ShowHelpAsync(
+        HelpCommand command,
+        TextWriter output,
+        CliTextCatalog text,
+        CliPresentationProfile presentation)
     {
-        foreach (var key in new[]
-                 {
-                     "HelpTitle", "HelpWarning", "HelpGlobalOptions", "HelpLanguage", "HelpBanner", "HelpNoColor",
-                     "HelpCommands", "HelpSample", "HelpImport1", "HelpImport2", "HelpImport3", "HelpEpubInspect",
-                     "HelpEpubInventory1", "HelpEpubInventory2",
-                     "HelpEpubInventoryQualify1", "HelpEpubInventoryQualify2",
-                     "HelpEpubInventoryMatrix1", "HelpEpubInventoryMatrix2",
-                     "HelpEpubInventoryReview1", "HelpEpubInventoryReview2", "HelpEpubInventoryReview3",
-                     "HelpCorpus1", "HelpCorpus2", "HelpEpubQualify1", "HelpEpubQualify2", "HelpEpubQualify3",
-                     "HelpEpubReview1", "HelpEpubReview2", "HelpEpubReview3", "HelpOutputPolicy",
-                     "HelpExecutionStatus", "HelpExecutionClean",
-                     "HelpInspect", "HelpValidate", "HelpHash", "HelpRenderHtml", "HelpRenderBook", "HelpExitCodes",
-                 })
+        if (command.CommandName is not null)
         {
-            await output.WriteLineAsync(text.Get(key)).ConfigureAwait(false);
+            if (!CliCommandCatalog.TryGet(command.CommandName, out var descriptor))
+            {
+                throw new CliOperationException("ErrorUnknownHelpCommand", command.CommandName);
+            }
+
+            await CliCommandHelpWriter.WriteAsync(descriptor, output, text).ConfigureAwait(false);
+            return 0;
         }
+
+        await CliGeneralHelpWriter.WriteAsync(output, text, presentation).ConfigureAwait(false);
 
         return 0;
     }
@@ -626,6 +689,7 @@ public sealed class CliOperations
         TextWriter output,
         TextWriter error,
         CliTextCatalog text,
+        ICliOperationObserver? observer,
         CancellationToken cancellationToken)
     {
         var sourcePath = Path.GetFullPath(command.SourcePath);
@@ -660,6 +724,7 @@ public sealed class CliOperations
             EnsureParentDirectory(jsonOutputPath);
             await WriteInspectionAtomicallyAsync(inspection, jsonOutputPath, cancellationToken)
                 .ConfigureAwait(false);
+            observer?.FileWritten(jsonOutputPath);
             await output.WriteLineAsync(text.Format("LabelReportJson", jsonOutputPath)).ConfigureAwait(false);
         }
 
@@ -1123,6 +1188,7 @@ public sealed class CliOperations
         TextWriter output,
         TextWriter error,
         CliTextCatalog text,
+        ICliOperationObserver? observer,
         CancellationToken cancellationToken)
     {
         var sourcePath = Path.GetFullPath(command.SourcePath);
@@ -1247,6 +1313,7 @@ public sealed class CliOperations
             EnsureParentDirectory(diagnosticsPath);
             await WriteImportDiagnosticsAtomicallyAsync(import, diagnosticsPath, cancellationToken)
                 .ConfigureAwait(false);
+            observer?.FileWritten(diagnosticsPath);
             await output.WriteLineAsync(text.Format("LabelDiagnosticsJson", diagnosticsPath)).ConfigureAwait(false);
         }
 
@@ -1260,6 +1327,7 @@ public sealed class CliOperations
             EnsureParentDirectory(fidelityPath);
             await WriteFidelityReportAtomicallyAsync(fidelity, fidelityPath, cancellationToken)
                 .ConfigureAwait(false);
+            observer?.FileWritten(fidelityPath);
             await output.WriteLineAsync(text.Format("LabelFidelityReport", fidelityPath)).ConfigureAwait(false);
         }
 
@@ -1270,6 +1338,7 @@ public sealed class CliOperations
                 sourceMapPath,
                 output,
                 text,
+                observer,
                 cancellationToken)
             .ConfigureAwait(false);
 
@@ -1314,6 +1383,7 @@ public sealed class CliOperations
         EnsureParentDirectory(outputPath);
         var serializationStarted = Stopwatch.GetTimestamp();
         await WriteDocumentAtomicallyAsync(import.Document, outputPath, cancellationToken).ConfigureAwait(false);
+        observer?.FileWritten(outputPath);
         pipelineMetrics = pipelineMetrics?
             .AddPhaseTiming(EpubImportPhase.SerializingDocument, Stopwatch.GetElapsedTime(serializationStarted))
             .WithOutputSizes(new FileInfo(outputPath).Length, null, null);
@@ -1430,6 +1500,7 @@ public sealed class CliOperations
         RenderHtmlCommand command,
         TextWriter output,
         CliTextCatalog text,
+        ICliOperationObserver? observer,
         CancellationToken cancellationToken)
     {
         var document = await ReadDocumentAsync(command.DocumentPath, cancellationToken).ConfigureAwait(false);
@@ -1445,6 +1516,7 @@ public sealed class CliOperations
         var outputPath = Path.GetFullPath(command.OutputPath);
         EnsureParentDirectory(outputPath);
         rendered.WriteTo(outputPath);
+        observer?.FileWritten(outputPath);
 
         var hash = _integrityService.ComputeHash(document);
         await output.WriteLineAsync(text.Format("LabelRendered", outputPath)).ConfigureAwait(false);
@@ -1465,6 +1537,7 @@ public sealed class CliOperations
         RenderHtmlBookCommand command,
         TextWriter output,
         CliTextCatalog text,
+        ICliOperationObserver? observer,
         CancellationToken cancellationToken)
     {
         const double width = 1024;
@@ -1491,6 +1564,7 @@ public sealed class CliOperations
 
         var writingStarted = Stopwatch.GetTimestamp();
         await WriteHtmlBookPackageAtomicallyAsync(package, outputDirectory, cancellationToken).ConfigureAwait(false);
+        observer?.FileWritten(outputDirectory);
         var writingDuration = Stopwatch.GetElapsedTime(writingStarted);
         await output.WriteLineAsync(text.Format("LabelHtmlBook", outputDirectory)).ConfigureAwait(false);
         await output.WriteLineAsync(text.Format("LabelEntry", Path.Combine(outputDirectory, "index.html")))
@@ -1723,6 +1797,7 @@ public sealed class CliOperations
         string? sourceMapPath,
         TextWriter output,
         CliTextCatalog text,
+        ICliOperationObserver? observer,
         CancellationToken cancellationToken)
     {
         if (metadataPath is not null)
@@ -1734,6 +1809,7 @@ public sealed class CliOperations
                     EpubImportEvidenceJsonWriter.WriteMetadataAsync,
                     cancellationToken)
                 .ConfigureAwait(false);
+            observer?.FileWritten(metadataPath);
             await output.WriteLineAsync(text.Format("LabelMetadataJson", metadataPath)).ConfigureAwait(false);
         }
 
@@ -1746,6 +1822,7 @@ public sealed class CliOperations
                     EpubImportEvidenceJsonWriter.WriteProcessingAsync,
                     cancellationToken)
                 .ConfigureAwait(false);
+            observer?.FileWritten(processingPath);
             await output.WriteLineAsync(text.Format("LabelProcessingJson", processingPath)).ConfigureAwait(false);
         }
 
@@ -1758,6 +1835,7 @@ public sealed class CliOperations
                     EpubImportEvidenceJsonWriter.WriteSourceMapAsync,
                     cancellationToken)
                 .ConfigureAwait(false);
+            observer?.FileWritten(sourceMapPath);
             await output.WriteLineAsync(text.Format("LabelSourceMapJson", sourceMapPath)).ConfigureAwait(false);
         }
     }

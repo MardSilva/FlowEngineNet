@@ -7,40 +7,91 @@ namespace Flow.Cli;
 /// <summary>Parses framework-free command-line arguments into typed Flow CLI commands.</summary>
 public sealed class CliCommandParser
 {
+    private static readonly IReadOnlyDictionary<string, Func<IReadOnlyList<string>, CommandParseResult>> Parsers =
+        new Dictionary<string, Func<IReadOnlyList<string>, CommandParseResult>>(StringComparer.Ordinal)
+        {
+            ["menu"] = ParseMenu,
+            ["sample"] = ParseSample,
+            ["import"] = ParseImport,
+            ["epub-inspect"] = ParseEpubInspect,
+            ["epub-inventory"] = ParseEpubInventory,
+            ["epub-inventory-qualify"] = ParseEpubInventoryQualify,
+            ["epub-inventory-matrix"] = ParseEpubInventoryMatrix,
+            ["epub-inventory-review"] = ParseEpubInventoryReview,
+            ["corpus"] = ParseCorpus,
+            ["epub-qualify"] = ParseEpubQualify,
+            ["epub-review"] = ParseEpubReview,
+            ["execution-status"] = ParseExecutionStatus,
+            ["execution-clean"] = ParseExecutionClean,
+            ["inspect"] = static arguments => ParseDocumentCommand(arguments, static path => new InspectCommand(path)),
+            ["validate"] = static arguments => ParseDocumentCommand(arguments, static path => new ValidateCommand(path)),
+            ["hash"] = static arguments => ParseDocumentCommand(arguments, static path => new HashCommand(path)),
+            ["render"] = ParseRender,
+        };
+
+    internal static IReadOnlyCollection<string> SupportedCommandNames { get; } =
+        ["help", .. Parsers.Keys];
+
     /// <summary>Parses one complete argument vector.</summary>
     public CommandParseResult Parse(IReadOnlyList<string> arguments)
     {
         ArgumentNullException.ThrowIfNull(arguments);
 
-        if (arguments.Count == 0 || arguments[0] is "help" or "--help" or "-h")
+        if (arguments.Count == 0)
         {
             return CommandParseResult.Success(new HelpCommand());
         }
 
-        return arguments[0] switch
+        if (arguments[0] is "--help" or "-h")
         {
-            "sample" => ParseSample(arguments),
-            "import" => ParseImport(arguments),
-            "epub-inspect" => ParseEpubInspect(arguments),
-            "epub-inventory" => ParseEpubInventory(arguments),
-            "epub-inventory-qualify" => ParseEpubInventoryQualify(arguments),
-            "epub-inventory-matrix" => ParseEpubInventoryMatrix(arguments),
-            "epub-inventory-review" => ParseEpubInventoryReview(arguments),
-            "corpus" => ParseCorpus(arguments),
-            "epub-qualify" => ParseEpubQualify(arguments),
-            "epub-review" => ParseEpubReview(arguments),
-            "execution-status" => ParseExecutionStatus(arguments),
-            "execution-clean" => ParseExecutionClean(arguments),
-            "inspect" => ParseDocumentCommand(arguments, static path => new InspectCommand(path)),
-            "validate" => ParseDocumentCommand(arguments, static path => new ValidateCommand(path)),
-            "hash" => ParseDocumentCommand(arguments, static path => new HashCommand(path)),
-            "render" => ParseRender(arguments),
-            _ => CommandParseResult.Failure(
+            return arguments.Count == 1
+                ? CommandParseResult.Success(new HelpCommand())
+                : CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", "flow help [command]");
+        }
+
+        if (arguments[0] == "help")
+        {
+            if (arguments.Count == 1)
+            {
+                return CommandParseResult.Success(new HelpCommand());
+            }
+
+            if (arguments.Count != 2)
+            {
+                return CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", "flow help [command]");
+            }
+
+            var requestedCommand = arguments[1] is "--help" or "-h" ? "help" : arguments[1];
+            return SupportedCommandNames.Contains(requestedCommand, StringComparer.Ordinal)
+                ? CommandParseResult.Success(new HelpCommand(requestedCommand))
+                : CommandParseResult.Failure(
+                    "FLOWCLI_UNKNOWN_HELP_COMMAND",
+                    "ErrorUnknownHelpCommand",
+                    requestedCommand);
+        }
+
+        if (arguments.Count == 2 && (arguments[1] is "--help" or "-h"))
+        {
+            return Parsers.ContainsKey(arguments[0])
+                ? CommandParseResult.Success(new HelpCommand(arguments[0]))
+                : CommandParseResult.Failure(
+                    "FLOWCLI_UNKNOWN_HELP_COMMAND",
+                    "ErrorUnknownHelpCommand",
+                    arguments[0]);
+        }
+
+        return Parsers.TryGetValue(arguments[0], out var parser)
+            ? parser(arguments)
+            : CommandParseResult.Failure(
                 "FLOWCLI_UNKNOWN_COMMAND",
                 "ErrorUnknownCommand",
-                arguments[0]),
-        };
+                arguments[0]);
     }
+
+    private static CommandParseResult ParseMenu(IReadOnlyList<string> arguments) =>
+        arguments.Count == 1
+            ? CommandParseResult.Success(new MenuCommand())
+            : CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", "flow menu");
 
     private static CommandParseResult ParseImport(IReadOnlyList<string> arguments)
     {

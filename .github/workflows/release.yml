@@ -1,0 +1,217 @@
+name: Draft release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Exact version from eng/release-plan.json, without the v prefix'
+        required: true
+        type: string
+      source_ref:
+        description: 'Trusted source ref: main or release/<version>'
+        required: true
+        default: main
+        type: string
+      confirmation:
+        description: 'Explicit authorization to create a draft GitHub Release'
+        required: true
+        type: choice
+        default: CANCEL
+        options:
+          - CANCEL
+          - CREATE_DRAFT_RELEASE
+
+permissions:
+  contents: read
+
+concurrency:
+  group: draft-release-${{ inputs.version }}
+  cancel-in-progress: false
+
+jobs:
+  resolve:
+    if: inputs.confirmation == 'CREATE_DRAFT_RELEASE'
+    name: Resolve immutable candidate
+    runs-on: ubuntu-latest
+    outputs:
+      source_revision: ${{ steps.source.outputs.revision }}
+    steps:
+      - name: Checkout requested source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ inputs.source_ref }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Validate release identity and bind revision
+        id: source
+        shell: pwsh
+        env:
+          FLOW_RELEASE_VERSION: ${{ inputs.version }}
+          FLOW_RELEASE_REF: ${{ inputs.source_ref }}
+        run: |
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/get-release-proposal.ps1 `
+            -BranchName $env:FLOW_RELEASE_REF `
+            -RequestedVersion $env:FLOW_RELEASE_VERSION `
+            -RequireVersionMatch | Out-Null
+          $revision = (git rev-parse HEAD).Trim()
+          if ($revision -notmatch '^[0-9a-f]{40}$') {
+              throw 'Could not bind the candidate to a Git source revision.'
+          }
+          "revision=$revision" >> $env:GITHUB_OUTPUT
+
+  validate:
+    needs: resolve
+    name: Validate candidate / ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - name: Checkout requested source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.source_revision }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Validate release identity
+        shell: pwsh
+        env:
+          FLOW_RELEASE_VERSION: ${{ inputs.version }}
+          FLOW_RELEASE_REF: ${{ inputs.source_ref }}
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/get-release-proposal.ps1
+          -BranchName $env:FLOW_RELEASE_REF
+          -RequestedVersion $env:FLOW_RELEASE_VERSION
+          -RequireVersionMatch
+
+      - name: Restore
+        run: dotnet restore Flow.sln
+
+      - name: Verify formatting
+        run: dotnet format Flow.sln --verify-no-changes --no-restore
+
+      - name: Verify bilingual documentation
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-documentation.ps1
+
+      - name: Build
+        run: dotnet build Flow.sln --no-restore
+
+      - name: Test
+        run: dotnet test Flow.sln --no-build
+
+      - name: Smoke test packaged CLI
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/smoke-test-cli.ps1 -Configuration Release
+
+  build:
+    name: Build draft artifacts
+    needs: [resolve, validate]
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout requested source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.source_revision }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore Flow.sln
+
+      - name: Build and validate release artifacts
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/build-release-artifacts.ps1 -Configuration Release
+
+      - name: Produce versioned dry-run evidence
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/invoke-release-dry-run.ps1
+
+      - name: Store draft candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: draft-release-candidate
+          path: artifacts/release
+          if-no-files-found: error
+          retention-days: 7
+
+  create-draft:
+    name: Create draft GitHub Release
+    needs: [resolve, build]
+    runs-on: ubuntu-latest
+    environment: draft-release
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout requested source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.source_revision }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Download validated candidate
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: draft-release-candidate
+          path: artifacts/release
+
+      - name: Create draft release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FLOW_RELEASE_VERSION: ${{ inputs.version }}
+        run: |
+          $plan = Get-Content -LiteralPath ./eng/release-plan.json -Raw | ConvertFrom-Json
+          if ($plan.packageVersion -ne $env:FLOW_RELEASE_VERSION -or
+              $plan.tag -ne "v$env:FLOW_RELEASE_VERSION" -or
+              $plan.githubRelease -ne 'draft-only') {
+              throw 'The downloaded candidate no longer matches the checked-in draft release plan.'
+          }
+          $evidence = Get-Content -LiteralPath ./artifacts/release/release-evidence.json -Raw | ConvertFrom-Json
+          $revision = (git rev-parse HEAD).Trim()
+          if ($evidence.sourceRevision -ne $revision -or
+              $evidence.sourceState -ne 'clean' -or
+              -not $evidence.releaseReady -or
+              $evidence.publicationPerformed) {
+              throw 'The release evidence is not bound to this clean, validated source revision.'
+          }
+          gh release view $plan.tag *> $null
+          if ($LASTEXITCODE -eq 0) {
+              throw "Release or draft already exists for $($plan.tag)."
+          }
+          $arguments = @(
+              'release', 'create', $plan.tag,
+              './artifacts/release/*',
+              '--draft',
+              '--generate-notes',
+              '--target', $revision,
+              '--title', "Flow Engine .NET $($plan.packageVersion)"
+          )
+          if ($plan.channel -eq 'prerelease') {
+              $arguments += '--prerelease'
+          }
+          & gh @arguments
+          if ($LASTEXITCODE -ne 0) {
+              throw 'GitHub did not create the draft release.'
+          }

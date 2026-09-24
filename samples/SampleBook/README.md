@@ -115,7 +115,7 @@ Validation checks stable IDs, hierarchy, heading levels, figure assets, footnote
 dotnet run --project src/Flow.Cli -- hash samples/SampleBook/sample.flow.json
 ```
 
-Expected evidence for `0.2.0-alpha.1`:
+Expected evidence for the current sample document:
 
 ```text
 Hash: SHA-256:1190B819D30D2ACFFE6B1B97CB961BAAD280AE03845BBFAAED8ADF9A4CD08452

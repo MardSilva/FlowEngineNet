@@ -16,7 +16,7 @@ The project is not a replacement for PDF or EPUB. Version 0.1 tests engine found
 
 ## Current milestone
 
-The current development milestone is **`0.2.0-alpha.1`**, focused on real EPUB workflows.
+The current development milestone is **`0.2.0-alpha.2`**, focused on real EPUB workflows and the optional interactive CLI experience.
 
 Implemented:
 
@@ -219,14 +219,20 @@ The qualified fixtures and the locally supplied real publication now complete th
 
 ## CLI quick start
 
-The CLI keeps command names, option names, JSON fields and diagnostic codes invariant. Human-readable help, CLI errors, labels and summaries can be selected with the global `--language` option. The first catalogs are `en-US` and `pt-BR`; omitting the option selects `en-US`, while an unsupported value is rejected with an English fallback error. `--banner` adds an optional FIGlet-style ASCII heading, while normal output remains plain and contains no required ANSI color sequences:
+The CLI keeps command names, option names, JSON fields and diagnostic codes invariant. Human-readable help, errors, labels and summaries can be selected with the global `--language` option. The first catalogs are `en-US` and `pt-BR`; omitting the option selects `en-US`, while an unsupported value is rejected with an English fallback error. `--banner` adds an optional FIGlet-style ASCII heading.
 
 ```powershell
 dotnet run --project src/Flow.Cli -- --language pt-BR --banner help
 dotnet run --project src/Flow.Cli -- --language en-US --no-color help
+dotnet run --project src/Flow.Cli -- --plain help import
+dotnet run --project src/Flow.Cli -- --language pt-BR --banner menu
 ```
 
-Global options must precede the command. The banner can accompany any operation:
+On a compatible interactive terminal, `help` uses a responsive Rich presentation and `menu` opens the optional keyboard-driven assistants. `flow help <command>` and `flow <command> --help` show the complete contract for one command. The menu calls those same typed commands; it does not replace direct use or automation.
+
+Global options must precede the command. `--plain` forces deterministic text without color, animation, cursor movement, or box-drawing characters. Use it for screen readers and limited terminals. `--no-color` and `NO_COLOR` preserve the Rich layout but remove color. Redirected output and terminals without the required capabilities fall back to Plain automatically. These choices affect terminal presentation only, never generated documents, reports, canonical bytes, or hashes.
+
+The banner can accompany any operation:
 
 ```powershell
 dotnet run --project src/Flow.Cli -- --language pt-BR --banner epub-inspect C:\books\book.epub
@@ -240,7 +246,7 @@ The repository can also build `Flow.Cli` as the local .NET tool `FlowEngineNet.T
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\eng\smoke-test-cli.ps1 -Configuration Release
 ```
 
-On PowerShell 7, including Linux, use `pwsh` instead of `powershell.exe`. A successful run leaves its report and package under `artifacts/cli-smoke/`, which is ignored by Git. GitHub Actions runs the same smoke test on Windows and Ubuntu after restore, formatting, build and tests.
+On PowerShell 7, including Linux, use `pwsh` instead of `powershell.exe`. A successful run leaves its report and package under `artifacts/cli-smoke/`, which is ignored by Git. The smoke checks Plain and command-specific help, the `pt-BR` catalog, ANSI-free redirected output, Spectre.Console package dependencies, safe menu refusal without an interactive terminal, and the sample document workflow. GitHub Actions runs it on Windows and Ubuntu after restore, formatting, build and tests.
 
 This check requires the .NET 10 SDK selected by `global.json`. It proves that the locally built framework-dependent package can be installed, started and used for the basic document workflow; it is not a signed release or an operating-system installer.
 
@@ -259,6 +265,10 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\eng\invoke-release-dry
 ```
 
 The plan explicitly disables publication. After the ordinary Windows/Linux validation matrix passes, CI builds one canonical candidate on Ubuntu and retains it for one day. Ubuntu and Windows then install and exercise that exact `.nupkg`; a final job requires both validation reports to name the same revision, SDK, package identity and SHA-256. The candidate is transferred only between workflow jobs and is never published to NuGet, attached to a GitHub Release or associated with a created tag.
+
+Branches named `feature/<version>-<description>` or `release/<version>` are inspected by CI. The release-proposal job compares the branch version with MSBuild and `eng/release-plan.json`, then writes a neutral suggestion to the job summary. Feature branches can suggest a candidate but cannot create a release.
+
+The separate **Draft release** workflow is manual. It accepts only synchronized `main` or `release/<version>` sources, repeats validation on Windows and Ubuntu, and requires the explicit `CREATE_DRAFT_RELEASE` choice. It creates a draft GitHub Release and attaches the local package, SBOM, checksums, manifest, and provenance evidence. It does not publish to NuGet and never makes the GitHub Release public automatically. Configure required reviewers on the `draft-release` GitHub environment if a second approval is desired.
 
 Global options must appear before the command. They affect terminal text only: generated `.flow.json`, evidence JSON, canonical bytes, hashes and stable diagnostic codes do not change. In `pt-BR`, every current EPUB, document-validation and Flow JSON code receives a short Portuguese summary followed by its original technical detail. This keeps paths, IDs and rejected values available for troubleshooting without changing deterministic reports.
 

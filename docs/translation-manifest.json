@@ -6,7 +6,7 @@
     {
       "source": "README.md",
       "translation": "README.pt-BR.md",
-      "sourceSha256": "B1A94BD35A1EF8C38196D044397E79EBFEDB43A18F6064AD95DFFB63DBD0185A"
+      "sourceSha256": "314163999FB6205C5038FAA6210BA3A2AC7894C483DBC53FDA1FB9D651235F7B"
     },
     {
       "source": "docs/0.1-release-review.md",
@@ -36,7 +36,7 @@
     {
       "source": "docs/cli.md",
       "translation": "docs/pt-BR/cli.md",
-      "sourceSha256": "EBE2F8F67EA9BA6128F76D48F3C381DAD65122FF823655DAC0353DD9EE2007DC"
+      "sourceSha256": "42C1D95E47BD066D206FF02A4CF54720FD458274EDC8F0F531BF2D88BB04E01D"
     },
     {
       "source": "docs/conformance.md",
@@ -86,12 +86,12 @@
     {
       "source": "docs/known-limitations.md",
       "translation": "docs/pt-BR/known-limitations.md",
-      "sourceSha256": "3FBE9719A67C5B2EF851A453DBDA368B0BF41B59EBCE5D1CA03D67860808E2BC"
+      "sourceSha256": "377D22A0F6A9161EDF9B0A77C05AECA17F5D426A0AE86DE422673CCC5B212910"
     },
     {
       "source": "docs/release-artifacts.md",
       "translation": "docs/pt-BR/release-artifacts.md",
-      "sourceSha256": "2D19F0070DF2BD2537915AE52B41377C1345FFDC7EEFE2CBC8D242CD0A63304B"
+      "sourceSha256": "7A2F9BF23D803D94F197FB3284DF6EA18DF0347764340C94A40C2EDFB4E80BC8"
     },
     {
       "source": "docs/research-findings.md",
@@ -101,7 +101,7 @@
     {
       "source": "docs/resolved-limitations.md",
       "translation": "docs/pt-BR/resolved-limitations.md",
-      "sourceSha256": "FBD321DBD2898BE78B10A0F6879FB3BA7432312A323C251BFA101CB7A769F9CD"
+      "sourceSha256": "44D99EA8F8DCA753A9339F765706414F536D2F81EA5EE3220A8EB64744688BF8"
     },
     {
       "source": "docs/roadmap.md",
@@ -121,7 +121,7 @@
     {
       "source": "samples/SampleBook/README.md",
       "translation": "samples/SampleBook/README.pt-BR.md",
-      "sourceSha256": "4D1C9F32C2AE01AFD515123AF8DA4FD411668F3DABDE75B0829751365C8D03B9"
+      "sourceSha256": "B5DC98A6DCD8D30E187F21F071429D0CB951BF33C8910D6A9DFF7D2B1909F3FC"
     }
   ]
 }

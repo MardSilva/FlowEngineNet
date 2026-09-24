@@ -14,7 +14,7 @@ O projeto não substitui PDF nem EPUB. A versão atual testa a base do motor e u
 
 ## Marco atual
 
-O marco em desenvolvimento é o **`0.2.0-alpha.1`**, dedicado a fluxos EPUB reais.
+O marco em desenvolvimento é o **`0.2.0-alpha.2`**, dedicado a fluxos EPUB reais e à experiência interativa opcional da CLI.
 
 Já estão implementados:
 
@@ -71,18 +71,28 @@ dotnet test Flow.sln --no-build
 pwsh -NoProfile -File ./eng/test-documentation.ps1
 ```
 
-O CI executa restore, formatação, documentação, build, testes e smoke test da CLI em Windows e Ubuntu. Os artefatos continuam locais; nada é publicado no NuGet ou em GitHub Releases.
+O CI executa restore, formatação, documentação, build, testes e smoke test da CLI em Windows e Ubuntu. O fluxo normal não publica no NuGet nem cria GitHub Release; a criação de um draft pertence ao workflow manual descrito abaixo.
+
+Branches no formato `feature/<versão>-<descrição>` ou `release/<versão>` recebem uma proposta automática no resumo do CI. A versão da branch é comparada com MSBuild e `eng/release-plan.json`. Uma feature pode sugerir um candidato, mas não cria release.
+
+O workflow manual **Draft release** aceita somente `main` ou `release/<versão>` sincronizada. Ele repete a validação em Windows e Ubuntu e exige a confirmação `CREATE_DRAFT_RELEASE`. Se tudo passar, cria um rascunho de GitHub Release com pacote, SBOM, checksums, manifesto e proveniência. Não publica no NuGet nem torna a release pública. Para exigir uma segunda aprovação, configure revisores no environment `draft-release` do GitHub.
 
 ## Início rápido da CLI
 
-Comandos, opções, campos JSON e códigos diagnósticos permanecem em inglês. A opção global `--language` muda apenas os textos para pessoas. Os catálogos atuais são `en-US` e `pt-BR`; sem a opção, a CLI usa `en-US`.
+Comandos, opções, campos JSON e códigos diagnósticos permanecem em inglês. A opção global `--language` muda apenas os textos apresentados às pessoas. Os catálogos atuais são `en-US` e `pt-BR`; sem a opção, a CLI usa `en-US`.
 
 ```powershell
 dotnet run --project src/Flow.Cli -- --language pt-BR --banner help
 dotnet run --project src/Flow.Cli -- --language en-US --no-color help
+dotnet run --project src/Flow.Cli -- --plain help import
+dotnet run --project src/Flow.Cli -- --language pt-BR --banner menu
 ```
 
-As opções globais aparecem antes do comando. `--banner` exibe o cabeçalho ASCII opcional e não altera arquivos gerados, bytes canônicos ou hashes.
+Em um terminal interativo compatível, `help` usa uma apresentação rica e responsiva. `menu` abre os assistentes opcionais com navegação pelo teclado. `flow help <comando>` e `flow <comando> --help` mostram o contrato completo de um comando. O menu chama os mesmos comandos tipados; ele não substitui o uso direto nem a automação.
+
+As opções globais aparecem antes do comando. `--plain` força texto determinístico, sem cor, animação, movimento do cursor ou caracteres de moldura. É a opção indicada para leitores de tela e terminais limitados. `--no-color` e `NO_COLOR` mantêm a organização da interface rica, mas retiram as cores. Saída redirecionada e terminais sem os recursos necessários usam Plain automaticamente. Essas escolhas mudam somente a apresentação no terminal, nunca documentos, relatórios, bytes canônicos ou hashes.
+
+`--banner` exibe o cabeçalho ASCII opcional e pode acompanhar qualquer operação.
 
 ### Importar um EPUB
 

@@ -106,6 +106,9 @@ if ($plan.format -ne 'flow-cli-release-plan-0.1') {
 if ($plan.publication -ne 'disabled') {
     throw 'This dry-run accepts only a release plan with publication set to disabled.'
 }
+if ($plan.githubRelease -ne 'draft-only') {
+    throw 'This dry-run accepts only a release plan restricted to draft GitHub releases.'
+}
 if ([string]::IsNullOrWhiteSpace($plan.packageId) -or
     $plan.packageVersion -notmatch '^[0-9]+\.[0-9]+\.[0-9]+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$') {
     throw 'The release plan package identity or semantic version is invalid.'
