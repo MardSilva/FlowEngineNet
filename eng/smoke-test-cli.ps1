@@ -158,7 +158,8 @@ try {
         $packageArchive.Dispose()
     }
 
-    $installedSpectreAssembly = Get-ChildItem -LiteralPath $toolDirectory -Filter 'Spectre.Console.dll' -File -Recurse |
+    # Include the .store directory, which is hidden on Unix.
+    $installedSpectreAssembly = Get-ChildItem -LiteralPath $toolDirectory -Filter 'Spectre.Console.dll' -File -Recurse -Force |
         Select-Object -First 1
     if ($null -eq $installedSpectreAssembly) {
         throw 'Spectre.Console.dll was not restored into the isolated tool installation.'
