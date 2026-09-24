@@ -108,6 +108,10 @@ jobs:
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-documentation.ps1
 
+      - name: Verify editorial release introduction
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-release-introduction.ps1
+
       - name: Build
         run: dotnet build Flow.sln --no-restore
 
@@ -200,11 +204,19 @@ jobs:
           if ($LASTEXITCODE -eq 0) {
               throw "Release or draft already exists for $($plan.tag)."
           }
+          $notesPath = Join-Path $env:GITHUB_WORKSPACE 'artifacts/release-notes/release-introduction.md'
+          & ./eng/new-release-introduction.ps1 `
+            -Version $env:FLOW_RELEASE_VERSION `
+            -OutputPath $notesPath | Out-Null
+          $releaseIntroduction = Get-Content -LiteralPath $notesPath -Raw -Encoding UTF8
           $arguments = @(
               'release', 'create', $plan.tag,
               './artifacts/release/*',
               '--draft',
               '--generate-notes',
+              '--notes', $releaseIntroduction,
+              '--fail-on-no-commits',
+              '--latest=false',
               '--target', $revision,
               '--title', "Flow Engine .NET $($plan.packageVersion)"
           )

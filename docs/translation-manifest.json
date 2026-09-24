@@ -6,7 +6,7 @@
     {
       "source": "README.md",
       "translation": "README.pt-BR.md",
-      "sourceSha256": "314163999FB6205C5038FAA6210BA3A2AC7894C483DBC53FDA1FB9D651235F7B"
+      "sourceSha256": "7D488E4A0B62FC9A2CABFC1E07F61B4698971EEDAED3879ECFCF10F5BD4BEA13"
     },
     {
       "source": "docs/0.1-release-review.md",
@@ -91,7 +91,7 @@
     {
       "source": "docs/release-artifacts.md",
       "translation": "docs/pt-BR/release-artifacts.md",
-      "sourceSha256": "7A2F9BF23D803D94F197FB3284DF6EA18DF0347764340C94A40C2EDFB4E80BC8"
+      "sourceSha256": "A699F55A38F88E428D85D3F71E56CFA2A9079C9A6C32F815C2F54DCCEEBF7BFD"
     },
     {
       "source": "docs/research-findings.md",

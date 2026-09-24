@@ -14,7 +14,7 @@ O projeto não substitui PDF nem EPUB. A versão atual testa a base do motor e u
 
 ## Marco atual
 
-O marco em desenvolvimento é o **`0.2.0-alpha.2`**, dedicado a fluxos EPUB reais e à experiência interativa opcional da CLI.
+O marco em desenvolvimento é o **`0.2.0-alpha.3`**. A prerelease mais recente é a [`v0.2.0-alpha.2`](https://github.com/MardSilva/FlowEngineNet/releases/tag/v0.2.0-alpha.2).
 
 Já estão implementados:
 
@@ -75,7 +75,7 @@ O CI executa restore, formatação, documentação, build, testes e smoke test d
 
 Branches no formato `feature/<versão>-<descrição>` ou `release/<versão>` recebem uma proposta automática no resumo do CI. A versão da branch é comparada com MSBuild e `eng/release-plan.json`. Uma feature pode sugerir um candidato, mas não cria release.
 
-O workflow manual **Draft release** aceita somente `main` ou `release/<versão>` sincronizada. Ele repete a validação em Windows e Ubuntu e exige a confirmação `CREATE_DRAFT_RELEASE`. Se tudo passar, cria um rascunho de GitHub Release com pacote, SBOM, checksums, manifesto e proveniência. Não publica no NuGet nem torna a release pública. Para exigir uma segunda aprovação, configure revisores no environment `draft-release` do GitHub.
+O workflow manual **Draft release** aceita somente `main` ou `release/<versão>` sincronizada. Ele repete a validação em Windows e Ubuntu e exige a confirmação `CREATE_DRAFT_RELEASE`. Se tudo passar, cria um rascunho com introdução editorial bilíngue, mudanças automáticas categorizadas, instruções de instalação e os arquivos validados: pacote, SBOM, checksums, manifesto e proveniência. Prereleases não recebem a posição `Latest`. O workflow não publica no NuGet nem torna a release pública. Para exigir uma segunda aprovação, configure revisores no environment `draft-release` do GitHub.
 
 ## Início rápido da CLI
 
