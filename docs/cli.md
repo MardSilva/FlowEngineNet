@@ -18,7 +18,7 @@ Use `pwsh` on PowerShell 7 or Linux. The script obtains the package identity fro
 
 The deterministic summary is written to `artifacts/cli-smoke/smoke-result.json`; build products remain under the ignored `artifacts/` directory. The script requires the .NET 10 SDK selected by `global.json`. It does not publish, sign or install a machine-wide tool.
 
-There is no MSI or graphical installer yet. For local development, you can install the current build in your user profile as a global .NET tool:
+A local, unsigned per-user MSI can now be built on Windows, but it is not attached to a public release yet. See [Windows distribution](windows-distribution.md). For cross-platform development, you can still install the current build in your user profile as a global .NET tool:
 
 ```powershell
 $packageDirectory = Join-Path $PWD "artifacts/local-tool"

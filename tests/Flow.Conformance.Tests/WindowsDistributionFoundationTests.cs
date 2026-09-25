@@ -9,6 +9,7 @@ namespace Flow.Conformance.Tests;
 public sealed class WindowsDistributionFoundationTests
 {
     private const string UpgradeCode = "{C412C622-FA2F-400C-88EE-BA5D4A573F7D}";
+    private const string ProductCode = "{D4F3061D-355D-4DFC-8814-A99165AEEA42}";
     private static readonly IReadOnlyDictionary<string, string> ExpectedSourceHashes =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -94,6 +95,8 @@ public sealed class WindowsDistributionFoundationTests
         Assert.Equal("0.2.3", properties["FlowWindowsInstallerVersion"]);
         Assert.Equal(UpgradeCode, properties["FlowWindowsUpgradeCode"]);
         Assert.True(Guid.TryParse(properties["FlowWindowsUpgradeCode"], out _));
+        Assert.Equal(ProductCode, properties["FlowWindowsProductCode"]);
+        Assert.True(Guid.TryParse(properties["FlowWindowsProductCode"], out _));
         Assert.Equal("win-x64", properties["FlowWindowsRuntimeIdentifier"]);
         Assert.Equal("x64", properties["FlowWindowsArchitecture"]);
         Assert.Equal("perUser", properties["FlowWindowsInstallScope"]);
@@ -119,6 +122,95 @@ public sealed class WindowsDistributionFoundationTests
         Assert.Contains("FlowDocuments", preserved);
         Assert.Contains("Books", preserved);
         Assert.Contains("Preferences", preserved);
+    }
+
+    [Fact]
+    public void WindowsPortableContract_IsSelfContainedSingleFileAndAuditable()
+    {
+        var root = FindRepositoryRoot();
+        var windowsProperties = XDocument.Load(Path.Combine(root, "eng", "Flow.WindowsProduct.props"));
+        var properties = windowsProperties.Descendants("PropertyGroup").Elements()
+            .Where(static element => element.Name.LocalName is not "FlowPublicVersion")
+            .ToDictionary(static element => element.Name.LocalName, static element => element.Value, StringComparer.Ordinal);
+        var cliProject = XDocument.Load(Path.Combine(root, "src", "Flow.Cli", "Flow.Cli.csproj"));
+        var buildScript = File.ReadAllText(Path.Combine(root, "eng", "build-windows-portable.ps1"));
+        var testScript = File.ReadAllText(Path.Combine(root, "eng", "test-windows-portable.ps1"));
+
+        Assert.Equal("flow-windows-portable-0.1", properties["FlowWindowsPortableFormat"]);
+        Assert.Equal("true", properties["FlowWindowsPortableSingleFile"]);
+        Assert.Equal("true", properties["FlowWindowsPortableSelfContained"]);
+        Assert.Contains(
+            cliProject.Descendants("ApplicationIcon"),
+            static icon => icon.Value.EndsWith("assets\\branding\\windows\\flow.ico", StringComparison.Ordinal));
+
+        Assert.Contains("--self-contained', 'true'", buildScript, StringComparison.Ordinal);
+        Assert.Contains("-p:PublishSingleFile=true", buildScript, StringComparison.Ordinal);
+        Assert.Contains("-p:IncludeAllContentForSelfExtract=false", buildScript, StringComparison.Ordinal);
+        Assert.Contains("New-DeterministicZip", buildScript, StringComparison.Ordinal);
+        Assert.Contains("CycloneDX", buildScript, StringComparison.Ordinal);
+        Assert.Contains("SHA256SUMS", buildScript, StringComparison.Ordinal);
+        Assert.Contains("LICENSE.txt", buildScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("C:\\Users\\", buildScript, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Contains("DOTNET_ROOT", testScript, StringComparison.Ordinal);
+        Assert.Contains("FLOWCLI_MENU_REQUIRES_INTERACTIVE", testScript, StringComparison.Ordinal);
+        Assert.Contains("render-html", testScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("eym_s", testScript, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void WindowsInstallerContract_IsPerUserUpgradeableAndSafelyRemovable()
+    {
+        var root = FindRepositoryRoot();
+        var packagePath = Path.Combine(root, "installer", "Flow.WindowsInstaller", "Package.wxs");
+        var projectPath = Path.Combine(root, "installer", "Flow.WindowsInstaller", "Flow.WindowsInstaller.wixproj");
+        var package = XDocument.Load(packagePath);
+        var project = XDocument.Load(projectPath);
+        var windowsProperties = XDocument.Load(Path.Combine(root, "eng", "Flow.WindowsProduct.props"));
+        var packageElement = package.Descendants().Single(static element => element.Name.LocalName == "Package");
+        var source = File.ReadAllText(packagePath);
+        var buildScript = File.ReadAllText(Path.Combine(root, "eng", "build-windows-installer.ps1"));
+        var testScript = File.ReadAllText(Path.Combine(root, "eng", "test-windows-installer.ps1"));
+
+        Assert.Equal("WixToolset.Sdk/4.0.6", (string?)project.Root?.Attribute("Sdk"));
+        Assert.Contains(
+            project.Descendants("PackageReference"),
+            static reference => (string?)reference.Attribute("Include") == "WixToolset.UI.wixext");
+        Assert.Equal("perUser", (string?)packageElement.Attribute("Scope"));
+        Assert.Equal("500", (string?)packageElement.Attribute("InstallerVersion"));
+        Assert.Equal("$(var.ProductCode)", (string?)packageElement.Attribute("ProductCode"));
+        Assert.Contains("<MajorUpgrade", source, StringComparison.Ordinal);
+        Assert.Contains("IgnoreLanguage=\"yes\"", source, StringComparison.Ordinal);
+        Assert.Contains("DowngradeErrorMessage", source, StringComparison.Ordinal);
+        Assert.Contains("LocalAppDataFolder", source, StringComparison.Ordinal);
+        Assert.Contains("Name=\"PATH\"", source, StringComparison.Ordinal);
+        Assert.Contains("System=\"no\"", source, StringComparison.Ordinal);
+        Assert.Contains("Permanent=\"no\"", source, StringComparison.Ordinal);
+        Assert.Contains("ARPPRODUCTICON", source, StringComparison.Ordinal);
+        Assert.Contains("ARPINSTALLLOCATION", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("ARPSYSTEMCOMPONENT", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Shortcut", source, StringComparison.Ordinal);
+        Assert.DoesNotContain("Extension", source, StringComparison.Ordinal);
+
+        Assert.Contains("WixToolset.Sdk", buildScript, StringComparison.Ordinal);
+        Assert.Contains(
+            windowsProperties.Descendants("FlowWindowsInstallerToolLicense"),
+            static license => license.Value == "MS-RL");
+        Assert.Contains("flow-windows-installer-0.1", buildScript, StringComparison.Ordinal);
+        Assert.Contains("FlowWindowsProductCode", buildScript, StringComparison.Ordinal);
+        Assert.Contains("Major upgrade", testScript, StringComparison.Ordinal);
+        Assert.Contains("downgrade-refused", testScript, StringComparison.Ordinal);
+        Assert.Contains("path-preserved", testScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("eym_s", buildScript, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("eym_s", testScript, StringComparison.OrdinalIgnoreCase);
+
+        foreach (var culture in new[] { "en-US", "pt-BR" })
+        {
+            var localization = XDocument.Load(Path.Combine(root, "installer", "Flow.WindowsInstaller", $"Installer.{culture}.wxl"));
+            Assert.Equal(culture, (string?)localization.Root?.Attribute("Culture"));
+            Assert.Contains(localization.Descendants(), static element =>
+                element.Name.LocalName == "String" && (string?)element.Attribute("Id") == "DowngradeError");
+        }
     }
 
     [Fact]

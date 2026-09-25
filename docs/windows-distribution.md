@@ -24,6 +24,68 @@ The generator verifies the source hashes, crops only transparent padding, preser
 
 GDI+ is the pinned renderer for this engineering step, so regeneration is supported only on Windows. Committed derivatives can be consumed and verified on other systems. Windows tests regenerate them in a temporary directory and require byte-for-byte agreement; no extra runtime graphics package is added to the Flow engine.
 
+## Portable win-x64 distribution
+
+The first runnable Windows artifact is a self-contained `win-x64` ZIP. It does not require a separately installed .NET SDK or runtime and does not modify the registry, `PATH`, Start menu or installed-program list. Extract the archive to a local directory and run `flow.exe` from there.
+
+Build it from the repository root with PowerShell 7:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/build-windows-portable.ps1
+```
+
+The output is written atomically to `artifacts/windows-portable/`. An existing destination is rejected unless `-Force` is supplied. The directory contains the versioned ZIP, `portable-manifest.json`, a CycloneDX 1.5 SBOM and `SHA256SUMS`. The ZIP itself contains only `flow.exe`, `LICENSE.txt` and `VERSION.json`.
+
+The builder publishes the application twice and compares every payload file and the two normalized archives. ZIP entries use ordinal ordering, a fixed timestamp and neutral external attributes. The manifest and version document record the public version, exact Git revision, RID, architecture, localization catalogs and deployment mode without timestamps or local paths.
+
+Run the installed-artifact smoke test with:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-portable.ps1
+```
+
+The test validates checksums and the SBOM, extracts the ZIP to an isolated temporary directory, removes .NET locations from the child process environment, and exercises English and Brazilian Portuguese help, safe redirected-menu refusal, sample creation, inspection, validation and HTML rendering. Redirected output must contain no ANSI escape sequences.
+
+### Single-file decision
+
+`PublishSingleFile` is enabled because the current CLI, Spectre.Console dependency and both localization catalogs work without sidecar assemblies. `IncludeNativeLibrariesForSelfExtract` and `IncludeAllContentForSelfExtract` remain disabled: the package does not request extraction of its full contents to a temporary directory. If a later dependency cannot meet these conditions, the project will prefer a reviewed multi-file payload over hidden extraction.
+
+The CycloneDX document is derived from the RID-specific dependency graph created by publish. It covers Flow assemblies, Spectre.Console and the bundled .NET runtime pack. All currently shipped components use the MIT license. The SBOM does not describe Windows system libraries, the build host, test-only dependencies or GitHub Actions.
+
+## Per-user MSI
+
+The repository can also build localized `en-US` and `pt-BR` MSI packages. They are language alternatives for the same release, not packages to install side by side. Both install the same reviewed self-contained payload under `%LocalAppData%\Programs\FlowEngineNet`, add that directory to the current user's `PATH`, and register Flow in Installed Apps and Programs and Features. No administrator elevation is intended. Open a new terminal after installation before running `flow` by name.
+
+Build both variants with:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/build-windows-installer.ps1
+```
+
+The output under `artifacts/windows-installer/` contains both MSI files, SHA-256 checksums, an installer manifest and a CycloneDX document. Existing output is rejected unless `-Force` is supplied. The MSI is unsigned and experimental; Windows may display an unknown-publisher or SmartScreen warning.
+
+For an unattended installation:
+
+```powershell
+msiexec.exe /i ".\FlowEngineNet.Setup.0.2.0-alpha.3.en-US.win-x64.msi" /qn /norestart
+```
+
+Windows Installer owns repair, upgrade and removal. A repair can be requested with `msiexec.exe /fa <product-code> /qn /norestart`; normal removal should use Windows Installed Apps or Programs and Features. Both localized variants of this release share one fixed `ProductCode`. A future public MSI release must use a new `ProductCode`, keep the permanent `UpgradeCode`, and increase the numeric installer version. This allows a major upgrade to replace the older release and blocks installation of a lower version over a newer one.
+
+The uninstaller removes `flow.exe`, its license and version document, the product registration and only the `PATH` segment created by this MSI. It does not know about or remove books, configured directories, `.flow.json` documents, reports, exports or preferences. There are no Start menu shortcuts and no `.epub` or `.flow.json` associations in this release.
+
+Run the destructive installation test only on Windows:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-installer.ps1
+```
+
+The test uses random product, upgrade, component, registry and directory identities. It never addresses the production product code or an existing personal installation. Within that isolated identity it verifies clean installation, execution without .NET on `PATH`, repair, major upgrade, downgrade rejection and uninstallation. The test also uses a directory containing spaces and Unicode and requires the original user `PATH` to be restored exactly.
+
+The installer is built with WiX Toolset 4.0.6, fixed in the project and licensed under MS-RL. WiX 6 and 7 were not selected because their current distribution adds a separate Open Source Maintenance Fee EULA. WiX is a build-time tool and is not installed with Flow. Its version, license and excluded build-tool role are recorded in the installer SBOM. The MSI uses the standard Windows Installer registration and major-upgrade mechanisms described by [Microsoft](https://learn.microsoft.com/en-us/windows/win32/msi/configuring-add-remove-programs-with-windows-installer) and [WiX](https://docs.firegiant.com/wix/schema/wxs/majorupgrade/).
+
+The MSI is built once for each release candidate and then identified by its checksum. Rebuilding the same source is not expected to reproduce identical MSI bytes because Windows Installer packages require package-level identity metadata for each build. The portable ZIP remains the byte-reproducible Windows artifact; the MSI manifest records the fixed product identity, source revision and payload version used for the installer.
+
 ## Current boundary
 
-This foundation does not yet publish a self-contained executable, MSI, MSIX, graphical application or file association. It does not install or remove anything from the developer's machine. Installer creation, installed-package upgrade tests and GitHub Release integration remain separate increments.
+The portable ZIP and MSI are local, unsigned development artifacts; neither is attached to a GitHub Release yet. There is still no MSIX, graphical application or file association. Automated release integration, code signing and update discovery remain separate increments.

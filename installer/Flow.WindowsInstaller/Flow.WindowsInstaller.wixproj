@@ -1,0 +1,34 @@
+<Project Sdk="WixToolset.Sdk/4.0.6">
+
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <Platform>x64</Platform>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <Cultures>$(InstallerCulture)</Cultures>
+    <OutputName>$(InstallerOutputName)</OutputName>
+    <DefineConstants>
+      PayloadDirectory=$(PayloadDirectory);
+      ProductName=$(ProductName);
+      Manufacturer=$(Manufacturer);
+      SupportUrl=$(SupportUrl);
+      PublicVersion=$(PublicVersion);
+      InstallerVersion=$(InstallerVersion);
+      UpgradeCode=$(UpgradeCode);
+      ProductCode=$(ProductCode);
+      ExecutableComponentGuid=$(ExecutableComponentGuid);
+      ProductLanguage=$(ProductLanguage);
+      InstallDirectoryName=$(InstallDirectoryName);
+      ProductRegistryKey=$(ProductRegistryKey);
+      ProductIcon=$(ProductIcon);
+      LicenseRtf=$(LicenseRtf)
+    </DefineConstants>
+    <SuppressValidation>false</SuppressValidation>
+    <!-- ICE64/ICE91 do not model this fixed per-user LocalAppData package correctly. -->
+    <SuppressIces>ICE64;ICE91</SuppressIces>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" />
+  </ItemGroup>
+
+</Project>

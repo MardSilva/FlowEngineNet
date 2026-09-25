@@ -6,7 +6,7 @@
 
 ## Instalação local no perfil do usuário
 
-Ainda não existe MSI nem instalador gráfico. Durante o desenvolvimento, você pode empacotar a versão atual e instalá-la como uma ferramenta .NET no seu perfil:
+Já é possível gerar no Windows um MSI local por utilizador, ainda sem assinatura e fora da release pública. Consulte [distribuição para Windows](windows-distribution.md). Para desenvolvimento multiplataforma, a versão atual também pode ser instalada como ferramenta .NET no seu perfil:
 
 ```powershell
 $packageDirectory = Join-Path $PWD "artifacts/local-tool"

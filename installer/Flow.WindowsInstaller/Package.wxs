@@ -1,0 +1,65 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="$(var.ProductName)"
+           Manufacturer="$(var.Manufacturer)"
+           Version="$(var.InstallerVersion)"
+           ProductCode="$(var.ProductCode)"
+           UpgradeCode="$(var.UpgradeCode)"
+           Language="$(var.ProductLanguage)"
+           Codepage="65001"
+           InstallerVersion="500"
+           Compressed="yes"
+           Scope="perUser">
+
+    <SummaryInformation Description="!(loc.ProductDescription)"
+                        Manufacturer="$(var.Manufacturer)" />
+    <MajorUpgrade DowngradeErrorMessage="!(loc.DowngradeError)"
+                  IgnoreLanguage="yes"
+                  Schedule="afterInstallInitialize" />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="FlowProductIcon.ico" SourceFile="$(var.ProductIcon)" />
+    <Property Id="ARPPRODUCTICON" Value="FlowProductIcon.ico" />
+    <Property Id="ARPURLINFOABOUT" Value="$(var.SupportUrl)" />
+    <Property Id="ARPHELPLINK" Value="$(var.SupportUrl)" />
+    <Property Id="ARPCONTACT" Value="$(var.Manufacturer)" />
+    <Property Id="ARPCOMMENTS" Value="!(loc.ProductDescription) $(var.PublicVersion)" />
+    <SetProperty Id="ARPINSTALLLOCATION"
+                 Value="[INSTALLFOLDER]"
+                 Before="RegisterProduct"
+                 Sequence="execute" />
+
+    <StandardDirectory Id="LocalAppDataFolder">
+      <Directory Id="FlowProgramsFolder" Name="Programs">
+        <Directory Id="INSTALLFOLDER" Name="$(var.InstallDirectoryName)">
+          <Component Id="FlowExecutableComponent" Guid="$(var.ExecutableComponentGuid)">
+            <File Id="FlowExecutable" Source="$(var.PayloadDirectory)\flow.exe" Checksum="yes" />
+            <File Id="FlowLicense" Source="$(var.PayloadDirectory)\LICENSE.txt" />
+            <File Id="FlowVersion" Source="$(var.PayloadDirectory)\VERSION.json" />
+            <RegistryValue Root="HKCU"
+                           Key="$(var.ProductRegistryKey)"
+                           Name="InstallPath"
+                           Type="string"
+                           Value="[INSTALLFOLDER]"
+                           KeyPath="yes" />
+            <Environment Id="FlowPathEnvironment"
+                         Name="PATH"
+                         Action="set"
+                         Part="last"
+                         Permanent="no"
+                         System="no"
+                         Value="[INSTALLFOLDER]" />
+            <RemoveFolder Id="RemoveFlowInstallFolder" On="uninstall" />
+          </Component>
+        </Directory>
+      </Directory>
+    </StandardDirectory>
+
+    <Feature Id="Complete" Title="!(loc.FeatureTitle)" Description="!(loc.FeatureDescription)" Level="1">
+      <ComponentRef Id="FlowExecutableComponent" />
+    </Feature>
+
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
+    <ui:WixUI Id="WixUI_Minimal" />
+  </Package>
+</Wix>

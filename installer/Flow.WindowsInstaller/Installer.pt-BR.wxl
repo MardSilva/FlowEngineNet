@@ -1,0 +1,6 @@
+<WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="pt-BR" Codepage="1252">
+  <String Id="ProductDescription" Value="Ferramentas experimentais para documentos semânticos Flow e processamento de EPUB." />
+  <String Id="DowngradeError" Value="Uma versão mais recente do Flow Engine .NET já está instalada." />
+  <String Id="FeatureTitle" Value="Ferramentas de linha de comando do Flow" />
+  <String Id="FeatureDescription" Value="Instala a CLI self-contained do Flow para o utilizador atual." />
+</WixLocalization>
