@@ -5,6 +5,8 @@ param(
 
     [string]$OutputDirectory,
 
+    [string]$PortableArtifactsDirectory,
+
     [switch]$Force
 )
 
@@ -189,9 +191,25 @@ try {
     }
     $sourceTreeDirty = $sourceStatus.Count -ne 0
 
-    & $portableBuilder -Configuration $Configuration -OutputDirectory $portableArtifacts
-    if ($LASTEXITCODE -ne 0) {
-        throw 'The existing Windows portable builder failed while producing the CLI payload.'
+    if ([string]::IsNullOrWhiteSpace($PortableArtifactsDirectory)) {
+        & $portableBuilder -Configuration $Configuration -OutputDirectory $portableArtifacts
+        if ($LASTEXITCODE -ne 0) {
+            throw 'The existing Windows portable builder failed while producing the CLI payload.'
+        }
+    }
+    else {
+        $suppliedPortable = [System.IO.Path]::GetFullPath($PortableArtifactsDirectory)
+        if (-not $suppliedPortable.StartsWith(
+                $allowedArtifactsRoot + [System.IO.Path]::DirectorySeparatorChar,
+                [System.StringComparison]::OrdinalIgnoreCase) -or
+            -not (Test-Path -LiteralPath $suppliedPortable -PathType Container)) {
+            throw "The supplied portable artifacts must be an existing directory below '$allowedArtifactsRoot'."
+        }
+        $portableItem = Get-Item -LiteralPath $suppliedPortable -Force
+        if (($portableItem.Attributes -band [System.IO.FileAttributes]::ReparsePoint) -ne 0) {
+            throw 'The supplied portable artifacts directory cannot be a reparse point.'
+        }
+        $portableArtifacts = $suppliedPortable
     }
     $portableZip = @(Get-ChildItem -LiteralPath $portableArtifacts -Filter '*.zip' -File)
     if ($portableZip.Count -ne 1) {

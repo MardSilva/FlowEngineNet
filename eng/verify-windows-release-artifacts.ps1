@@ -2,6 +2,7 @@
 param(
     [Parameter(Mandatory)][string]$CanonicalArtifactsDirectory,
     [Parameter(Mandatory)][string]$PortableArtifactsDirectory,
+    [Parameter(Mandatory)][string]$CombinedPayloadDirectory,
     [Parameter(Mandatory)][string]$InstallerArtifactsDirectory,
     [string]$OutputDirectory,
     [switch]$Force
@@ -79,6 +80,41 @@ function Test-Checksums {
     return @($entries | Sort-Object { $_.name })
 }
 
+function Test-CombinedPayloadChecksums {
+    param([Parameter(Mandatory)][string]$Directory)
+
+    $checksumsPath = Join-Path $Directory 'SHA256SUMS'
+    if (-not (Test-Path -LiteralPath $checksumsPath -PathType Leaf)) {
+        throw "Combined payload SHA256SUMS is missing: $checksumsPath"
+    }
+    $entries = @()
+    $names = [System.Collections.Generic.HashSet[string]]::new([System.StringComparer]::Ordinal)
+    foreach ($line in Get-Content -LiteralPath $checksumsPath -Encoding UTF8) {
+        if ([string]::IsNullOrWhiteSpace($line)) { continue }
+        if ($line -notmatch '^([0-9a-f]{64})  (.+)$') {
+            throw "Invalid combined payload SHA256SUMS entry: $line"
+        }
+        $name = $Matches[2].Replace('\', '/')
+        if ($name.StartsWith('/', [System.StringComparison]::Ordinal) -or
+            $name.Split('/') -contains '..' -or
+            -not $names.Add($name)) {
+            throw "Unsafe or duplicate combined payload checksum path: $name"
+        }
+        $path = Join-Path $Directory $name
+        if (-not (Test-Path -LiteralPath $path -PathType Leaf) -or (Get-Sha256Lower -Path $path) -ne $Matches[1]) {
+            throw "Combined payload checksum validation failed: $name"
+        }
+        $entries += [ordered]@{ name = $name; sha256 = $Matches[1]; bytes = (Get-Item -LiteralPath $path).Length }
+    }
+
+    $expected = @('combined-payload-manifest.json') + @(Get-ChildItem -LiteralPath (Join-Path $Directory 'payload') -File -Recurse |
+        ForEach-Object { [System.IO.Path]::GetRelativePath($Directory, $_.FullName).Replace('\', '/') })
+    if ([string]::Join("`n", @($names | Sort-Object)) -cne [string]::Join("`n", @($expected | Sort-Object))) {
+        throw 'Combined payload SHA256SUMS does not cover exactly the promoted artifact.'
+    }
+    return @($entries | Sort-Object { $_.name })
+}
+
 function Write-Utf8Lf {
     param([Parameter(Mandatory)][string]$Path, [Parameter(Mandatory)][string]$Content)
 
@@ -91,6 +127,7 @@ function Write-Utf8Lf {
 
 $canonicalRoot = Resolve-ArtifactDirectory -Path $CanonicalArtifactsDirectory -Description 'Canonical artifacts directory'
 $portableRoot = Resolve-ArtifactDirectory -Path $PortableArtifactsDirectory -Description 'Portable artifacts directory'
+$combinedRoot = Resolve-ArtifactDirectory -Path $CombinedPayloadDirectory -Description 'Combined payload directory'
 $installerRoot = Resolve-ArtifactDirectory -Path $InstallerArtifactsDirectory -Description 'Installer artifacts directory'
 $outputRoot = [System.IO.Path]::GetFullPath($OutputDirectory)
 if (-not $outputRoot.StartsWith($allowedArtifactsRoot + [System.IO.Path]::DirectorySeparatorChar, $comparison)) {
@@ -110,6 +147,9 @@ $canonicalEvidence = Get-JsonFile -Path (Join-Path $canonicalRoot 'release-evide
 $canonicalManifest = Get-JsonFile -Path (Join-Path $canonicalRoot 'release-manifest.json')
 $portableManifest = Get-JsonFile -Path (Join-Path $portableRoot 'portable-manifest.json')
 $portableSmoke = Get-JsonFile -Path (Join-Path $portableRoot 'portable-smoke-result.json')
+$combinedManifestPath = Join-Path $combinedRoot 'combined-payload-manifest.json'
+$combinedManifest = Get-JsonFile -Path $combinedManifestPath
+$combinedVersion = Get-JsonFile -Path (Join-Path $combinedRoot 'payload/VERSION.json')
 $installerManifest = Get-JsonFile -Path (Join-Path $installerRoot 'installer-manifest.json')
 $installerSmoke = Get-JsonFile -Path (Join-Path $installerRoot 'installer-smoke-result.json')
 
@@ -122,7 +162,8 @@ if ($canonicalEvidence.format -ne 'flow-cli-release-evidence-0.1' -or
 if ($portableManifest.format -ne 'flow-windows-portable-0.1' -or
     $portableSmoke.format -ne 'flow-windows-portable-smoke-0.1' -or
     $portableSmoke.status -ne 'passed' -or
-    $installerManifest.format -ne 'flow-windows-installer-0.1' -or
+    $combinedManifest.format -ne 'flow-windows-combined-payload-0.1' -or
+    $installerManifest.format -ne 'flow-windows-installer-0.2' -or
     $installerSmoke.format -ne 'flow-windows-installer-smoke-0.1' -or
     $installerSmoke.status -ne 'passed') {
     throw 'The portable, installer or installer-smoke evidence has an unsupported format or status.'
@@ -141,25 +182,34 @@ if ($canonicalManifest.format -ne 'flow-cli-release-manifest-0.1' -or
 }
 if ($portableManifest.version -ne $version -or
     $portableSmoke.version -ne $version -or
+    $combinedManifest.version -ne $version -or
+    $combinedVersion.version -ne $version -or
     $installerManifest.publicVersion -ne $version -or
     $installerSmoke.productionVersion -ne $version) {
     throw 'The canonical package, portable ZIP, MSI and smoke evidence do not share one public version.'
 }
 if ($portableManifest.sourceRevision -ne $revision -or
     $portableSmoke.sourceRevision -ne $revision -or
+    $combinedManifest.sourceRevision -ne $revision -or
+    $combinedVersion.sourceRevision -ne $revision -or
     $installerManifest.sourceRevision -ne $revision) {
-    throw 'The canonical package, portable ZIP and MSI do not share one source revision.'
+    throw 'The canonical package, portable ZIP, combined payload and MSI do not share one source revision.'
 }
 if ($portableManifest.product -ne 'Flow Engine .NET' -or
+    $combinedManifest.product -ne 'Flow Engine .NET' -or
     $installerManifest.product -ne 'Flow Engine .NET' -or
     $canonicalEvidence.packageId -ne 'FlowEngineNet.Tool') {
     throw 'The release artifacts do not match the expected Flow product identity.'
 }
 if ($portableManifest.runtimeIdentifier -ne 'win-x64' -or
+    $combinedManifest.runtimeIdentifier -ne 'win-x64' -or
     $installerManifest.runtimeIdentifier -ne 'win-x64' -or
     $portableManifest.architecture -ne 'x64' -or
+    $combinedManifest.architecture -ne 'x64' -or
     $installerManifest.architecture -ne 'x64' -or
     $installerManifest.scope -ne 'perUser' -or
+    $combinedManifest.sourceTreeDirty -or
+    $installerManifest.sourceTreeDirty -or
     $installerManifest.signed) {
     throw 'The Windows distribution identity, scope or unsigned-state declaration is invalid.'
 }
@@ -180,7 +230,8 @@ if ($installerManifest.installerVersion -ne $properties.FlowWindowsInstallerVers
     $installerManifest.runtimeIdentifier -ne $properties.FlowWindowsRuntimeIdentifier) {
     throw 'The MSI manifest does not match the checked-in Windows product identity.'
 }
-$requiredOperations = @('clean-install', 'installed-cli', 'repair', 'major-upgrade', 'downgrade-refused', 'uninstall', 'path-preserved')
+$requiredOperations = @('clean-install', 'installed-application', 'start-menu-launch', 'installed-cli', 'repair', 'major-upgrade',
+    'downgrade-refused', 'uninstall', 'user-data-preserved', 'path-preserved')
 foreach ($operation in $requiredOperations) {
     if ($operation -notin @($installerSmoke.operations)) {
         throw "The installer smoke evidence is missing operation '$operation'."
@@ -189,7 +240,33 @@ foreach ($operation in $requiredOperations) {
 
 $canonicalFiles = Test-Checksums -Directory $canonicalRoot
 $portableFiles = Test-Checksums -Directory $portableRoot
+$combinedFiles = Test-CombinedPayloadChecksums -Directory $combinedRoot
 $installerFiles = Test-Checksums -Directory $installerRoot
+$combinedPayloadRoot = Join-Path $combinedRoot 'payload'
+$combinedActualPaths = @(Get-ChildItem -LiteralPath $combinedPayloadRoot -File -Recurse |
+    ForEach-Object { [System.IO.Path]::GetRelativePath($combinedPayloadRoot, $_.FullName).Replace('\', '/') } | Sort-Object)
+$combinedDeclaredPaths = @($combinedManifest.files | ForEach-Object { [string]$_.path } | Sort-Object)
+if ([string]::Join("`n", $combinedActualPaths) -cne [string]::Join("`n", $combinedDeclaredPaths)) {
+    throw 'The combined payload manifest does not cover exactly the promoted payload.'
+}
+foreach ($entry in $combinedManifest.files) {
+    $path = Join-Path $combinedPayloadRoot ([string]$entry.path)
+    if ((Get-Item -LiteralPath $path).Length -ne [long]$entry.bytes -or
+        (Get-Sha256Lower -Path $path) -ne [string]$entry.sha256) {
+        throw "The promoted combined payload failed hash validation: $($entry.path)"
+    }
+}
+$installerDeclaredPaths = @($installerManifest.payloadFiles | ForEach-Object { [string]$_.path } | Sort-Object)
+if ([string]::Join("`n", $combinedDeclaredPaths) -cne [string]::Join("`n", $installerDeclaredPaths)) {
+    throw 'The MSI manifest does not declare the promoted combined payload.'
+}
+foreach ($entry in $installerManifest.payloadFiles) {
+    $combinedEntry = $combinedManifest.files | Where-Object { $_.path -ceq $entry.path } | Select-Object -First 1
+    if ($null -eq $combinedEntry -or [string]$combinedEntry.sha256 -ne [string]$entry.sha256 -or
+        [long]$combinedEntry.bytes -ne [long]$entry.bytes) {
+        throw "The MSI payload differs from the promoted combined payload: $($entry.path)"
+    }
+}
 $portableZip = @(Get-ChildItem -LiteralPath $portableRoot -Filter '*.zip' -File)
 if ($portableZip.Count -ne 1) {
     throw 'The portable distribution must contain exactly one ZIP archive.'
@@ -205,18 +282,13 @@ $resultRoot = Join-Path $stagingRoot 'result'
 try {
     New-Item -ItemType Directory -Path $extractRoot, $resultRoot -Force | Out-Null
     [System.IO.Compression.ZipFile]::ExtractToDirectory($portableZip[0].FullName, $extractRoot)
-    $payloadFiles = @(Get-ChildItem -LiteralPath $extractRoot -File | Sort-Object Name)
-    $declaredPayload = @($installerManifest.payloadFiles | Sort-Object name)
-    if ($payloadFiles.Count -ne 3 -or $declaredPayload.Count -ne $payloadFiles.Count) {
-        throw 'The portable ZIP and installer manifest do not declare the same three-file payload.'
-    }
-    for ($index = 0; $index -lt $payloadFiles.Count; $index++) {
-        $actual = $payloadFiles[$index]
-        $declared = $declaredPayload[$index]
-        if ($actual.Name -ne $declared.name -or
-            $actual.Length -ne $declared.bytes -or
-            (Get-Sha256Lower -Path $actual.FullName) -ne $declared.sha256) {
-            throw "The MSI payload differs from the promoted portable payload: $($actual.Name)"
+    foreach ($mapping in @(
+            @{ Portable = 'flow.exe'; Combined = 'cli/flow.exe' },
+            @{ Portable = 'LICENSE.txt'; Combined = 'LICENSE.txt' })) {
+        $portablePath = Join-Path $extractRoot $mapping.Portable
+        $combinedPath = Join-Path $combinedPayloadRoot $mapping.Combined
+        if ((Get-Sha256Lower -Path $portablePath) -ne (Get-Sha256Lower -Path $combinedPath)) {
+            throw "The combined payload did not preserve the promoted portable file: $($mapping.Portable)"
         }
     }
 
@@ -225,7 +297,7 @@ try {
     $evidencePath = Join-Path $resultRoot $evidenceFileName
     $checksumsPath = Join-Path $resultRoot $checksumsFileName
     $evidence = [ordered]@{
-        format = 'flow-windows-release-evidence-0.1'
+        format = 'flow-windows-release-evidence-0.2'
         product = 'Flow Engine .NET'
         packageId = [string]$canonicalEvidence.packageId
         publicVersion = $version
@@ -244,19 +316,24 @@ try {
             canonicalPackage = 'passed'
             portableChecksums = 'passed'
             portableSmoke = 'passed'
+            combinedPayloadHashes = 'passed'
             installerChecksums = 'passed'
             declaredPayloadMatch = 'passed'
             silentInstall = 'passed'
+            installedApplication = 'passed'
+            startMenuLaunch = 'passed'
             installedCli = 'passed'
             repair = 'passed'
             majorUpgrade = 'passed'
             downgradeRefusal = 'passed'
             uninstall = 'passed'
             ownedRemoval = 'passed'
+            userDataPreserved = 'passed'
         }
         artifacts = [ordered]@{
             canonical = @($canonicalFiles)
             portable = @($portableFiles)
+            combined = @($combinedFiles)
             installer = @($installerFiles)
         }
     }
@@ -267,6 +344,7 @@ try {
         (Get-ChildItem -LiteralPath $portableRoot -Filter '*.cdx.json' -File).FullName
         (Join-Path $portableRoot 'portable-manifest.json')
         (Join-Path $portableRoot 'portable-smoke-result.json')
+        $combinedManifestPath
         $msiFiles.FullName
         (Get-ChildItem -LiteralPath $installerRoot -Filter '*.cdx.json' -File).FullName
         (Join-Path $installerRoot 'installer-manifest.json')

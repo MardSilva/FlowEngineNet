@@ -101,6 +101,10 @@ jobs:
       - name: Restore
         run: dotnet restore Flow.sln
 
+      - name: Restore WinUI shell
+        if: runner.os == 'Windows'
+        run: dotnet restore src/Flow.Windows/Flow.Windows.csproj -p:Platform=x64
+
       - name: Verify formatting
         run: dotnet format Flow.sln --verify-no-changes --no-restore
 
@@ -197,55 +201,9 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
-  windows-installer:
-    name: Build Windows MSI from promoted payload
-    needs: [resolve, windows-portable]
-    runs-on: windows-latest
-    timeout-minutes: 20
-    steps:
-      - name: Checkout requested source
-        uses: actions/checkout@v7
-        with:
-          ref: ${{ needs.resolve.outputs.source_revision }}
-          fetch-depth: 0
-          persist-credentials: false
-
-      - name: Install .NET SDK
-        uses: actions/setup-dotnet@v6
-        with:
-          global-json-file: global.json
-
-      - name: Download promoted Windows payload
-        uses: actions/download-artifact@v8.0.1
-        with:
-          name: draft-windows-portable
-          path: artifacts/windows-portable
-
-      - name: Extract reviewed portable payload
-        shell: pwsh
-        run: |
-          $zip = @(Get-ChildItem -LiteralPath ./artifacts/windows-portable -Filter '*.zip' -File)
-          if ($zip.Count -ne 1) { throw 'Expected exactly one promoted Windows portable ZIP.' }
-          Expand-Archive -LiteralPath $zip[0].FullName -DestinationPath ./artifacts/windows-installer-payload
-
-      - name: Build localized per-user MSI packages
-        shell: pwsh
-        run: >-
-          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/build-windows-installer.ps1
-          -PayloadDirectory ./artifacts/windows-installer-payload
-          -OutputDirectory ./artifacts/windows-installer
-
-      - name: Store unvalidated Windows installer candidate
-        uses: actions/upload-artifact@v7
-        with:
-          name: draft-windows-installer-unvalidated
-          path: artifacts/windows-installer
-          if-no-files-found: error
-          retention-days: 1
-
-  windows-installer-smoke:
-    name: Install, upgrade and remove Windows MSI
-    needs: [resolve, windows-portable, windows-installer]
+  windows-combined-payload:
+    name: Build and validate combined Windows payload
+    needs: [resolve, validate, windows-portable]
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -261,11 +219,101 @@ jobs:
         with:
           global-json-file: global.json
 
-      - name: Download promoted Windows payload
+      - name: Download promoted portable CLI
         uses: actions/download-artifact@v8.0.1
         with:
           name: draft-windows-portable
           path: artifacts/windows-portable
+
+      - name: Revalidate promoted portable CLI
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-portable.ps1
+          -ArtifactsDirectory ./artifacts/windows-portable
+
+      - name: Build combined payload once
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/build-windows-combined-payload.ps1
+          -PortableArtifactsDirectory ./artifacts/windows-portable
+          -OutputDirectory ./artifacts/windows-combined-payload
+
+      - name: Smoke test application and CLI entry points
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-combined-payload.ps1
+          -ArtifactsDirectory ./artifacts/windows-combined-payload
+
+      - name: Store immutable combined Windows payload
+        uses: actions/upload-artifact@v7
+        with:
+          name: draft-windows-combined-payload
+          path: artifacts/windows-combined-payload
+          if-no-files-found: error
+          retention-days: 7
+
+  windows-installer:
+    name: Build Windows MSI from promoted payload
+    needs: [resolve, windows-combined-payload]
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout requested source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.source_revision }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Download promoted combined Windows payload
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: draft-windows-combined-payload
+          path: artifacts/windows-combined-payload
+
+      - name: Build localized per-user MSI packages
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/build-windows-installer.ps1
+          -PayloadDirectory ./artifacts/windows-combined-payload
+          -OutputDirectory ./artifacts/windows-installer
+
+      - name: Store unvalidated Windows installer candidate
+        uses: actions/upload-artifact@v7
+        with:
+          name: draft-windows-installer-unvalidated
+          path: artifacts/windows-installer
+          if-no-files-found: error
+          retention-days: 1
+
+  windows-installer-smoke:
+    name: Install, upgrade and remove Windows MSI
+    needs: [resolve, windows-combined-payload, windows-installer]
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout requested source
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.source_revision }}
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Download promoted combined Windows payload
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: draft-windows-combined-payload
+          path: artifacts/windows-combined-payload
 
       - name: Download Windows installer candidate
         uses: actions/download-artifact@v8.0.1
@@ -273,19 +321,12 @@ jobs:
           name: draft-windows-installer-unvalidated
           path: artifacts/windows-installer
 
-      - name: Extract reviewed portable payload
-        shell: pwsh
-        run: |
-          $zip = @(Get-ChildItem -LiteralPath ./artifacts/windows-portable -Filter '*.zip' -File)
-          if ($zip.Count -ne 1) { throw 'Expected exactly one promoted Windows portable ZIP.' }
-          Expand-Archive -LiteralPath $zip[0].FullName -DestinationPath ./artifacts/windows-installer-payload
-
       - name: Prove silent install, execution, upgrade and owned removal
         shell: pwsh
         run: >-
           pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-installer.ps1
           -ArtifactsDirectory ./artifacts/windows-installer
-          -PayloadDirectory ./artifacts/windows-installer-payload
+          -PayloadDirectory ./artifacts/windows-combined-payload
 
       - name: Store validated Windows installer candidate
         uses: actions/upload-artifact@v7
@@ -297,7 +338,7 @@ jobs:
 
   windows-release-evidence:
     name: Bind Windows artifacts to canonical release
-    needs: [resolve, build, windows-portable, windows-installer-smoke]
+    needs: [resolve, build, windows-portable, windows-combined-payload, windows-installer-smoke]
     runs-on: windows-latest
     timeout-minutes: 10
     steps:
@@ -320,6 +361,12 @@ jobs:
           name: draft-windows-portable
           path: artifacts/windows-portable
 
+      - name: Download combined Windows payload evidence
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: draft-windows-combined-payload
+          path: artifacts/windows-combined-payload
+
       - name: Download validated Windows installer candidate
         uses: actions/download-artifact@v8.0.1
         with:
@@ -332,6 +379,7 @@ jobs:
           pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/verify-windows-release-artifacts.ps1
           -CanonicalArtifactsDirectory ./artifacts/release
           -PortableArtifactsDirectory ./artifacts/windows-portable
+          -CombinedPayloadDirectory ./artifacts/windows-combined-payload
           -InstallerArtifactsDirectory ./artifacts/windows-installer
           -OutputDirectory ./artifacts/windows-release-validation
 
@@ -345,6 +393,7 @@ jobs:
               Get-ChildItem -LiteralPath ./artifacts/windows-portable -Filter '*.cdx.json' -File
               Get-Item -LiteralPath ./artifacts/windows-portable/portable-manifest.json
               Get-Item -LiteralPath ./artifacts/windows-portable/portable-smoke-result.json
+              Get-Item -LiteralPath ./artifacts/windows-combined-payload/combined-payload-manifest.json
               Get-ChildItem -LiteralPath ./artifacts/windows-installer -Filter '*.msi' -File
               Get-ChildItem -LiteralPath ./artifacts/windows-installer -Filter '*.cdx.json' -File
               Get-Item -LiteralPath ./artifacts/windows-installer/installer-manifest.json

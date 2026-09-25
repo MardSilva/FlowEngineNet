@@ -185,6 +185,7 @@ public sealed class WindowsDistributionFoundationTests
                 && (string?)target.Attribute("AfterTargets") == "Publish");
 
         Assert.Contains("build-windows-portable.ps1", buildScript, StringComparison.Ordinal);
+        Assert.Contains("PortableArtifactsDirectory", buildScript, StringComparison.Ordinal);
         Assert.Contains("-p:PublishSingleFile=false", buildScript, StringComparison.Ordinal);
         Assert.Contains("--self-contained', 'true'", buildScript, StringComparison.Ordinal);
         Assert.Contains("Compare-DirectoryContent", buildScript, StringComparison.Ordinal);
@@ -289,11 +290,14 @@ public sealed class WindowsDistributionFoundationTests
         var verifier = File.ReadAllText(Path.Combine(root, "eng", "verify-windows-release-artifacts.ps1"));
 
         Assert.Contains("windows-portable:", workflow, StringComparison.Ordinal);
+        Assert.Contains("windows-combined-payload:", workflow, StringComparison.Ordinal);
         Assert.Contains("windows-installer:", workflow, StringComparison.Ordinal);
         Assert.Contains("windows-installer-smoke:", workflow, StringComparison.Ordinal);
         Assert.Contains("windows-release-evidence:", workflow, StringComparison.Ordinal);
         Assert.Contains("build-windows-portable.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("test-windows-portable.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("build-windows-combined-payload.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("test-windows-combined-payload.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("build-windows-installer.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("test-windows-installer.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("verify-windows-release-artifacts.ps1", workflow, StringComparison.Ordinal);
@@ -302,13 +306,34 @@ public sealed class WindowsDistributionFoundationTests
         Assert.Contains("'--latest=false'", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("--draft=false", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("dotnet nuget push", workflow, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("windows-installer-payload", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("Extract-Archive", workflow, StringComparison.Ordinal);
 
-        Assert.Contains("flow-windows-release-evidence-0.1", verifier, StringComparison.Ordinal);
+        Assert.Contains("flow-windows-release-evidence-0.2", verifier, StringComparison.Ordinal);
+        Assert.Contains("CombinedPayloadDirectory", verifier, StringComparison.Ordinal);
+        Assert.Contains("combinedPayloadHashes = 'passed'", verifier, StringComparison.Ordinal);
         Assert.Contains("declaredPayloadMatch = 'passed'", verifier, StringComparison.Ordinal);
+        Assert.Contains("startMenuLaunch = 'passed'", verifier, StringComparison.Ordinal);
         Assert.Contains("majorUpgrade = 'passed'", verifier, StringComparison.Ordinal);
+        Assert.Contains("userDataPreserved = 'passed'", verifier, StringComparison.Ordinal);
         Assert.Contains("ownedRemoval = 'passed'", verifier, StringComparison.Ordinal);
         Assert.Contains("installerManifest.signed", verifier, StringComparison.Ordinal);
         Assert.DoesNotContain("C:\\Users\\", verifier, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CiWorkflow_ExercisesPromotedCombinedPayloadBeforeDraftRelease()
+    {
+        var root = FindRepositoryRoot();
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "ci.yml"));
+
+        Assert.Contains("windows-installer-integration:", workflow, StringComparison.Ordinal);
+        Assert.Contains("build-windows-portable.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("-PortableArtifactsDirectory ./artifacts/windows-portable", workflow, StringComparison.Ordinal);
+        Assert.Contains("build-windows-installer.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("test-windows-installer.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("installer-smoke-result.json", workflow, StringComparison.Ordinal);
+        Assert.Contains("dotnet restore src/Flow.Windows/Flow.Windows.csproj -p:Platform=x64", workflow, StringComparison.Ordinal);
     }
 
     [Fact]

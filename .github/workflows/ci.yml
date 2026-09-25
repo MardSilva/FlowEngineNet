@@ -121,6 +121,74 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  windows-installer-integration:
+    name: Windows application and installer integration
+    needs: validate
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Build portable CLI once
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/build-windows-portable.ps1
+          -Configuration Release
+          -OutputDirectory ./artifacts/windows-portable
+
+      - name: Smoke test portable CLI
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-portable.ps1
+          -ArtifactsDirectory ./artifacts/windows-portable
+
+      - name: Build combined payload from promoted CLI
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/build-windows-combined-payload.ps1
+          -PortableArtifactsDirectory ./artifacts/windows-portable
+          -OutputDirectory ./artifacts/windows-combined-payload
+
+      - name: Smoke test combined payload
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-combined-payload.ps1
+          -ArtifactsDirectory ./artifacts/windows-combined-payload
+
+      - name: Build localized MSI packages from promoted payload
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/build-windows-installer.ps1
+          -PayloadDirectory ./artifacts/windows-combined-payload
+          -OutputDirectory ./artifacts/windows-installer
+
+      - name: Install, repair, upgrade and remove isolated MSI
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-installer.ps1
+          -ArtifactsDirectory ./artifacts/windows-installer
+          -PayloadDirectory ./artifacts/windows-combined-payload
+
+      - name: Store Windows validation evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer-integration-evidence
+          path: |
+            artifacts/windows-combined-payload/combined-payload-manifest.json
+            artifacts/windows-installer/installer-manifest.json
+            artifacts/windows-installer/installer-smoke-result.json
+          if-no-files-found: error
+          retention-days: 1
+
   canonical-release:
     name: Build canonical CLI release
     needs: validate
