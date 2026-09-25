@@ -35,6 +35,9 @@ public sealed class FlowWindowsProjectConformanceTests
         var explanation = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "Pages", "HowItWorksPage.xaml"));
         var operations = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "Pages", "OperationsPage.xaml"));
         var operationsCode = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "Pages", "OperationsPage.xaml.cs"));
+        var library = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "Pages", "LibraryPage.xaml"));
+        var preview = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "Pages", "PreviewPage.xaml"));
+        var previewCode = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "Pages", "PreviewPage.xaml.cs"));
 
         Assert.Contains("<NavigationView", window, StringComparison.Ordinal);
         Assert.Contains("PaneDisplayMode=\"Auto\"", window, StringComparison.Ordinal);
@@ -50,7 +53,14 @@ public sealed class FlowWindowsProjectConformanceTests
         Assert.Contains("CancelButton_Click", operationsCode, StringComparison.Ordinal);
         Assert.Contains("ContentDialog", operationsCode, StringComparison.Ordinal);
         Assert.DoesNotContain("Process.Start", operationsCode, StringComparison.Ordinal);
-        Assert.DoesNotContain("WebView", window + home + explanation + operations, StringComparison.Ordinal);
+        Assert.Contains("AutomationProperties.HeadingLevel=\"Level1\"", library, StringComparison.Ordinal);
+        Assert.Contains("<WebView2", preview, StringComparison.Ordinal);
+        Assert.Contains("SetVirtualHostNameToFolderMapping", previewCode, StringComparison.Ordinal);
+        Assert.Contains("WebResourceRequested", previewCode, StringComparison.Ordinal);
+        Assert.Contains("DownloadStarting", previewCode, StringComparison.Ordinal);
+        Assert.Contains("PermissionRequested", previewCode, StringComparison.Ordinal);
+        Assert.Contains("args.Cancel = true", previewCode, StringComparison.Ordinal);
+        Assert.DoesNotContain("http://", previewCode, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

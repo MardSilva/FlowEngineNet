@@ -40,13 +40,14 @@
                     <StackPanel Spacing="14" Padding="0,12,0,4">
                         <StackPanel Spacing="6">
                             <TextBlock x:Name="OutputPathLabel" Style="{ThemeResource BodyStrongTextBlockStyle}" />
-                            <TextBox x:Name="OutputPathBox" TextWrapping="NoWrap" />
+                            <TextBox x:Name="OutputPathBox" TextWrapping="NoWrap" TextChanged="AdvancedOption_Changed" />
                         </StackPanel>
-                        <CheckBox x:Name="DiagnosticsCheck" />
+                        <CheckBox x:Name="DiagnosticsCheck" Checked="AdvancedOption_Changed" Unchecked="AdvancedOption_Changed" />
                         <CheckBox x:Name="HtmlBookCheck" Checked="HtmlBookCheck_Changed" Unchecked="HtmlBookCheck_Changed" />
                         <StackPanel x:Name="HtmlLanguagePanel" Spacing="6" Visibility="Collapsed">
                             <TextBlock x:Name="HtmlLanguageLabel" Style="{ThemeResource BodyStrongTextBlockStyle}" />
-                            <ComboBox x:Name="HtmlLanguageSelector" MinWidth="260" SelectedIndex="0">
+                            <ComboBox x:Name="HtmlLanguageSelector" MinWidth="260" SelectedIndex="0"
+                                      SelectionChanged="AdvancedOption_Changed">
                                 <ComboBoxItem x:Name="AutomaticLanguageItem" Tag="Automatic" />
                                 <ComboBoxItem x:Name="EnglishLanguageItem" Tag="English" />
                                 <ComboBoxItem x:Name="PortugueseBrazilLanguageItem" Tag="PortugueseBrazil" />
@@ -57,7 +58,10 @@
                 </Expander.Content>
             </Expander>
 
-            <Button x:Name="RunButton" HorizontalAlignment="Right" Click="RunButton_Click" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+                <Button x:Name="PreviewButton" Click="PreviewButton_Click" />
+                <Button x:Name="RunButton" Click="RunButton_Click" />
+            </StackPanel>
 
             <StackPanel x:Name="ProgressPanel" Spacing="10" Visibility="Collapsed">
                 <ProgressBar x:Name="OperationProgress" IsIndeterminate="True" />
@@ -102,6 +106,26 @@
                 <Expander.Content>
                     <ItemsControl x:Name="DiagnosticsList" Margin="0,12,0,0" />
                 </Expander.Content>
+            </Expander>
+
+            <Expander x:Name="AdvancedPanel" Visibility="Collapsed" IsExpanded="False">
+                <StackPanel Spacing="10" Padding="0,12,0,4">
+                    <TextBlock x:Name="AdvancedNotice" TextWrapping="Wrap" />
+                    <ComboBox x:Name="CommandShellSelector" Width="220" HorizontalAlignment="Left"
+                              SelectedIndex="0" SelectionChanged="AdvancedOption_Changed">
+                        <ComboBoxItem Content="PowerShell" Tag="PowerShell" />
+                        <ComboBoxItem Content="Command Prompt" Tag="CommandPrompt" />
+                    </ComboBox>
+                    <TextBox x:Name="AdvancedCommandText" IsReadOnly="True" AcceptsReturn="True"
+                             TextWrapping="Wrap" FontFamily="Consolas" MinHeight="72" />
+                    <StackPanel Orientation="Horizontal" Spacing="8">
+                        <Button x:Name="CopyCommandButton" Click="CopyCommandButton_Click" />
+                        <Button x:Name="SaveLogButton" Click="SaveLogButton_Click" />
+                        <Button x:Name="OpenPowerShellButton" Click="OpenPowerShellButton_Click" />
+                    </StackPanel>
+                    <TextBox x:Name="AdvancedLogText" IsReadOnly="True" AcceptsReturn="True"
+                             TextWrapping="Wrap" FontFamily="Consolas" MinHeight="100" />
+                </StackPanel>
             </Expander>
         </StackPanel>
     </ScrollViewer>

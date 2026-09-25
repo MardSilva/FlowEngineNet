@@ -184,6 +184,39 @@ public sealed class FlowWindowsOperationServiceTests
         Assert.Equal(countBefore, Directory.EnumerateFileSystemEntries(workspace.Path).Count());
     }
 
+    [Theory]
+    [InlineData(FlowWindowsPreviewProfile.Phone)]
+    [InlineData(FlowWindowsPreviewProfile.Tablet)]
+    [InlineData(FlowWindowsPreviewProfile.Desktop)]
+    public async Task PreviewIsLocalDisposableAndDoesNotChangeTheSource(FlowWindowsPreviewProfile profile)
+    {
+        using var workspace = new TemporaryWorkspace();
+        var source = workspace.CreateEpub("preview.epub");
+        var before = SHA256.HashData(File.ReadAllBytes(source));
+        var previewRoot = Path.Combine(workspace.Path, "private-preview");
+        var service = new FlowWindowsOperationService(
+            FlowApplicationService.CreateDefault(),
+            new FlowJsonDocumentSerializer(),
+            previewRoot);
+
+        string previewPath;
+        await using (var preview = await service.CreatePreviewAsync(source, profile))
+        {
+            var validation = await service.ExecuteAsync(new FlowWindowsOperationRequest(
+                FlowWindowsOperationKind.Validate,
+                source));
+            previewPath = preview.RootPath;
+            Assert.True(File.Exists(preview.IndexPath));
+            Assert.Equal(profile, preview.Profile);
+            Assert.Equal("Livro de teste", preview.Summary.Title);
+            Assert.False(string.IsNullOrWhiteSpace(preview.DocumentHash));
+            Assert.Equal(validation.DocumentHash, preview.DocumentHash);
+            Assert.Equal(before, SHA256.HashData(File.ReadAllBytes(source)));
+        }
+
+        Assert.False(Directory.Exists(previewPath));
+    }
+
     private sealed class TemporaryWorkspace : IDisposable
     {
         public TemporaryWorkspace()

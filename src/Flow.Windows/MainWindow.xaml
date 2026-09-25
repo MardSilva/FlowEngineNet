@@ -19,6 +19,11 @@
             </NavigationView.PaneHeader>
             <NavigationView.MenuItems>
                 <NavigationViewItem x:Name="HomeItem" Tag="Home" Icon="Home" />
+                <NavigationViewItem x:Name="LibraryItem" Tag="Library">
+                    <NavigationViewItem.Icon>
+                        <FontIcon Glyph="&#xE8F1;" />
+                    </NavigationViewItem.Icon>
+                </NavigationViewItem>
                 <NavigationViewItem x:Name="OperationsItem" Tag="Operations">
                     <NavigationViewItem.Icon>
                         <FontIcon Glyph="&#xE8B7;" />

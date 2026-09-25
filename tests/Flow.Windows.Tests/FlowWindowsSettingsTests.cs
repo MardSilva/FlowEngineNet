@@ -14,7 +14,8 @@ public sealed class FlowWindowsSettingsTests
             var expected = new FlowWindowsSettings(
                 FlowWindowsSettings.PortugueseBrazil,
                 FlowWindowsTheme.Dark,
-                advancedMode: true);
+                advancedMode: true,
+                personalLibraryPath: directory);
 
             await store.SaveAsync(expected);
             var actual = await store.LoadAsync(new FlowWindowsSettings());
@@ -27,6 +28,16 @@ public sealed class FlowWindowsSettingsTests
         {
             Directory.Delete(directory, recursive: true);
         }
+    }
+
+    [Fact]
+    public void PersonalFolderMustBeAbsoluteAndDoesNotEnterDocumentState()
+    {
+        Assert.Throws<ArgumentException>(() => new FlowWindowsSettings(personalLibraryPath: "relative-books"));
+
+        var path = Path.Combine(Path.GetTempPath(), "Flow books");
+        var settings = new FlowWindowsSettings(personalLibraryPath: path);
+        Assert.Equal(Path.GetFullPath(path), settings.PersonalLibraryPath);
     }
 
     [Fact]

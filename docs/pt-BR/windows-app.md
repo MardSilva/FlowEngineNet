@@ -24,6 +24,18 @@ O host gráfico chama diretamente os casos tipados de `Flow.Application`. `Flow.
 
 O relatório opcional de diagnósticos usa, por enquanto, o envelope específico da interface `flow-windows-diagnostics-0.1`, com os mesmos diagnósticos da camada de aplicação. O `.flow.json`, a validação semântica, o hash canônico e o pacote HTML vêm do motor compartilhado. Os relatórios completos de metadados, fidelidade, processamento e source map continuam disponíveis na CLI até receberem controles visuais próprios.
 
+## Pasta pessoal e prévia
+
+A página **Pasta pessoal** guarda nas configurações locais um único diretório absoluto escolhido pelo utilizador. Ela procura recursivamente até 500 arquivos EPUB, ignora reparse points, ordena os caminhos de forma determinística e processa um livro por vez. O índice em memória reúne caminhos de origem, metadados básicos, capas seguras e diagnósticos apenas enquanto a aplicação está aberta. Nada disso entra no `FlowDocument`, no hash canônico ou nos relatórios de evidência. Atualizar a página reconstrói o índice a partir dos arquivos de origem.
+
+Cada publicação encontrada pode seguir para inspeção, importação, validação ou prévia. A prévia gera um livro HTML temporário pelo mesmo renderer e mantém o hash canônico nos perfis celular, tablet e desktop. Esses perfis mudam apenas o viewport entregue ao renderer. Eles não representam páginas, emulação completa do dispositivo nem um Reader.
+
+O WebView2 recebe o pacote pelo host virtual fixo `flow-preview.local`. A navegação fica restrita a esse host. Novas janelas, downloads, pedidos de permissão e recursos externos são bloqueados. O diretório temporário é removido quando a página fecha ou o perfil muda. Se o processo for encerrado à força, pode restar um diretório reconhecível em dados locais; ele contém apenas a saída local gerada e está registrado nas limitações conhecidas.
+
+## Modo avançado
+
+O modo avançado continua desativado por padrão. Quando é habilitado nas configurações, a página de operações mostra as fases reais, os códigos diagnósticos e uma representação para PowerShell ou Prompt de Comando criada por `FlowCommandDisplayFormatter`. Esse texto nunca é usado para executar a operação. **Copiar comando** envia o texto à área de transferência, **Salvar log** só grava depois da escolha do destino e **Copiar e abrir PowerShell** abre uma janela limpa do PowerShell após a cópia. O comando não é colado nem executado.
+
 ## Arquitetura e acessibilidade
 
 A aplicação está dividida em dois projetos:
@@ -47,6 +59,6 @@ dotnet run --project .\src\Flow.Windows\Flow.Windows.csproj -p:Platform=x64
 
 Por enquanto, a aplicação roda a partir da saída do build. O MSI da alpha.3 ainda instala apenas a CLI. A inclusão da interface gráfica no instalador, o atalho do menu Iniciar, o upgrade da alpha.3 e a remoção dos dois executáveis pertencem à etapa final de integração do instalador Windows.
 
-Os testes automatizados cobrem recuperação e persistência atômica das configurações, navegação, os dois catálogos de idioma, escolha de tema, contratos das operações, preservação da origem, políticas de saída, limpeza após cancelamento, validação de EPUB e Flow, acessibilidade do XAML, alto contraste e limites entre projetos. Testes locais de abertura e UI Automation confirmam que o processo cria uma janela nativa responsiva e expõe a página de processamento. A revisão visual nas escalas de 100%, 150% e 200% continua manual, pois testes unitários não comprovam ausência de cortes nem legibilidade física.
+Os testes automatizados cobrem recuperação e persistência atômica das configurações, descoberta da pasta pessoal, natureza não canônica do índice, navegação, os dois catálogos de idioma, escolha de tema, contratos das operações, preservação da origem, políticas de saída, limpeza após cancelamento, descarte e hash da prévia, escaping dos comandos, validação de EPUB e Flow, estrutura de segurança do XAML, acessibilidade, alto contraste e limites entre projetos. Testes locais de abertura e UI Automation confirmam que o processo cria uma janela nativa responsiva e expõe a página de processamento. A revisão visual nas escalas de 100%, 150% e 200% continua manual, pois testes unitários não comprovam ausência de cortes nem legibilidade física.
 
-A aplicação ainda não tem pasta pessoal indexada, prévia incorporada, exibição do comando equivalente no modo avançado nem integração ao instalador. Esses pontos pertencem a incrementos separados; esta página operacional não é um Reader.
+A aplicação ainda não tem banco persistente de biblioteca, progresso de leitura, anotações, pesquisa, paginação de produção nem integração ao instalador. A pasta pessoal e a prévia são conveniências operacionais, não o Flow Reader.

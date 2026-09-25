@@ -27,6 +27,14 @@ public enum FlowWindowsHtmlLanguage
     PortuguesePortugal,
 }
 
+/// <summary>Selects a renderer viewport used only for visual preview.</summary>
+public enum FlowWindowsPreviewProfile
+{
+    Phone,
+    Tablet,
+    Desktop,
+}
+
 /// <summary>Requests one local visual workflow without transferring private publication data.</summary>
 public sealed record FlowWindowsOperationRequest
 {
@@ -129,4 +137,58 @@ public interface IFlowWindowsOperationService
     public string SuggestDocumentOutputPath(string sourcePath, string? title = null);
 
     public string GetInterruptedOutputPath(string finalPath);
+
+    public Task<FlowWindowsPreviewSession> CreatePreviewAsync(
+        string sourcePath,
+        FlowWindowsPreviewProfile profile,
+        FlowWindowsHtmlLanguage htmlLanguage = FlowWindowsHtmlLanguage.Automatic,
+        IProgress<Flow.Application.FlowApplicationProgress>? progress = null,
+        CancellationToken cancellationToken = default);
+}
+
+/// <summary>Owns one temporary, local-only HTML preview until the host disposes it.</summary>
+public sealed class FlowWindowsPreviewSession : IAsyncDisposable
+{
+    internal FlowWindowsPreviewSession(
+        string rootPath,
+        FlowWindowsPreviewProfile profile,
+        FlowWindowsBookSummary summary,
+        IEnumerable<Flow.Application.FlowApplicationDiagnostic> diagnostics,
+        string documentHash)
+    {
+        RootPath = Path.GetFullPath(rootPath);
+        Profile = profile;
+        Summary = summary;
+        Diagnostics = diagnostics.ToImmutableArray();
+        DocumentHash = documentHash;
+    }
+
+    public string RootPath { get; }
+
+    public string IndexPath => Path.Combine(RootPath, "index.html");
+
+    public FlowWindowsPreviewProfile Profile { get; }
+
+    public FlowWindowsBookSummary Summary { get; }
+
+    public ImmutableArray<Flow.Application.FlowApplicationDiagnostic> Diagnostics { get; }
+
+    public string DocumentHash { get; }
+
+    public ValueTask DisposeAsync()
+    {
+        try
+        {
+            if (Directory.Exists(RootPath))
+            {
+                Directory.Delete(RootPath, recursive: true);
+            }
+        }
+        catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
+        {
+            // A locked WebView2 file is safer left under the recognized preview root than deleted broadly.
+        }
+
+        return ValueTask.CompletedTask;
+    }
 }

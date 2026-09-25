@@ -12,7 +12,9 @@ public enum FlowWindowsTheme
 public enum FlowWindowsDestination
 {
     Home,
+    Library,
     Operations,
+    Preview,
     HowItWorks,
     Settings,
 }
@@ -26,7 +28,8 @@ public sealed record FlowWindowsSettings
     public FlowWindowsSettings(
         string language = English,
         FlowWindowsTheme theme = FlowWindowsTheme.System,
-        bool advancedMode = false)
+        bool advancedMode = false,
+        string? personalLibraryPath = null)
     {
         if (!IsSupportedLanguage(language))
         {
@@ -41,6 +44,7 @@ public sealed record FlowWindowsSettings
         Language = language;
         Theme = theme;
         AdvancedMode = advancedMode;
+        PersonalLibraryPath = NormalizeOptionalDirectory(personalLibraryPath);
     }
 
     public string Language { get; }
@@ -48,6 +52,9 @@ public sealed record FlowWindowsSettings
     public FlowWindowsTheme Theme { get; }
 
     public bool AdvancedMode { get; }
+
+    /// <summary>Gets the optional local folder selected by the user. It is never canonical document data.</summary>
+    public string? PersonalLibraryPath { get; }
 
     public static bool IsSupportedLanguage(string? value) =>
         string.Equals(value, English, StringComparison.OrdinalIgnoreCase)
@@ -57,4 +64,19 @@ public sealed record FlowWindowsSettings
         new(string.Equals(cultureName, PortugueseBrazil, StringComparison.OrdinalIgnoreCase)
             ? PortugueseBrazil
             : English);
+
+    private static string? NormalizeOptionalDirectory(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return null;
+        }
+
+        if (!Path.IsPathFullyQualified(value))
+        {
+            throw new ArgumentException("The personal library path must be absolute.", nameof(value));
+        }
+
+        return Path.GetFullPath(value);
+    }
 }

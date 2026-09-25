@@ -48,7 +48,29 @@ public sealed class FlowWindowsShellViewModel : INotifyPropertyChanged
         bool advancedMode,
         CancellationToken cancellationToken = default)
     {
-        var updated = new FlowWindowsSettings(language, theme, advancedMode);
+        await ApplySettingsAsync(language, theme, advancedMode, _settings.PersonalLibraryPath, cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    public async Task SetPersonalLibraryPathAsync(
+        string? path,
+        CancellationToken cancellationToken = default) =>
+        await ApplySettingsAsync(
+                _settings.Language,
+                _settings.Theme,
+                _settings.AdvancedMode,
+                path,
+                cancellationToken)
+            .ConfigureAwait(false);
+
+    private async Task ApplySettingsAsync(
+        string language,
+        FlowWindowsTheme theme,
+        bool advancedMode,
+        string? personalLibraryPath,
+        CancellationToken cancellationToken)
+    {
+        var updated = new FlowWindowsSettings(language, theme, advancedMode, personalLibraryPath);
         if (updated == _settings)
         {
             return;

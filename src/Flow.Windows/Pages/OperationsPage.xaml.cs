@@ -15,6 +15,10 @@ public sealed partial class OperationsPage : Page
     private readonly FlowWindowsTextCatalog _text;
     private readonly IFlowWindowsOperationService _operations;
     private readonly Func<Task<string?>> _chooseFile;
+    private readonly Action<string> _openPreview;
+    private readonly Func<string, string, Task<string?>> _saveText;
+    private readonly Func<Task> _openPowerShell;
+    private readonly List<string> _advancedLog = [];
     private CancellationTokenSource? _cancellation;
     private string? _sourcePath;
     private FlowWindowsOperationKind _selectedOperation;
@@ -23,7 +27,12 @@ public sealed partial class OperationsPage : Page
         FlowWindowsTextCatalog text,
         IFlowWindowsOperationService operations,
         Func<Task<string?>> chooseFile,
-        FlowWindowsOperationKind initialOperation = FlowWindowsOperationKind.Inspect)
+        FlowWindowsOperationKind initialOperation = FlowWindowsOperationKind.Inspect,
+        string? initialSourcePath = null,
+        bool advancedMode = false,
+        Action<string>? openPreview = null,
+        Func<string, string, Task<string?>>? saveText = null,
+        Func<Task>? openPowerShell = null)
     {
         ArgumentNullException.ThrowIfNull(text);
         ArgumentNullException.ThrowIfNull(operations);
@@ -31,11 +40,15 @@ public sealed partial class OperationsPage : Page
         _text = text;
         _operations = operations;
         _chooseFile = chooseFile;
+        _openPreview = openPreview ?? (_ => { });
+        _saveText = saveText ?? ((_, _) => Task.FromResult<string?>(null));
+        _openPowerShell = openPowerShell ?? (() => Task.CompletedTask);
         _selectedOperation = initialOperation;
         InitializeComponent();
         Localize();
         SelectOperation(initialOperation);
-        SetSource(null);
+        AdvancedPanel.Visibility = advancedMode ? Visibility.Visible : Visibility.Collapsed;
+        SetSource(initialSourcePath);
     }
 
     private async void ChooseButton_Click(object sender, RoutedEventArgs e)
@@ -85,6 +98,40 @@ public sealed partial class OperationsPage : Page
 
     private void CancelButton_Click(object sender, RoutedEventArgs e) => _cancellation?.Cancel();
 
+    private void PreviewButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_sourcePath is not null)
+        {
+            _openPreview(_sourcePath);
+        }
+    }
+
+    private void AdvancedOption_Changed(object sender, object e) => UpdateAdvancedCommand();
+
+    private void CopyCommandButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrWhiteSpace(AdvancedCommandText.Text))
+        {
+            return;
+        }
+
+        var package = new DataPackage();
+        package.SetText(AdvancedCommandText.Text);
+        Clipboard.SetContent(package);
+    }
+
+    private async void SaveLogButton_Click(object sender, RoutedEventArgs e)
+    {
+        var log = string.Join(Environment.NewLine, _advancedLog.Prepend(AdvancedCommandText.Text));
+        await _saveText("flow-operation.log", log);
+    }
+
+    private async void OpenPowerShellButton_Click(object sender, RoutedEventArgs e)
+    {
+        CopyCommandButton_Click(sender, e);
+        await _openPowerShell();
+    }
+
     private void SelectOperation(FlowWindowsOperationKind operation)
     {
         _selectedOperation = operation;
@@ -98,6 +145,7 @@ public sealed partial class OperationsPage : Page
             ? Microsoft.UI.Xaml.Application.Current.Resources["AccentButtonStyle"] as Style
             : null;
         ImportOptions.Visibility = operation == FlowWindowsOperationKind.Import ? Visibility.Visible : Visibility.Collapsed;
+        UpdateAdvancedCommand();
     }
 
     private void SetSource(string? path)
@@ -112,6 +160,8 @@ public sealed partial class OperationsPage : Page
         ResultBar.IsOpen = false;
         SummaryCard.Visibility = Visibility.Collapsed;
         DiagnosticsExpander.Visibility = Visibility.Collapsed;
+        _advancedLog.Clear();
+        UpdateAdvancedCommand();
     }
 
     private async Task ExecuteAsync()
@@ -239,6 +289,9 @@ public sealed partial class OperationsPage : Page
         {
             OperationProgress.IsIndeterminate = true;
         }
+
+        _advancedLog.Add($"{DateTimeOffset.Now:O} {progress.Operation} {progress.Stage} {progress.CompletedUnits}/{progress.TotalUnits?.ToString() ?? "?"} {progress.CurrentResource}");
+        AdvancedLogText.Text = string.Join(Environment.NewLine, _advancedLog);
     }
 
     private async Task ShowResultAsync(FlowWindowsOperationResult result)
@@ -278,6 +331,12 @@ public sealed partial class OperationsPage : Page
                     + $": {diagnostic.Message}"
                     + (diagnostic.Count == 1 ? string.Empty : $" (x{diagnostic.Count})"))
                 .ToArray();
+        foreach (var diagnostic in result.Diagnostics)
+        {
+            _advancedLog.Add($"{diagnostic.Severity} {diagnostic.Code} {diagnostic.Location}: {diagnostic.Message} (x{diagnostic.Count})");
+        }
+
+        AdvancedLogText.Text = string.Join(Environment.NewLine, _advancedLog);
     }
 
     private async Task ShowCoverAsync(FlowWindowsBookSummary summary)
@@ -370,10 +429,53 @@ public sealed partial class OperationsPage : Page
         PortuguesePortugalLanguageItem.Content = _text["LanguagePortuguesePortugal"];
         CancelButton.Content = _text["CancelAction"];
         RunButton.Content = _text["RunAction"];
+        PreviewButton.Content = _text["PreviewAction"];
+        AdvancedPanel.Header = _text["AdvancedPanelTitle"];
+        AdvancedNotice.Text = _text["AdvancedPanelNotice"];
+        CopyCommandButton.Content = _text["CopyCommand"];
+        SaveLogButton.Content = _text["SaveLog"];
+        OpenPowerShellButton.Content = _text["OpenPowerShell"];
         AutomationProperties.SetName(DropArea, _text["DropFile"]);
         AutomationProperties.SetName(OutputPathBox, _text["OutputPath"]);
         AutomationProperties.SetName(HtmlLanguageSelector, _text["HtmlLanguage"]);
         AutomationProperties.SetName(RunButton, _text["RunAction"]);
+    }
+
+    private void UpdateAdvancedCommand()
+    {
+        if (AdvancedPanel.Visibility != Visibility.Visible || _sourcePath is null)
+        {
+            return;
+        }
+
+        try
+        {
+            var output = _selectedOperation == FlowWindowsOperationKind.Import
+                ? Path.GetFullPath(OutputPathBox.Text)
+                : null;
+            var language = HtmlLanguageSelector.SelectedItem is ComboBoxItem item
+                           && Enum.TryParse<FlowWindowsHtmlLanguage>(item.Tag?.ToString(), out var selected)
+                ? selected
+                : FlowWindowsHtmlLanguage.Automatic;
+            var request = new FlowWindowsOperationRequest(
+                _selectedOperation,
+                _sourcePath,
+                output,
+                DiagnosticsCheck.IsChecked == true,
+                HtmlBookCheck.IsChecked == true,
+                language);
+            var shell = CommandShellSelector.SelectedItem is ComboBoxItem shellItem
+                        && Enum.TryParse<FlowCommandShell>(shellItem.Tag?.ToString(), out var selectedShell)
+                ? selectedShell
+                : FlowCommandShell.PowerShell;
+            AdvancedCommandText.Text = string.Join(
+                Environment.NewLine,
+                FlowWindowsCommandDisplayService.Create(request, shell).Select(static command => command.Text));
+        }
+        catch (Exception exception) when (exception is ArgumentException or NotSupportedException)
+        {
+            AdvancedCommandText.Text = exception.Message;
+        }
     }
 
     private static bool IsSupportedPath(string path) =>

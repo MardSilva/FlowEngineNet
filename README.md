@@ -52,7 +52,7 @@ Implemented:
 - responsive figures, semantic ID preservation, and typed layout intentions;
 - unit and semantic-conformance tests;
 - typed EPUB progress and runtime metrics, cooperative cancellation, and atomic cancellation-safe CLI outputs.
-- a native WinUI 3 application with adaptive navigation, accessible themes, `en-US`/`pt-BR` settings, and visual EPUB inspection, import, validation, cancellation, diagnostics, and atomic output handling.
+- a native WinUI 3 application with visual EPUB inspection, import and validation, a reconstructible personal-folder index, restricted local HTML preview, and an optional advanced command/log view.
 
 Not implemented yet:
 
@@ -162,8 +162,8 @@ The layout operation validates the semantic document first. Invalid IDs, hierarc
 | `Flow.Epub` | Package inspection and diagnostic-first EPUB-to-`FlowDocument` adapter | Expanded subset in 0.2 alpha |
 | `Flow.Application` | Presentation-neutral use cases shared by first-party hosts | Initial boundary in 0.2 alpha |
 | `Flow.Cli` | EPUB inspection/import, sample, inspect, validate, hash, and HTML rendering commands | EPUB CLI integration in 0.2 alpha |
-| `Flow.Windows.Shell` | Testable settings, localization, navigation, and typed local-operation coordination for the Windows host | Expanded in 0.2 alpha |
-| `Flow.Windows` | Native WinUI 3 host for visual EPUB inspection, import, and validation | Expanded in 0.2 alpha |
+| `Flow.Windows.Shell` | Testable settings, localization, local discovery, preview sessions, and typed operation coordination | Expanded in 0.2 alpha |
+| `Flow.Windows` | Native WinUI 3 host for visual EPUB workflows and restricted renderer preview | Expanded in 0.2 alpha |
 
 Dependencies point inward: the document domain does not reference layout or renderer projects. EPUB and HTML remain adapters at the edge. The approved direct dependency graph is enforced by `Flow.Conformance.Tests`.
 

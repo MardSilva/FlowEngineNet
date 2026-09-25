@@ -31,7 +31,7 @@ Já estão implementados:
 - CLI leve para importar, inspecionar, validar, calcular hashes, renderizar e executar os fluxos privados de corpus e revisão;
 - relatórios tipados de fidelidade, metadados de origem, processamento e source map;
 - testes unitários, de integração, segurança, regressão e conformidade.
-- aplicação WinUI 3 nativa, com navegação adaptável, temas acessíveis, configurações em `en-US` e `pt-BR` e fluxos visuais de inspeção, importação e validação de EPUB, incluindo cancelamento, diagnósticos e gravação atômica.
+- aplicação WinUI 3 nativa para inspecionar, importar e validar EPUB, com índice reconstruível da pasta pessoal, prévia HTML local e restrita e um modo avançado opcional para comandos e logs.
 
 Ainda não estão implementados renderers além de HTML, exportação EPUB, paginação física, modos `Paged` e `Print`, Reader, editor, PKI, DRM ou serviços de publicação. `ReadingMode.Paged` e `ReadingMode.Print` são contratos reservados e lançam `NotSupportedException`.
 

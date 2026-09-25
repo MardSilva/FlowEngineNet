@@ -24,6 +24,18 @@ The graphical host uses the typed `Flow.Application` cases directly. `Flow.Windo
 
 The optional diagnostics sidecar currently uses the UI-specific `flow-windows-diagnostics-0.1` envelope over the same application diagnostics. The generated `.flow.json`, semantic validation, canonical hash and HTML package come from the shared engine. The CLI's full metadata, fidelity, processing and source-map report set remains available through the command line until those choices receive dedicated visual controls.
 
+## Personal folder and preview
+
+The **Personal folder** page stores one user-selected absolute directory in local settings. It discovers at most 500 EPUB files recursively, skips reparse points, sorts paths deterministically and processes books sequentially. The in-memory index contains source paths, basic metadata, safe covers and diagnostics only while the application is running; it is never serialized into a `FlowDocument`, canonical hash or evidence report. Refreshing the page rebuilds it from the source files.
+
+Each discovered publication can be sent to inspection, import, validation or preview. The preview generates a temporary HTML-book package through the same renderer and preserves the canonical document hash across phone, tablet and desktop profiles. These profiles change the renderer viewport only. They are not pages, device emulation or a Reader.
+
+WebView2 receives the package through the fixed virtual host `flow-preview.local`. Navigation is restricted to that host. New windows, downloads, permission requests and every external resource request are blocked. The temporary directory is removed when the preview page closes or the profile changes. A forced process termination can leave a recognized preview directory under local application data; it contains generated local output and is listed as a known limitation.
+
+## Advanced mode
+
+Advanced mode remains disabled by default. When enabled in settings, the operation page shows real progress observations, diagnostic codes and a PowerShell or Command Prompt representation built by `FlowCommandDisplayFormatter`. The representation is never used to run the operation. **Copy command** writes it to the clipboard, **Save log** writes only after the user chooses a destination, and **Copy and open PowerShell** opens a clean PowerShell window after copying the text. It does not paste or execute the command.
+
 ## Architecture and accessibility
 
 The application is split into two projects:
@@ -47,6 +59,6 @@ dotnet run --project .\src\Flow.Windows\Flow.Windows.csproj -p:Platform=x64
 
 The application currently runs from its build output. The existing alpha.3 MSI still installs only the CLI. Start-menu integration, packaging the graphical host, upgrade from alpha.3 and uninstalling both executables belong to the final Windows installer integration increment.
 
-Automated tests cover settings recovery and atomic persistence, navigation, both localization catalogs, theme selection, operation contracts, source preservation, output policies, cancellation cleanup, EPUB and Flow validation, XAML accessibility, high-contrast resources and project dependency boundaries. Local launch and UI Automation smoke tests confirm that the process creates a responsive native window and exposes the document-processing page. Visual review at Windows display scales of 100%, 150% and 200% remains a manual release check because unit tests cannot prove text clipping or physical readability.
+Automated tests cover settings recovery and atomic persistence, personal-folder discovery, noncanonical index behavior, navigation, both localization catalogs, theme selection, operation contracts, source preservation, output policies, cancellation cleanup, preview disposal and hash parity, command escaping, EPUB and Flow validation, XAML security structure, accessibility, high-contrast resources and project dependency boundaries. Local launch and UI Automation smoke tests confirm that the process creates a responsive native window and exposes the document-processing page. Visual review at Windows display scales of 100%, 150% and 200% remains a manual release check because unit tests cannot prove text clipping or physical readability.
 
-The application still has no personal-folder index, embedded preview, advanced equivalent-command view or installer integration. Those are separate increments; this operation page is not a Reader.
+The application still has no persistent library database, reading progress, annotations, search, production pagination or installer integration. The personal folder and preview are operational conveniences, not the Flow Reader.

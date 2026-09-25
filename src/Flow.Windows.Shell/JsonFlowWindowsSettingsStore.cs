@@ -59,7 +59,7 @@ public sealed class JsonFlowWindowsSettingsStore : IFlowWindowsSettingsStore
                    && document.Format == SettingsDocument.CurrentFormat
                    && FlowWindowsSettings.IsSupportedLanguage(document.Language)
                    && Enum.IsDefined(document.Theme)
-                ? new FlowWindowsSettings(document.Language!, document.Theme, document.AdvancedMode)
+                ? CreateSettings(document, fallback)
                 : fallback;
         }
         catch (Exception exception) when (exception is JsonException
@@ -90,7 +90,11 @@ public sealed class JsonFlowWindowsSettingsStore : IFlowWindowsSettingsStore
             {
                 await JsonSerializer.SerializeAsync(
                         stream,
-                        new SettingsDocument(settings.Language, settings.Theme, settings.AdvancedMode),
+                        new SettingsDocument(
+                            settings.Language,
+                            settings.Theme,
+                            settings.AdvancedMode,
+                            settings.PersonalLibraryPath),
                         SerializerOptions,
                         cancellationToken)
                     .ConfigureAwait(false);
@@ -111,10 +115,29 @@ public sealed class JsonFlowWindowsSettingsStore : IFlowWindowsSettingsStore
     private sealed record SettingsDocument(
         string? Language,
         FlowWindowsTheme Theme,
-        bool AdvancedMode)
+        bool AdvancedMode,
+        string? PersonalLibraryPath = null)
     {
         public const string CurrentFormat = "flow-windows-settings-0.1";
 
         public string Format { get; init; } = CurrentFormat;
+    }
+
+    private static FlowWindowsSettings CreateSettings(
+        SettingsDocument document,
+        FlowWindowsSettings fallback)
+    {
+        try
+        {
+            return new FlowWindowsSettings(
+                document.Language!,
+                document.Theme,
+                document.AdvancedMode,
+                document.PersonalLibraryPath);
+        }
+        catch (ArgumentException)
+        {
+            return fallback;
+        }
     }
 }

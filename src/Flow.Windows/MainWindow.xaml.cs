@@ -18,6 +18,8 @@ public sealed partial class MainWindow : Window
     private readonly IFlowWindowsOperationService _operations;
     private readonly AccessibilitySettings _accessibility = new();
     private FlowWindowsOperationKind _initialOperation = FlowWindowsOperationKind.Inspect;
+    private string? _initialSourcePath;
+    private string? _previewSourcePath;
 
     public MainWindow(
         FlowWindowsShellViewModel viewModel,
@@ -55,11 +57,24 @@ public sealed partial class MainWindow : Window
         ContentFrame.Content = destination switch
         {
             FlowWindowsDestination.Home => new HomePage(_viewModel.Text, OpenOperation),
+            FlowWindowsDestination.Library => new LibraryPage(
+                _viewModel,
+                new FlowWindowsLibraryService(_operations),
+                ChooseFolderAsync,
+                OpenOperation,
+                OpenPreview),
             FlowWindowsDestination.Operations => new OperationsPage(
                 _viewModel.Text,
                 _operations,
                 ChooseDocumentAsync,
-                _initialOperation),
+                _initialOperation,
+                _initialSourcePath,
+                _viewModel.Settings.AdvancedMode,
+                OpenPreview,
+                SaveTextAsync,
+                OpenPowerShellAsync),
+            FlowWindowsDestination.Preview when _previewSourcePath is not null =>
+                new PreviewPage(_viewModel.Text, _operations, _previewSourcePath),
             FlowWindowsDestination.HowItWorks => new HowItWorksPage(_viewModel.Text),
             FlowWindowsDestination.Settings => new SettingsPage(_viewModel, ApplySettingsAsync),
             _ => throw new ArgumentOutOfRangeException(nameof(destination)),
@@ -94,6 +109,7 @@ public sealed partial class MainWindow : Window
         Title = _viewModel.Text["WindowTitle"];
         BrandText.Text = _viewModel.Text["AppName"];
         HomeItem.Content = _viewModel.Text["NavHome"];
+        LibraryItem.Content = _viewModel.Text["NavLibrary"];
         OperationsItem.Content = _viewModel.Text["NavOperations"];
         HowItem.Content = _viewModel.Text["NavHowItWorks"];
         SettingsItem.Content = _viewModel.Text["NavSettings"];
@@ -101,7 +117,9 @@ public sealed partial class MainWindow : Window
         AutomationProperties.SetName(ContentFrame, _viewModel.Text[_viewModel.Destination switch
         {
             FlowWindowsDestination.Home => "HomeTitle",
+            FlowWindowsDestination.Library => "LibraryTitle",
             FlowWindowsDestination.Operations => "OperationsTitle",
+            FlowWindowsDestination.Preview => "PreviewTitle",
             FlowWindowsDestination.HowItWorks => "HowTitle",
             _ => "SettingsTitle",
         }]);
@@ -109,9 +127,28 @@ public sealed partial class MainWindow : Window
 
     private void OpenOperation(FlowWindowsOperationKind operation)
     {
+        _initialSourcePath = null;
         _initialOperation = operation;
         _viewModel.Destination = FlowWindowsDestination.Operations;
         Navigation.SelectedItem = OperationsItem;
+        ShowDestination(FlowWindowsDestination.Operations);
+    }
+
+    private void OpenOperation(string sourcePath, FlowWindowsOperationKind operation)
+    {
+        _initialSourcePath = sourcePath;
+        _initialOperation = operation;
+        _viewModel.Destination = FlowWindowsDestination.Operations;
+        Navigation.SelectedItem = OperationsItem;
+        ShowDestination(FlowWindowsDestination.Operations);
+    }
+
+    private void OpenPreview(string sourcePath)
+    {
+        _previewSourcePath = sourcePath;
+        _viewModel.Destination = FlowWindowsDestination.Preview;
+        Navigation.SelectedItem = null;
+        ShowDestination(FlowWindowsDestination.Preview);
     }
 
     private async Task<string?> ChooseDocumentAsync()
@@ -128,6 +165,52 @@ public sealed partial class MainWindow : Window
             WinRT.Interop.WindowNative.GetWindowHandle(this));
         var file = await picker.PickSingleFileAsync();
         return file?.Path;
+    }
+
+    private async Task<string?> ChooseFolderAsync()
+    {
+        var picker = new FolderPicker
+        {
+            SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+            ViewMode = PickerViewMode.List,
+        };
+        picker.FileTypeFilter.Add("*");
+        WinRT.Interop.InitializeWithWindow.Initialize(
+            picker,
+            WinRT.Interop.WindowNative.GetWindowHandle(this));
+        var folder = await picker.PickSingleFolderAsync();
+        return folder?.Path;
+    }
+
+    private async Task<string?> SaveTextAsync(string suggestedName, string content)
+    {
+        var picker = new FileSavePicker
+        {
+            SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+            SuggestedFileName = Path.GetFileNameWithoutExtension(suggestedName),
+        };
+        picker.FileTypeChoices.Add("Text log", [Path.GetExtension(suggestedName)]);
+        WinRT.Interop.InitializeWithWindow.Initialize(
+            picker,
+            WinRT.Interop.WindowNative.GetWindowHandle(this));
+        var file = await picker.PickSaveFileAsync();
+        if (file is null)
+        {
+            return null;
+        }
+
+        await File.WriteAllTextAsync(file.Path, content, new System.Text.UTF8Encoding(false));
+        return file.Path;
+    }
+
+    private static Task OpenPowerShellAsync()
+    {
+        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+        {
+            FileName = "powershell.exe",
+            UseShellExecute = true,
+        });
+        return Task.CompletedTask;
     }
 
     private void UpdateLogo()

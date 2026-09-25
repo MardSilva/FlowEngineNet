@@ -30,19 +30,124 @@ public sealed class FlowWindowsOperationService : IFlowWindowsOperationService
 
     private readonly IFlowApplicationService _application;
     private readonly IFlowDocumentSerializer _serializer;
+    private readonly string _previewRoot;
 
     public FlowWindowsOperationService(
         IFlowApplicationService application,
-        IFlowDocumentSerializer serializer)
+        IFlowDocumentSerializer serializer,
+        string? previewRoot = null)
     {
         ArgumentNullException.ThrowIfNull(application);
         ArgumentNullException.ThrowIfNull(serializer);
         _application = application;
         _serializer = serializer;
+        _previewRoot = Path.GetFullPath(previewRoot ?? Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "FlowEngineNet",
+            "Preview"));
     }
 
     public static FlowWindowsOperationService CreateDefault() =>
         new(FlowApplicationService.CreateDefault(), new FlowJsonDocumentSerializer());
+
+    public async Task<FlowWindowsPreviewSession> CreatePreviewAsync(
+        string sourcePath,
+        FlowWindowsPreviewProfile profile,
+        FlowWindowsHtmlLanguage htmlLanguage = FlowWindowsHtmlLanguage.Automatic,
+        IProgress<FlowApplicationProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(sourcePath);
+        if (!Enum.IsDefined(profile))
+        {
+            throw new ArgumentOutOfRangeException(nameof(profile));
+        }
+
+        EnsureReadableSource(sourcePath);
+        var (width, height) = profile switch
+        {
+            FlowWindowsPreviewProfile.Phone => (390d, 844d),
+            FlowWindowsPreviewProfile.Tablet => (820d, 1180d),
+            FlowWindowsPreviewProfile.Desktop => (1440d, 900d),
+            _ => throw new ArgumentOutOfRangeException(nameof(profile)),
+        };
+
+        FlowDocument document;
+        ImmutableArray<FlowApplicationDiagnostic> diagnostics;
+        if (Path.GetExtension(sourcePath).Equals(".epub", StringComparison.OrdinalIgnoreCase))
+        {
+            await using var source = OpenRead(sourcePath);
+            var imported = await _application.ImportEpubAsync(new ImportEpubRequest(source), progress, cancellationToken)
+                .ConfigureAwait(false);
+            if (!imported.Import.IsSuccess || imported.Import.Document is null || imported.Validation?.IsValid != true)
+            {
+                throw new InvalidDataException("The EPUB could not be imported into a valid preview document.");
+            }
+
+            document = imported.Import.Document;
+            diagnostics = imported.Diagnostics;
+        }
+        else if (sourcePath.EndsWith(".flow.json", StringComparison.OrdinalIgnoreCase))
+        {
+            await using var source = OpenRead(sourcePath);
+            document = await _serializer.DeserializeAsync(source, cancellationToken).ConfigureAwait(false);
+            var validated = await _application.ValidateDocumentAsync(
+                    new ValidateDocumentRequest(document),
+                    progress,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (!validated.Validation.IsValid)
+            {
+                throw new InvalidDataException("The Flow document is invalid and cannot be previewed.");
+            }
+
+            diagnostics = validated.Diagnostics;
+        }
+        else
+        {
+            throw new NotSupportedException("Preview accepts local .epub or .flow.json files.");
+        }
+
+        var rendered = await _application.RenderHtmlBookAsync(
+                new RenderHtmlBookRequest(document, width, height, uiLanguage: MapLanguage(htmlLanguage)),
+                progress,
+                cancellationToken)
+            .ConfigureAwait(false);
+        Directory.CreateDirectory(_previewRoot);
+        var sessionPath = Path.Combine(_previewRoot, $"preview-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(sessionPath);
+        try
+        {
+            foreach (var file in rendered.Package.Files)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var destination = Path.GetFullPath(
+                    Path.Combine(sessionPath, file.Path.Replace('/', Path.DirectorySeparatorChar)));
+                if (!destination.StartsWith(
+                        sessionPath + Path.DirectorySeparatorChar,
+                        StringComparison.OrdinalIgnoreCase))
+                {
+                    throw new InvalidOperationException("The preview package contains an unsafe path.");
+                }
+
+                Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+                await File.WriteAllBytesAsync(destination, file.Content.ToArray(), cancellationToken)
+                    .ConfigureAwait(false);
+            }
+
+            return new FlowWindowsPreviewSession(
+                sessionPath,
+                profile,
+                CreateSummary(document, null),
+                diagnostics,
+                rendered.Hash.Hash);
+        }
+        catch
+        {
+            Directory.Delete(sessionPath, recursive: true);
+            throw;
+        }
+    }
 
     public async Task<FlowWindowsOperationResult> ExecuteAsync(
         FlowWindowsOperationRequest request,
