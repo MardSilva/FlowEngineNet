@@ -92,6 +92,14 @@ Execute `flow update check` para consultar releases estáveis ou `flow update ch
 
 Quando o executável atual corresponde ao diretório registrado pelo MSI por utilizador, o comando identifica esse método e orienta o download e a execução do MSI mais recente. O major upgrade usa o `UpgradeCode` permanente descrito acima. Instalações como ferramenta .NET ou pacote portátil também são reconhecidas e recebem o comando ou procedimento manual adequado. Sem evidência suficiente, o método fica como desconhecido, sem tentativa de adivinhação.
 
+## Gate de release
+
+O workflow manual **Draft release** gera o ZIP portátil no Windows, testa sua execução sem um runtime do .NET no `PATH` e entrega exatamente esse payload ao builder do MSI. Outro runner Windows instala silenciosamente um pacote de teste anterior com identidade isolada, exercita a CLI instalada, faz o reparo e o upgrade, recusa o downgrade, desinstala o produto e confirma a remoção dos arquivos, registros e segmento de `PATH` pertencentes ao instalador. Identidades aleatórias impedem que o teste alcance o código de produto da release ou uma instalação pessoal do Flow.
+
+O gate final exige que `.nupkg`, ZIP e MSI indiquem a mesma versão pública e a mesma revisão do Git. Também compara os três arquivos extraídos do ZIP promovido com os hashes do payload registrados no manifesto do MSI. Os formatos não precisam ter bytes iguais. Evidências do instalador, manifestos de distribuição, SBOMs separados e um arquivo consolidado de checksums do Windows só seguem para o draft depois dessas verificações.
+
+O workflow cria apenas uma GitHub Release em rascunho, depois da confirmação explícita e do environment protegido `draft-release`. Ele não publica no NuGet, não cria uma release pública e não marca uma pré-release como `Latest`.
+
 ## Limite atual
 
-O ZIP portátil e o MSI ainda são artefatos locais de desenvolvimento, sem assinatura, e não foram anexados a uma GitHub Release. Ainda não existem MSIX, aplicação gráfica ou associação de arquivos. O comando de atualização consegue inspecionar uma release oficial existente, mas não pode atualizar um artefato local de desenvolvimento enquanto os pacotes correspondentes não forem anexados. A integração automatizada com a release e a assinatura de código continuam como incrementos separados.
+O ZIP portátil e o MSI continuam sendo artefatos experimentais sem assinatura, embora o workflow confirmado manualmente já possa anexá-los a uma release em rascunho. Por isso, o Windows pode mostrar um aviso de publicador desconhecido ou do SmartScreen. Ainda não existem MSIX, aplicação gráfica ou associação de arquivos. O comando de atualização informa o pacote disponível e seu checksum, mas nunca baixa ou executa o arquivo. Assinatura de código e instalação automatizada continuam como incrementos separados.

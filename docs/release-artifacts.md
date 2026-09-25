@@ -43,7 +43,19 @@ The dry-run itself creates no tag or GitHub Release and uploads nothing. CI temp
 
 `eng/get-release-proposal.ps1` recognizes `feature/<version>-<description>` and `release/<version>` for the supported `alpha`, `beta`, and `rc` prerelease sequence. It compares that proposal with the package version resolved by MSBuild and with `eng/release-plan.json`. The CI summary reports one of four states: candidate, ready for draft, version update required, or no proposal. This job has read-only repository permission and cannot create tags or releases.
 
-`.github/workflows/release.yml` is a separate manual workflow. It requires the exact planned version, a trusted `main` or `release/<version>` source, and the explicit `CREATE_DRAFT_RELEASE` choice. Windows and Ubuntu repeat formatting, documentation, build, tests, and installed-package smoke checks before Ubuntu rebuilds the deterministic artifacts and dry-run evidence. The final job uses the `draft-release` environment and `contents: write` only while creating a draft GitHub Release. It prepends a deterministic bilingual introduction to GitHub's categorized generated notes, includes local installation and verification instructions, and attaches the validated files. A prerelease is explicitly not marked `Latest`. The workflow does not publish to NuGet or publish the GitHub Release. Repository administrators can add required reviewers to that environment.
+`.github/workflows/release.yml` is a separate manual workflow. It requires the exact planned version, a trusted `main` or `release/<version>` source, and the explicit `CREATE_DRAFT_RELEASE` choice. Windows and Ubuntu repeat formatting, documentation, build, tests, and installed-package smoke checks before Ubuntu rebuilds the deterministic artifacts and dry-run evidence. Separate Windows jobs then build and test the self-contained ZIP, build both localized MSI packages from that promoted payload, and prove silent installation, execution, repair, major upgrade, downgrade refusal, uninstallation and owned-component removal. The final job uses the `draft-release` environment and `contents: write` only while creating a draft GitHub Release. It prepends a deterministic bilingual introduction to GitHub's categorized generated notes, includes installation, removal and verification instructions, and attaches only validated files. A prerelease is explicitly not marked `Latest`. The workflow does not publish to NuGet or publish the GitHub Release. Repository administrators can add required reviewers to that environment.
+
+## Windows release artifacts
+
+The Windows path does not replace or rebuild the canonical `.nupkg`. It adds these release assets from the same immutable revision:
+
+- `FlowEngineNet.Portable.<version>.win-x64.zip`, with its CycloneDX SBOM and portable manifest;
+- localized `FlowEngineNet.Setup.<version>.<culture>.win-x64.msi` packages, with an installer SBOM and manifest;
+- `portable-smoke-result.json` and `installer-smoke-result.json`, recording the isolated execution and maintenance operations that passed;
+- `FlowEngineNet.<version>.windows-release-evidence.json`, binding version, revision, product identity, installer identity and declared payload;
+- `FlowEngineNet.<version>.windows-SHA256SUMS`, covering the promoted Windows assets without colliding with the canonical package checksum file.
+
+`eng/verify-windows-release-artifacts.ps1` requires the canonical package, portable distribution and MSI to identify the same public version and Git revision. It extracts the promoted portable ZIP and compares every payload file with the hashes recorded by the installer manifest. The verifier deliberately does not compare `.nupkg`, ZIP and MSI bytes: they are different distribution formats with different reproducibility boundaries.
 
 `.github/release.yml` defines the generated changelog categories. `eng/new-release-introduction.ps1` resolves the exact planned version, rejects mismatches, and writes UTF-8 without BOM and LF when an output file is requested. `eng/test-release-introduction.ps1` checks deterministic bytes, versioned links, installation text, encoding, and mismatch rejection. The generated introduction describes the whole experimental build; the categorized section below it lists the changes since the preceding release.
 
@@ -84,4 +96,4 @@ The package is then uninstalled from the isolated tool directory. The script nev
 
 ## Current boundary
 
-These files are unsigned release candidates. The provenance is informative and self-consistent, but it is not signed, hosted by a transparency service or a claim of any SLSA build level. There is no public NuGet package, installer, upgrade test or long-term artifact retention policy yet. A generated GitHub draft still needs human review before publication and must not be treated as a supported release.
+These files are unsigned release candidates. The provenance is informative and self-consistent, but it is not signed, hosted by a transparency service or a claim of any SLSA build level. The Windows MSI is also unsigned, so Windows may show an unknown-publisher or SmartScreen warning. There is no public NuGet package, automatic updater or long-term artifact retention policy yet. A generated GitHub draft still needs human review before publication and must not be treated as a supported release.

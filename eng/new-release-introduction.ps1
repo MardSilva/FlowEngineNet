@@ -31,18 +31,36 @@ $notesTemplate = @'
 
 ## Install and try / Instalar e testar
 
-This build requires the .NET 10 SDK. Download `FlowEngineNet.Tool.{VERSION}.nupkg` from the assets below, place it in an otherwise empty directory named `flow-package`, and run from its parent directory:
+### Windows installer / Instalador para Windows
 
-Esta versão exige o SDK do .NET 10. Baixe `FlowEngineNet.Tool.{VERSION}.nupkg` nos arquivos abaixo, coloque-o em um diretório vazio chamado `flow-package` e execute a partir do diretório pai:
+Download `FlowEngineNet.Setup.{VERSION}.en-US.win-x64.msi` or `FlowEngineNet.Setup.{VERSION}.pt-BR.win-x64.msi` and open it. The per-user installer does not require the .NET SDK or administrator privileges. This experimental prerelease is not code-signed, so Windows may show an unknown-publisher or SmartScreen warning. Verify the SHA-256 before continuing.
+
+Baixe `FlowEngineNet.Setup.{VERSION}.pt-BR.win-x64.msi` ou `FlowEngineNet.Setup.{VERSION}.en-US.win-x64.msi` e abra o arquivo. O instalador por utilizador não exige o SDK do .NET nem privilégios de administrador. Esta pré-release experimental não tem assinatura de código; por isso, o Windows pode mostrar um aviso de publicador desconhecido ou do SmartScreen. Confira o SHA-256 antes de continuar.
+
+To remove Flow, use **Settings > Apps > Installed apps > Flow Engine .NET > Uninstall**. Removal deletes only installer-owned application files and registration. Books, Flow documents, preferences, reports and exports are preserved.
+
+Para remover o Flow, use **Configurações > Aplicativos > Aplicativos instalados > Flow Engine .NET > Desinstalar**. A remoção apaga somente os arquivos e registros pertencentes ao instalador. Livros, documentos Flow, preferências, relatórios e exportações são preservados.
+
+### Portable Windows ZIP / ZIP portátil para Windows
+
+`FlowEngineNet.Portable.{VERSION}.win-x64.zip` is self-contained. Extract it and run `flow.exe`; it changes neither Installed Apps nor the user `PATH`.
+
+`FlowEngineNet.Portable.{VERSION}.win-x64.zip` é self-contained. Extraia o arquivo e execute `flow.exe`; ele não altera Aplicativos instalados nem o `PATH` do utilizador.
+
+### Local .NET tool / Ferramenta .NET local
+
+This option requires the .NET 10 SDK. Download `FlowEngineNet.Tool.{VERSION}.nupkg` from the assets below, place it in an otherwise empty directory named `flow-package`, and run from its parent directory:
+
+Esta opção exige o SDK do .NET 10. Baixe `FlowEngineNet.Tool.{VERSION}.nupkg` nos arquivos abaixo, coloque-o em um diretório vazio chamado `flow-package` e execute a partir do diretório pai:
 
 ```text
 dotnet tool install --global FlowEngineNet.Tool --version {VERSION} --add-source ./flow-package
 flow --language pt-BR --banner menu
 ```
 
-The package is not published to NuGet.org yet. The local directory passed to `--add-source` is required.
+The .NET tool package is not published to NuGet.org yet. The local directory passed to `--add-source` is required.
 
-O pacote ainda não está publicado no NuGet.org. O diretório local informado em `--add-source` é obrigatório.
+O pacote da ferramenta .NET ainda não está publicado no NuGet.org. O diretório local informado em `--add-source` é obrigatório.
 
 ## What is included / O que está incluído
 

@@ -36,12 +36,18 @@ try {
 
     $requiredFragments = @(
         "FlowEngineNet.Tool.$version.nupkg",
+        "FlowEngineNet.Setup.$version.pt-BR.win-x64.msi",
+        "FlowEngineNet.Portable.$version.win-x64.zip",
         "--version $version",
         '--add-source ./flow-package',
         'flow --language pt-BR --banner menu',
         "blob/v$version/README.md",
         'Experimental prerelease',
         'Pré-release experimental',
+        'Installed apps > Flow Engine .NET > Uninstall',
+        'Aplicativos instalados > Flow Engine .NET > Desinstalar',
+        'not code-signed',
+        'não tem assinatura de código',
         'SHA256SUMS',
         'not published to NuGet.org yet'
     )

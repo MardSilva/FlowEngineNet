@@ -216,11 +216,20 @@ try {
     Write-Utf8Lf -Path $sbomPath -Content ($sbom | ConvertTo-Json -Depth 12)
 
     $manifestPath = Join-Path $resultDirectory 'installer-manifest.json'
+    $payloadManifestFiles = @($payloadFiles |
+        Sort-Object Name |
+        ForEach-Object {
+            [ordered]@{
+                name = $_.Name
+                sha256 = Get-Sha256Lower -Path $_.FullName
+                bytes = $_.Length
+            }
+        })
     $manifest = [ordered]@{
         format = 'flow-windows-installer-0.1'; product = $ProductName; publicVersion = $publicVersion; installerVersion = $InstallerVersion
         sourceRevision = $revision; productCode = $ProductCode.ToUpperInvariant(); upgradeCode = $UpgradeCode.ToUpperInvariant(); runtimeIdentifier = $runtimeIdentifier; architecture = 'x64'; scope = 'perUser'
         installRoot = 'LocalAppDataFolder\Programs'; installDirectoryName = $InstallDirectoryName; pathRegistration = 'current-user'; signed = $false
-        cultures = @($Cultures); files = $installerFiles; buildTool = [ordered]@{ name = 'WixToolset.Sdk'; version = $wixVersion; license = $wixLicense }
+        cultures = @($Cultures); payloadFiles = $payloadManifestFiles; files = $installerFiles; buildTool = [ordered]@{ name = 'WixToolset.Sdk'; version = $wixVersion; license = $wixLicense }
     }
     Write-Utf8Lf -Path $manifestPath -Content ($manifest | ConvertTo-Json -Depth 10)
     $checksumPaths = @($installerFiles | ForEach-Object { Join-Path $resultDirectory $_.name }) + @($sbomPath, $manifestPath)

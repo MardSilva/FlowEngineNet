@@ -197,6 +197,7 @@ public sealed class WindowsDistributionFoundationTests
             windowsProperties.Descendants("FlowWindowsInstallerToolLicense"),
             static license => license.Value == "MS-RL");
         Assert.Contains("flow-windows-installer-0.1", buildScript, StringComparison.Ordinal);
+        Assert.Contains("payloadFiles", buildScript, StringComparison.Ordinal);
         Assert.Contains("FlowWindowsProductCode", buildScript, StringComparison.Ordinal);
         Assert.Contains("Major upgrade", testScript, StringComparison.Ordinal);
         Assert.Contains("downgrade-refused", testScript, StringComparison.Ordinal);
@@ -211,6 +212,36 @@ public sealed class WindowsDistributionFoundationTests
             Assert.Contains(localization.Descendants(), static element =>
                 element.Name.LocalName == "String" && (string?)element.Attribute("Id") == "DowngradeError");
         }
+    }
+
+    [Fact]
+    public void DraftReleaseWorkflow_GatesWindowsArtifactsOnInstalledMsiEvidence()
+    {
+        var root = FindRepositoryRoot();
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "release.yml"));
+        var verifier = File.ReadAllText(Path.Combine(root, "eng", "verify-windows-release-artifacts.ps1"));
+
+        Assert.Contains("windows-portable:", workflow, StringComparison.Ordinal);
+        Assert.Contains("windows-installer:", workflow, StringComparison.Ordinal);
+        Assert.Contains("windows-installer-smoke:", workflow, StringComparison.Ordinal);
+        Assert.Contains("windows-release-evidence:", workflow, StringComparison.Ordinal);
+        Assert.Contains("build-windows-portable.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("test-windows-portable.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("build-windows-installer.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("test-windows-installer.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("verify-windows-release-artifacts.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("needs: [resolve, build, windows-release-evidence]", workflow, StringComparison.Ordinal);
+        Assert.Contains("'--draft'", workflow, StringComparison.Ordinal);
+        Assert.Contains("'--latest=false'", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("--draft=false", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("dotnet nuget push", workflow, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Contains("flow-windows-release-evidence-0.1", verifier, StringComparison.Ordinal);
+        Assert.Contains("declaredPayloadMatch = 'passed'", verifier, StringComparison.Ordinal);
+        Assert.Contains("majorUpgrade = 'passed'", verifier, StringComparison.Ordinal);
+        Assert.Contains("ownedRemoval = 'passed'", verifier, StringComparison.Ordinal);
+        Assert.Contains("installerManifest.signed", verifier, StringComparison.Ordinal);
+        Assert.DoesNotContain("C:\\Users\\", verifier, StringComparison.OrdinalIgnoreCase);
     }
 
     [Fact]

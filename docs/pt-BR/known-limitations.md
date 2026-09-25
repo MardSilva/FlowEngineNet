@@ -10,11 +10,11 @@ Mudanças de comportamento devem classificar a fronteira como resolvida, reduzid
 
 - APIs, campos `.flow.json`, canonicalização, HTML e diagnósticos continuam experimentais durante `0.x`.
 - `.flow.json` é intercâmbio de desenvolvimento, não media type registrado, padrão, formato arquivístico ou container final.
-- Não há pacote NuGet, release pública, registry de schemas, garantia de migração ou compatibilidade. O candidato local inclui checksums, SBOM e manifesto apenas para desenvolvimento e CI.
-- O projeto fixa .NET SDK 10.0.401. A CLI depende de runtime .NET 10 compatível; não há instalador assinado nem pacote self-contained.
+- Não há pacote NuGet público, registry de schemas, garantia de migração ou compatibilidade. O workflow confirmado manualmente pode criar uma release em rascunho com artefatos validados da CLI e do Windows, mas a publicação desse draft continua sendo uma decisão humana.
+- O projeto fixa .NET SDK 10.0.401. O `.nupkg` depende de runtime .NET 10 compatível. Já existem ZIP self-contained para win-x64 e MSI por utilizador, mas o MSI não tem assinatura de código; outras arquiteturas Windows e distribuições self-contained para Linux ou macOS ainda não estão disponíveis.
 - Reprodutibilidade cobre duas builds normalizadas no builder Ubuntu canônico e a instalação do mesmo candidato em Ubuntu/Windows. Não prova igualdade entre compiladores independentes, macOS ou outros SDKs. Assinatura futura terá de ocorrer depois da normalização.
 - O SBOM não cobre SDK, host, Actions, dependências só de teste ou bibliotecas do sistema. A proveniência local não é assinada e não alega nível SLSA, transparência ou identidade confiável.
-- Proposta e dry-run não publicam no NuGet nem tornam uma GitHub Release pública. Um workflow separado e manual pode criar um draft depois da validação Windows/Linux, mas o rascunho, a intenção de tag e os artefatos não assinados ainda exigem revisão humana. Upgrade, rollback, revogação e recuperação de publicação acidental não foram definidos.
+- Proposta e dry-run não publicam no NuGet nem tornam uma GitHub Release pública. Um workflow separado e manual pode criar um draft depois da validação canônica em Windows/Linux e dos testes isolados de manutenção do instalador Windows. O rascunho, a intenção de tag e os artefatos não assinados ainda exigem revisão humana. Procedimentos de rollback, revogação e recuperação de publicação acidental não foram definidos.
 
 ## Modelo semântico
 

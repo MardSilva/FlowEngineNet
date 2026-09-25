@@ -92,6 +92,14 @@ Run `flow update check` to consult stable releases, or `flow update check --chan
 
 When the current executable matches the registered per-user MSI directory, the command identifies the installation as MSI and instructs the user to download and run the listed newer MSI. A major upgrade then uses the permanent `UpgradeCode` described above. The command also recognizes .NET tool and portable installations and presents the appropriate manual command or replacement procedure. If there is not enough evidence, it reports an unknown method instead of guessing.
 
+## Release gate
+
+The manually confirmed **Draft release** workflow now builds the portable ZIP on Windows, smoke-tests it without a .NET runtime on `PATH`, and passes that exact payload to the MSI builder. A separate Windows runner installs an isolated older test package silently, exercises the installed CLI, repairs it, upgrades it, rejects a downgrade, uninstalls it and checks that owned files, registration and the added `PATH` entry are gone. Random test identities prevent this process from addressing the production product code or a personal Flow installation.
+
+The final Windows gate requires the `.nupkg`, ZIP and MSI to name the same public version and Git revision. It also compares the three files extracted from the promoted ZIP with the payload hashes recorded by the MSI manifest. The formats are not expected to have equal bytes. Installer evidence, distribution manifests, separate SBOMs and a consolidated Windows checksum file are attached only after these checks pass.
+
+The workflow can create only a draft GitHub Release after explicit confirmation and the protected `draft-release` environment. It does not publish to NuGet, create a public release or mark a prerelease as `Latest`.
+
 ## Current boundary
 
-The portable ZIP and MSI are local, unsigned development artifacts; neither is attached to a GitHub Release yet. There is still no MSIX, graphical application or file association. The update command can inspect an existing official release but cannot update a local development artifact until matching packages are attached. Automated release integration and code signing remain separate increments.
+The portable ZIP and MSI remain unsigned experimental artifacts, although the manually confirmed workflow can now attach them to a draft release. Windows may therefore show an unknown-publisher or SmartScreen warning. There is still no MSIX, graphical application or file association. The update command reports an available package and its checksum but never downloads or executes it. Code signing and automated installation remain separate increments.
