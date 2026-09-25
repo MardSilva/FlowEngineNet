@@ -14,7 +14,7 @@ O projeto não substitui PDF nem EPUB. A versão atual testa a base do motor e u
 
 ## Marco atual
 
-O marco em desenvolvimento é o **`0.2.0-alpha.3`**. A prerelease mais recente é a [`v0.2.0-alpha.2`](https://github.com/MardSilva/FlowEngineNet/releases/tag/v0.2.0-alpha.2).
+O marco em desenvolvimento é o **`0.2.0-alpha.4`**. A prerelease mais recente é a [`v0.2.0-alpha.2`](https://github.com/MardSilva/FlowEngineNet/releases/tag/v0.2.0-alpha.2).
 
 Já estão implementados:
 
@@ -31,6 +31,7 @@ Já estão implementados:
 - CLI leve para importar, inspecionar, validar, calcular hashes, renderizar e executar os fluxos privados de corpus e revisão;
 - relatórios tipados de fidelidade, metadados de origem, processamento e source map;
 - testes unitários, de integração, segurança, regressão e conformidade.
+- aplicação WinUI 3 nativa para inspecionar, importar e validar EPUB, com índice reconstruível da pasta pessoal, prévia HTML local e restrita e um modo avançado opcional para comandos e logs.
 
 Ainda não estão implementados renderers além de HTML, exportação EPUB, paginação física, modos `Paged` e `Print`, Reader, editor, PKI, DRM ou serviços de publicação. `ReadingMode.Paged` e `ReadingMode.Print` são contratos reservados e lançam `NotSupportedException`.
 
@@ -237,6 +238,8 @@ O fluxo cria um candidato normalizado, checksums SHA-256, SBOM CycloneDX, manife
 - [Revisão da versão 0.1](docs/pt-BR/0.1-release-review.md)
 - [Revisão do ciclo EPUB 0.2](docs/pt-BR/0.2-epub-cycle-review.md)
 - [Artefatos locais de release](docs/pt-BR/release-artifacts.md)
+- [Aplicação do Flow para Windows](docs/pt-BR/windows-app.md)
+- [Distribuição para Windows](docs/pt-BR/windows-distribution.md)
 - [Resultados da pesquisa](docs/pt-BR/research-findings.md)
 - [Política de tradução](docs/pt-BR/translation-policy.md)
 - [Roteiro](docs/pt-BR/roadmap.md)

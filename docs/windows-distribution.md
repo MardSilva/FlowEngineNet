@@ -4,7 +4,7 @@ English | [Português (Brasil)](pt-BR/windows-distribution.md)
 
 Flow's Windows distribution has a stable product identity before the first installer is introduced. The semantic version remains defined in `Directory.Build.props`; `eng/Flow.WindowsProduct.props` adds only Windows-specific identity and installation policy. This avoids a second public version source.
 
-The initial target is `win-x64`, installed per user under the local application-data programs directory. The permanent upgrade code is `{C412C622-FA2F-400C-88EE-BA5D4A573F7D}`. Windows Installer uses the separate numeric version `0.2.3` for ordering the `0.2.0-alpha.3` package. Future installer versions must increase that numeric value even when the public SemVer changes between alpha, beta, release-candidate and stable channels.
+The initial target is `win-x64`, installed per user under the local application-data programs directory. The permanent upgrade code is `{C412C622-FA2F-400C-88EE-BA5D4A573F7D}`. Windows Installer uses the separate numeric version `0.2.4` for ordering the `0.2.0-alpha.4` package. Future installer versions must increase that numeric value even when the public SemVer changes between alpha, beta, release-candidate and stable channels.
 
 The installer may own and remove only its application payload, command alias, installer registration and product shortcuts. Books, configured directories, `.flow.json` documents, preferences, reports and exports are user data. Normal upgrades and uninstallation must preserve them.
 
@@ -67,7 +67,7 @@ The output under `artifacts/windows-installer/` contains both MSI files, SHA-256
 For an unattended installation:
 
 ```powershell
-msiexec.exe /i ".\FlowEngineNet.Setup.0.2.0-alpha.3.en-US.win-x64.msi" /qn /norestart
+msiexec.exe /i ".\FlowEngineNet.Setup.0.2.0-alpha.4.en-US.win-x64.msi" /qn /norestart
 ```
 
 Windows Installer owns repair, upgrade and removal. A repair can be requested with `msiexec.exe /fa <product-code> /qn /norestart`; normal removal should use Windows Installed Apps or Programs and Features. Both localized variants of this release share one fixed `ProductCode`. A future public MSI release must use a new `ProductCode`, keep the permanent `UpgradeCode`, and increase the numeric installer version. This allows a major upgrade to replace the older release and blocks installation of a lower version over a newer one.
@@ -80,7 +80,7 @@ Run the destructive installation test only on Windows:
 pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-installer.ps1
 ```
 
-The test uses random product, upgrade, component, registry and directory identities. It never addresses the production product code or an existing personal installation. Within that isolated identity it verifies clean installation, execution without .NET on `PATH`, repair, major upgrade, downgrade rejection and uninstallation. The test also uses a directory containing spaces and Unicode and requires the original user `PATH` to be restored exactly.
+The test uses random product, upgrade, component, registry and directory identities. It never addresses the production product code or an existing personal installation. Within that isolated identity it verifies clean installation, execution without .NET on `PATH`, repair, major upgrade, downgrade rejection and uninstallation. The test also uses a directory containing spaces and Unicode. Its final check compares normalized, ordered `PATH` entries: harmless separator and trailing-slash formatting changes are accepted, but a changed, removed, or reordered unrelated entry still fails the gate.
 
 The installer is built with WiX Toolset 4.0.6, fixed in the project and licensed under MS-RL. WiX 6 and 7 were not selected because their current distribution adds a separate Open Source Maintenance Fee EULA. WiX is a build-time tool and is not installed with Flow. Its version, license and excluded build-tool role are recorded in the installer SBOM. The MSI uses the standard Windows Installer registration and major-upgrade mechanisms described by [Microsoft](https://learn.microsoft.com/en-us/windows/win32/msi/configuring-add-remove-programs-with-windows-installer) and [WiX](https://docs.firegiant.com/wix/schema/wxs/majorupgrade/).
 
@@ -102,4 +102,8 @@ The workflow can create only a draft GitHub Release after explicit confirmation 
 
 ## Current boundary
 
-The portable ZIP and MSI remain unsigned experimental artifacts, although the manually confirmed workflow can now attach them to a draft release. Windows may therefore show an unknown-publisher or SmartScreen warning. There is still no MSIX, graphical application or file association. The update command reports an available package and its checksum but never downloads or executes it. Code signing and automated installation remain separate increments.
+`Flow.Application` provides the in-process boundary for EPUB inspection and import, Flow validation and hashing, and HTML rendering. It reports typed progress, cancellation, diagnostics and results without depending on the CLI, a terminal or subprocess execution. The CLI owns file paths, persistence, confirmation and exit codes.
+
+The WinUI 3 application now runs as a separate graphical `WinExe`, explains Flow offline and performs local EPUB inspection, import and validation through the shared typed application boundary. It also provides a reconstructible personal-folder index, restricted local preview and opt-in advanced command/log details. It never invokes the CLI; opening PowerShell is a separate explicit action and does not execute the displayed command. The alpha.3 MSI still contains only the CLI; packaging the graphical host and adding its Start-menu shortcut are deferred to the final installer-integration step. See [windows-app.md](windows-app.md).
+
+The portable ZIP and MSI remain unsigned experimental artifacts, although the manually confirmed workflow can attach them to a draft release. Windows may therefore show an unknown-publisher or SmartScreen warning. There is still no MSIX or file association. The update command reports an available package and its checksum but never downloads or executes it. Code signing and automated installation remain separate increments.

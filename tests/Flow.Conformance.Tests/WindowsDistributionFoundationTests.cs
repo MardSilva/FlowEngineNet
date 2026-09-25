@@ -9,7 +9,7 @@ namespace Flow.Conformance.Tests;
 public sealed class WindowsDistributionFoundationTests
 {
     private const string UpgradeCode = "{C412C622-FA2F-400C-88EE-BA5D4A573F7D}";
-    private const string ProductCode = "{D4F3061D-355D-4DFC-8814-A99165AEEA42}";
+    private const string ProductCode = "{2072AAB6-E0D0-446D-BB8E-9555DA3F1838}";
     private static readonly IReadOnlyDictionary<string, string> ExpectedSourceHashes =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -92,7 +92,7 @@ public sealed class WindowsDistributionFoundationTests
         Assert.Equal("FlowEngineNet", properties["FlowProductId"]);
         Assert.Equal("Flow Engine .NET", properties["FlowProductName"]);
         Assert.Equal("Flow Engine contributors", properties["FlowProductPublisher"]);
-        Assert.Equal("0.2.3", properties["FlowWindowsInstallerVersion"]);
+        Assert.Equal("0.2.4", properties["FlowWindowsInstallerVersion"]);
         Assert.Equal(UpgradeCode, properties["FlowWindowsUpgradeCode"]);
         Assert.True(Guid.TryParse(properties["FlowWindowsUpgradeCode"], out _));
         Assert.Equal(ProductCode, properties["FlowWindowsProductCode"]);
@@ -104,7 +104,7 @@ public sealed class WindowsDistributionFoundationTests
         Assert.Equal("Programs\\FlowEngineNet", properties["FlowWindowsInstallDirectory"]);
 
         var installerVersion = Version.Parse(properties["FlowWindowsInstallerVersion"]);
-        Assert.Equal(3, installerVersion.Build);
+        Assert.Equal(4, installerVersion.Build);
         Assert.Contains(
             propertyElements,
             static element => element.Name.LocalName == "FlowPublicVersion" && element.Value == "$(VersionPrefix)-$(VersionSuffix)");
@@ -202,6 +202,9 @@ public sealed class WindowsDistributionFoundationTests
         Assert.Contains("Major upgrade", testScript, StringComparison.Ordinal);
         Assert.Contains("downgrade-refused", testScript, StringComparison.Ordinal);
         Assert.Contains("path-preserved", testScript, StringComparison.Ordinal);
+        Assert.Contains("ConvertTo-ComparableUserPath", testScript, StringComparison.Ordinal);
+        Assert.Contains("Test-UserPathPreserved", testScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("(Get-UserPath) -ne $pathBefore", testScript, StringComparison.Ordinal);
         Assert.DoesNotContain("eym_s", buildScript, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("eym_s", testScript, StringComparison.OrdinalIgnoreCase);
 

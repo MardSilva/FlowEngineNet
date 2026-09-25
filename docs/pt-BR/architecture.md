@@ -19,9 +19,18 @@ Documento != Layout != Renderização
 - `Flow.Security`: hash e assinatura local sobre bytes canônicos;
 - `Flow.Epub`: adaptação segura e limitada de EPUB;
 - `Flow.Epub.Corpus`: evidência de corpus, gates e revisão assistida;
+- `Flow.Application`: casos de uso neutros, compartilhados pelos hosts oficiais;
 - `Flow.Cli`: composição e operações de linha de comando.
+- `Flow.Windows.Shell`: estado, localização, configurações e índices reconstruíveis, sessões temporárias de prévia e orquestração de arquivos locais sobre a fronteira compartilhada, sem dependência de WinUI;
+- `Flow.Windows`: composição nativa WinUI 3 para os fluxos visuais.
 
 As referências entre projetos apontam para dentro. O modelo de documentos não depende de EPUB, HTML, CLI ou sistema operacional.
+
+## Fronteira da aplicação
+
+`Flow.Application` recebe streams controlados pelo chamador ou documentos `FlowDocument` já carregados. A camada devolve resultados tipados de inspeção, importação, validação, hash, layout e renderização. Progresso e cancelamento podem ser observados sem `Console`, subprocessos ou caminhos de saída.
+
+A CLI continua responsável pelo parsing, pelo Spectre.Console e pelos códigos de saída. A interface WinUI chama diretamente os mesmos casos de uso e mantém sua própria política tipada para origem, destino, confirmação, gravação temporária, descoberta local e prévia. Nenhum projeto Windows referencia ou inicia a CLI. A representação de comando equivalente serve apenas para mostrar ou copiar texto com o escaping do shell selecionado; ela não executa processos. O PowerShell só pode ser aberto por uma ação explícita do modo avançado, com o comando copiado para a área de transferência, sem execução automática.
 
 ## Pipeline de renderização
 

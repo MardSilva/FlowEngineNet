@@ -11,7 +11,7 @@
     <NoWarn>$(NoWarn);1591</NoWarn>
     <IsPackable>false</IsPackable>
     <VersionPrefix>0.2.0</VersionPrefix>
-    <VersionSuffix>alpha.3</VersionSuffix>
+    <VersionSuffix>alpha.4</VersionSuffix>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
 

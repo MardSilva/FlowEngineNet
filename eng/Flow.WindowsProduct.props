@@ -6,9 +6,9 @@
     <FlowProductSupportUrl>https://github.com/MardSilva/FlowEngineNet</FlowProductSupportUrl>
     <FlowPublicVersion Condition="'$(VersionSuffix)' == ''">$(VersionPrefix)</FlowPublicVersion>
     <FlowPublicVersion Condition="'$(VersionSuffix)' != ''">$(VersionPrefix)-$(VersionSuffix)</FlowPublicVersion>
-    <FlowWindowsInstallerVersion>0.2.3</FlowWindowsInstallerVersion>
+    <FlowWindowsInstallerVersion>0.2.4</FlowWindowsInstallerVersion>
     <FlowWindowsUpgradeCode>{C412C622-FA2F-400C-88EE-BA5D4A573F7D}</FlowWindowsUpgradeCode>
-    <FlowWindowsProductCode>{D4F3061D-355D-4DFC-8814-A99165AEEA42}</FlowWindowsProductCode>
+    <FlowWindowsProductCode>{2072AAB6-E0D0-446D-BB8E-9555DA3F1838}</FlowWindowsProductCode>
     <FlowWindowsExecutableComponentGuid>{CF740E81-C89A-4F66-9748-42E3296D1FD7}</FlowWindowsExecutableComponentGuid>
     <FlowWindowsRuntimeIdentifier>win-x64</FlowWindowsRuntimeIdentifier>
     <FlowWindowsArchitecture>x64</FlowWindowsArchitecture>

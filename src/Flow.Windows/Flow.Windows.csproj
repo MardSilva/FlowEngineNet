@@ -1,0 +1,49 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <RootNamespace>Flow.Windows</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\..\assets\branding\windows\flow.ico</ApplicationIcon>
+    <UseWinUI>true</UseWinUI>
+    <WindowsPackageType>None</WindowsPackageType>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <PlatformTarget>x64</PlatformTarget>
+    <Platforms>x64</Platforms>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK.WinUI" />
+    <PackageReference Include="Microsoft.WindowsAppSDK.InteractiveExperiences" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.WindowsDesktop.App.WindowsForms" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Flow.Windows.Shell\Flow.Windows.Shell.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\..\assets\branding\windows\flow-app-symbol-on-dark-512.png"
+             Link="Assets\flow-app-symbol-on-dark-512.png"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\assets\branding\windows\flow-app-symbol-on-light-512.png"
+             Link="Assets\flow-app-symbol-on-light-512.png"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\assets\branding\windows\flow-app-tile-512.png"
+             Link="Assets\flow-app-tile-512.png"
+             CopyToOutputDirectory="PreserveNewest" />
+    <Content Include="..\..\assets\branding\windows\flow.ico"
+             Link="Assets\flow.ico"
+             CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

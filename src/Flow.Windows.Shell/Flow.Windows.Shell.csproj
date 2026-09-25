@@ -1,0 +1,15 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\Flow.Application\Flow.Application.csproj" />
+    <ProjectReference Include="..\Flow.Documents\Flow.Documents.csproj" />
+    <ProjectReference Include="..\Flow.Rendering.Html\Flow.Rendering.Html.csproj" />
+  </ItemGroup>
+
+</Project>

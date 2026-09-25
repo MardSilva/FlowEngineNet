@@ -16,7 +16,7 @@ The project is not a replacement for PDF or EPUB. Version 0.1 tests engine found
 
 ## Current milestone
 
-The current development milestone is **`0.2.0-alpha.3`**. The latest tagged prerelease is [`v0.2.0-alpha.2`](https://github.com/MardSilva/FlowEngineNet/releases/tag/v0.2.0-alpha.2).
+The current development milestone is **`0.2.0-alpha.4`**. The latest tagged prerelease is [`v0.2.0-alpha.2`](https://github.com/MardSilva/FlowEngineNet/releases/tag/v0.2.0-alpha.2).
 
 Implemented:
 
@@ -52,6 +52,7 @@ Implemented:
 - responsive figures, semantic ID preservation, and typed layout intentions;
 - unit and semantic-conformance tests;
 - typed EPUB progress and runtime metrics, cooperative cancellation, and atomic cancellation-safe CLI outputs.
+- a native WinUI 3 application with visual EPUB inspection, import and validation, a reconstructible personal-folder index, restricted local HTML preview, and an optional advanced command/log view.
 
 Not implemented yet:
 
@@ -159,7 +160,10 @@ The layout operation validates the semantic document first. Invalid IDs, hierarc
 | `Flow.Rendering` | Renderer contracts and immutable rendered output | Implemented for 0.1 |
 | `Flow.Rendering.Html` | Deterministic standalone HTML and multi-file HTML book adapter | Expanded in 0.2 alpha |
 | `Flow.Epub` | Package inspection and diagnostic-first EPUB-to-`FlowDocument` adapter | Expanded subset in 0.2 alpha |
+| `Flow.Application` | Presentation-neutral use cases shared by first-party hosts | Initial boundary in 0.2 alpha |
 | `Flow.Cli` | EPUB inspection/import, sample, inspect, validate, hash, and HTML rendering commands | EPUB CLI integration in 0.2 alpha |
+| `Flow.Windows.Shell` | Testable settings, localization, local discovery, preview sessions, and typed operation coordination | Expanded in 0.2 alpha |
+| `Flow.Windows` | Native WinUI 3 host for visual EPUB workflows and restricted renderer preview | Expanded in 0.2 alpha |
 
 Dependencies point inward: the document domain does not reference layout or renderer projects. EPUB and HTML remain adapters at the edge. The approved direct dependency graph is enforced by `Flow.Conformance.Tests`.
 
@@ -187,6 +191,8 @@ The final clean-directory review passes 134 tests with zero build warnings; see 
 - [HTML book package](docs/html-book-package.md)
 - [Command-line interface](docs/cli.md)
 - [Local release artifacts](docs/release-artifacts.md)
+- [Windows application shell](docs/windows-app.md)
+- [Windows distribution](docs/windows-distribution.md)
 - [Canonicalization and hashing](docs/canonicalization.md)
 - [Experimental document signatures](docs/signatures.md)
 - [Experimental EPUB import](docs/epub-import.md)

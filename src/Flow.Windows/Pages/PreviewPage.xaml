@@ -1,0 +1,57 @@
+<Page
+    x:Class="Flow.Windows.Pages.PreviewPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{ThemeResource FlowContentBackgroundBrush}">
+    <VisualStateManager.VisualStateGroups>
+        <VisualStateGroup x:Name="WidthStates">
+            <VisualState x:Name="Compact">
+                <VisualState.StateTriggers>
+                    <AdaptiveTrigger MinWindowWidth="0" />
+                </VisualState.StateTriggers>
+                <VisualState.Setters>
+                    <Setter Target="PageContent.Padding" Value="20,24,20,36" />
+                </VisualState.Setters>
+            </VisualState>
+            <VisualState x:Name="Regular">
+                <VisualState.StateTriggers>
+                    <AdaptiveTrigger MinWindowWidth="960" />
+                </VisualState.StateTriggers>
+                <VisualState.Setters>
+                    <Setter Target="PageContent.Padding" Value="32" />
+                </VisualState.Setters>
+            </VisualState>
+        </VisualStateGroup>
+    </VisualStateManager.VisualStateGroups>
+    <Grid x:Name="PageContent" Padding="32" RowSpacing="14"
+          MaxWidth="1600" HorizontalAlignment="Stretch">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+        <StackPanel Spacing="6">
+            <TextBlock x:Name="TitleText" Style="{ThemeResource TitleTextBlockStyle}"
+                       AutomationProperties.HeadingLevel="Level1" />
+            <TextBlock x:Name="NoticeText" TextWrapping="Wrap" MaxWidth="900" HorizontalAlignment="Left" />
+        </StackPanel>
+        <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8">
+            <Button x:Name="PhoneButton" Click="PhoneButton_Click" />
+            <Button x:Name="TabletButton" Click="TabletButton_Click" />
+            <Button x:Name="DesktopButton" Click="DesktopButton_Click" />
+            <Button x:Name="CancelButton" Click="CancelButton_Click" Visibility="Collapsed" />
+        </StackPanel>
+        <StackPanel Grid.Row="2" Spacing="6">
+            <ProgressBar x:Name="PreviewProgress" IsIndeterminate="True" Visibility="Collapsed" />
+            <InfoBar x:Name="PreviewStatus" IsOpen="False" IsClosable="True" />
+        </StackPanel>
+        <ScrollViewer Grid.Row="3" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto">
+            <Border x:Name="DeviceFrame" BorderThickness="1" CornerRadius="8"
+                    BorderBrush="{ThemeResource FlowCardBorderBrush}" HorizontalAlignment="Center"
+                    VerticalAlignment="Top" Background="{ThemeResource FlowPreviewBackgroundBrush}">
+                <WebView2 x:Name="PreviewWebView" NavigationStarting="PreviewWebView_NavigationStarting" />
+            </Border>
+        </ScrollViewer>
+    </Grid>
+</Page>

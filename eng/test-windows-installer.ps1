@@ -113,6 +113,28 @@ function Test-PathEntry {
         ForEach-Object { $_.Trim().TrimEnd('\') }) -contains $ExpectedEntry.TrimEnd('\')
 }
 
+function ConvertTo-ComparableUserPath {
+    param([AllowNull()][string]$PathValue)
+    if ([string]::IsNullOrWhiteSpace($PathValue)) { return '' }
+
+    $entries = @($PathValue.Split(';', [StringSplitOptions]::RemoveEmptyEntries) |
+        ForEach-Object {
+            $entry = $_.Trim()
+            if ($entry.Length -gt 3) { $entry = $entry.TrimEnd('\') }
+            $entry
+        } |
+        Where-Object { -not [string]::IsNullOrWhiteSpace($_) })
+    return [string]::Join(';', $entries)
+}
+
+function Test-UserPathPreserved {
+    param([AllowNull()][string]$Before, [AllowNull()][string]$After)
+    return [string]::Equals(
+        (ConvertTo-ComparableUserPath -PathValue $Before),
+        (ConvertTo-ComparableUserPath -PathValue $After),
+        [System.StringComparison]::OrdinalIgnoreCase)
+}
+
 $manifestPath = Join-Path $artifactsRoot 'installer-manifest.json'
 $checksumsPath = Join-Path $artifactsRoot 'SHA256SUMS'
 if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf) -or -not (Test-Path -LiteralPath $checksumsPath -PathType Leaf)) {
@@ -216,7 +238,9 @@ try {
         (Test-PathEntry -PathValue (Get-UserPath) -ExpectedEntry $installDirectory)) {
         throw 'Uninstallation left owned files, registry data or PATH entry behind.'
     }
-    if ((Get-UserPath) -ne $pathBefore) { throw 'Uninstallation changed an unrelated user PATH entry.' }
+    if (-not (Test-UserPathPreserved -Before $pathBefore -After (Get-UserPath))) {
+        throw 'Uninstallation changed an unrelated user PATH entry.'
+    }
 
     $result = [ordered]@{
         format = 'flow-windows-installer-smoke-0.1'; productionVersion = $manifest.publicVersion; productionInstallerVersion = $manifest.installerVersion

@@ -80,6 +80,9 @@ function New-ReframedBitmap {
         $Size,
         $Size,
         [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    # GDI+ otherwise inherits the active Windows display DPI, which makes the
+    # encoded pHYs chunk (and therefore every asset hash) depend on UI scaling.
+    $result.SetResolution(96, 96)
     $graphics = [System.Drawing.Graphics]::FromImage($result)
     try {
         $graphics.CompositingMode = if ($Background.A -eq 0) {
@@ -120,6 +123,7 @@ function New-ResizedBitmap {
         $Size,
         $Size,
         [System.Drawing.Imaging.PixelFormat]::Format32bppArgb)
+    $result.SetResolution(96, 96)
     $graphics = [System.Drawing.Graphics]::FromImage($result)
     try {
         $graphics.CompositingMode = [System.Drawing.Drawing2D.CompositingMode]::SourceOver

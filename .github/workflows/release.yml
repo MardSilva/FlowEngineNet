@@ -115,6 +115,10 @@ jobs:
       - name: Build
         run: dotnet build Flow.sln --no-restore
 
+      - name: Build WinUI shell
+        if: runner.os == 'Windows'
+        run: dotnet build src/Flow.Windows/Flow.Windows.csproj --no-restore -p:Platform=x64
+
       - name: Test
         run: dotnet test Flow.sln --no-build
 
