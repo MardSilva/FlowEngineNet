@@ -1,0 +1,31 @@
+{
+  "format": "flow-brand-assets-0.1",
+  "rights": "Provided by the repository owner for use by the Flow Engine .NET project. No separate brand license is currently declared.",
+  "generator": "eng/New-FlowWindowsBrandAssets.ps1",
+  "sources": [
+    {
+      "id": "symbol-on-light",
+      "path": "assets/branding/source/flow-symbol-on-light-512.png",
+      "sha256": "57372E66178421105A9BBC49CF3C6C07E46C124C0C3492F6BD0BFDEF0B3EF8E2",
+      "purpose": "Dark symbol with blue accent for light surfaces."
+    },
+    {
+      "id": "symbol-on-dark",
+      "path": "assets/branding/source/flow-symbol-on-dark-512.png",
+      "sha256": "69C2C8D6F3F0D11C7AE71DEFB461CFD3622F0047BC175AAF1BE27118D104FD6C",
+      "purpose": "Light symbol with blue accent for dark surfaces."
+    },
+    {
+      "id": "symbol-monochrome",
+      "path": "assets/branding/source/flow-symbol-monochrome-512.png",
+      "sha256": "18FC81574203C41EB49FDC92B314EC7FDC266547EA2F080496F43FA710BF8002",
+      "purpose": "Single-color fallback for constrained output."
+    }
+  ],
+  "colors": {
+    "navy": "#101828",
+    "blue": "#2563EB",
+    "light": "#E8EEF6",
+    "lightBlue": "#60A5FA"
+  }
+}

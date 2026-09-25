@@ -16,7 +16,7 @@ The project is not a replacement for PDF or EPUB. Version 0.1 tests engine found
 
 ## Current milestone
 
-The current development milestone is **`0.2.0-alpha.2`**, focused on real EPUB workflows and the optional interactive CLI experience.
+The current development milestone is **`0.2.0-alpha.3`**. The latest tagged prerelease is [`v0.2.0-alpha.2`](https://github.com/MardSilva/FlowEngineNet/releases/tag/v0.2.0-alpha.2).
 
 Implemented:
 
@@ -268,7 +268,7 @@ The plan explicitly disables publication. After the ordinary Windows/Linux valid
 
 Branches named `feature/<version>-<description>` or `release/<version>` are inspected by CI. The release-proposal job compares the branch version with MSBuild and `eng/release-plan.json`, then writes a neutral suggestion to the job summary. Feature branches can suggest a candidate but cannot create a release.
 
-The separate **Draft release** workflow is manual. It accepts only synchronized `main` or `release/<version>` sources, repeats validation on Windows and Ubuntu, and requires the explicit `CREATE_DRAFT_RELEASE` choice. It creates a draft GitHub Release and attaches the local package, SBOM, checksums, manifest, and provenance evidence. It does not publish to NuGet and never makes the GitHub Release public automatically. Configure required reviewers on the `draft-release` GitHub environment if a second approval is desired.
+The separate **Draft release** workflow is manual. It accepts only synchronized `main` or `release/<version>` sources, repeats validation on Windows and Ubuntu, and requires the explicit `CREATE_DRAFT_RELEASE` choice. It creates a draft GitHub Release with the canonical `.nupkg`, a self-contained win-x64 ZIP, localized per-user MSI packages, separate SBOMs, checksums, manifests and validation evidence. The Windows installer must pass isolated silent install, execution, repair, upgrade, downgrade-refusal and removal checks before its files can reach the draft. The bilingual introduction explains installation and removal and warns that the MSI is not code-signed. Prereleases are explicitly kept out of the `Latest` position. The workflow does not publish to NuGet and never makes the GitHub Release public automatically. Configure required reviewers on the `draft-release` GitHub environment if a second approval is desired.
 
 Global options must appear before the command. They affect terminal text only: generated `.flow.json`, evidence JSON, canonical bytes, hashes and stable diagnostic codes do not change. In `pt-BR`, every current EPUB, document-validation and Flow JSON code receives a short Portuguese summary followed by its original technical detail. This keeps paths, IDs and rejected values available for troubleshooting without changing deterministic reports.
 

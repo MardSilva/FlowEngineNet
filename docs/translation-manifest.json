@@ -6,7 +6,7 @@
     {
       "source": "README.md",
       "translation": "README.pt-BR.md",
-      "sourceSha256": "314163999FB6205C5038FAA6210BA3A2AC7894C483DBC53FDA1FB9D651235F7B"
+      "sourceSha256": "46B0EFBD867E0E0A4A5DCA318F9B46FF79CBE27A5F16D7F0911490CFB6B56579"
     },
     {
       "source": "docs/0.1-release-review.md",
@@ -36,7 +36,7 @@
     {
       "source": "docs/cli.md",
       "translation": "docs/pt-BR/cli.md",
-      "sourceSha256": "42C1D95E47BD066D206FF02A4CF54720FD458274EDC8F0F531BF2D88BB04E01D"
+      "sourceSha256": "2C2DD9469D0C27D942614E2C78AF52AAAC9F0DED999B013CEC1AE088F36B1FE7"
     },
     {
       "source": "docs/conformance.md",
@@ -86,12 +86,12 @@
     {
       "source": "docs/known-limitations.md",
       "translation": "docs/pt-BR/known-limitations.md",
-      "sourceSha256": "377D22A0F6A9161EDF9B0A77C05AECA17F5D426A0AE86DE422673CCC5B212910"
+      "sourceSha256": "59AEDF86B678D4C1F3EACF959120405BE5AEF360191F5DA2BCCC60F8D7028941"
     },
     {
       "source": "docs/release-artifacts.md",
       "translation": "docs/pt-BR/release-artifacts.md",
-      "sourceSha256": "7A2F9BF23D803D94F197FB3284DF6EA18DF0347764340C94A40C2EDFB4E80BC8"
+      "sourceSha256": "7EBC5187A5C6A034F63E89D54A6F2E0BFABB1094D1DC43FC836B6C5721471F3B"
     },
     {
       "source": "docs/research-findings.md",
@@ -101,7 +101,7 @@
     {
       "source": "docs/resolved-limitations.md",
       "translation": "docs/pt-BR/resolved-limitations.md",
-      "sourceSha256": "44D99EA8F8DCA753A9339F765706414F536D2F81EA5EE3220A8EB64744688BF8"
+      "sourceSha256": "4D6BDB767C76624785F0845212DDE4B560E20DEF458AC887FF6B490D44E45E7F"
     },
     {
       "source": "docs/roadmap.md",
@@ -117,6 +117,11 @@
       "source": "docs/translation-policy.md",
       "translation": "docs/pt-BR/translation-policy.md",
       "sourceSha256": "4E0413D98D79FDC65AB65012B5D2772C5E5BCA0D3AC5EE435077B9B0C965D439"
+    },
+    {
+      "source": "docs/windows-distribution.md",
+      "translation": "docs/pt-BR/windows-distribution.md",
+      "sourceSha256": "6F98C4013AA1713969DA4999655AE6DFD7202A61081EEF0F679D347F9720B960"
     },
     {
       "source": "samples/SampleBook/README.md",

@@ -23,6 +23,7 @@ public sealed class CliCommandParser
             ["epub-review"] = ParseEpubReview,
             ["execution-status"] = ParseExecutionStatus,
             ["execution-clean"] = ParseExecutionClean,
+            ["update"] = ParseUpdate,
             ["inspect"] = static arguments => ParseDocumentCommand(arguments, static path => new InspectCommand(path)),
             ["validate"] = static arguments => ParseDocumentCommand(arguments, static path => new ValidateCommand(path)),
             ["hash"] = static arguments => ParseDocumentCommand(arguments, static path => new HashCommand(path)),
@@ -860,6 +861,71 @@ public sealed class CliCommandParser
         return CommandParseResult.Success(new ExecutionCleanCommand(arguments[1], executionId));
     }
 
+    private static CommandParseResult ParseUpdate(IReadOnlyList<string> arguments)
+    {
+        if (arguments.Count < 2 || arguments[1] != "check")
+        {
+            return CommandParseResult.Failure("FLOWCLI_USAGE", "ErrorUsage", UpdateUsage);
+        }
+
+        var channel = UpdateChannel.Stable;
+        var hasChannel = false;
+        var json = false;
+        for (var index = 2; index < arguments.Count; index++)
+        {
+            var option = arguments[index];
+            if (option == "--json")
+            {
+                if (json)
+                {
+                    return CommandParseResult.Failure("FLOWCLI_DUPLICATE_OPTION", "ErrorDuplicateOption", option);
+                }
+
+                json = true;
+                continue;
+            }
+
+            if (option != "--channel")
+            {
+                return CommandParseResult.Failure(
+                    "FLOWCLI_UNKNOWN_OPTION",
+                    "ErrorUnknownOption",
+                    "update",
+                    option,
+                    UpdateUsage);
+            }
+
+            if (hasChannel)
+            {
+                return CommandParseResult.Failure("FLOWCLI_DUPLICATE_OPTION", "ErrorDuplicateOption", option);
+            }
+
+            if (++index >= arguments.Count || string.IsNullOrWhiteSpace(arguments[index]))
+            {
+                return CommandParseResult.Failure(
+                    "FLOWCLI_USAGE",
+                    "ErrorOptionRequiresValue",
+                    option,
+                    UpdateUsage);
+            }
+
+            channel = arguments[index] switch
+            {
+                "stable" => UpdateChannel.Stable,
+                "prerelease" => UpdateChannel.Prerelease,
+                _ => (UpdateChannel)(-1),
+            };
+            if (!Enum.IsDefined(channel))
+            {
+                return CommandParseResult.Failure("FLOWCLI_INVALID_VALUE", "ErrorInvalidUpdateChannel");
+            }
+
+            hasChannel = true;
+        }
+
+        return CommandParseResult.Success(new UpdateCheckCommand(channel, json));
+    }
+
     private static CommandParseResult ParseDocumentCommand(
         IReadOnlyList<string> arguments,
         Func<string, CliCommand> create) =>
@@ -1050,4 +1116,7 @@ public sealed class CliCommandParser
 
     private const string ExecutionCleanUsage =
         "flow execution-clean <destination> --execution-id <32-hex-id>";
+
+    private const string UpdateUsage =
+        "flow update check [--channel <stable|prerelease>] [--json]";
 }

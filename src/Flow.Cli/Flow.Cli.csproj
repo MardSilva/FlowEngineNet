@@ -20,6 +20,7 @@
     <Authors>Flow Engine contributors</Authors>
     <Description>Experimental Flow Engine command-line tool for semantic documents and EPUB workflows.</Description>
     <PackageTags>flow;epub;documents;cli</PackageTags>
+    <ApplicationIcon Condition="$([MSBuild]::IsOSPlatform('Windows'))">..\..\assets\branding\windows\flow.ico</ApplicationIcon>
   </PropertyGroup>
 
   <ItemGroup>

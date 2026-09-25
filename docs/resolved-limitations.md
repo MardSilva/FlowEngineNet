@@ -189,3 +189,9 @@ Two complete qualifications after the table correction were byte-identical with 
 The 0.1 cycle closed the original absence of a semantic document model, stable typed IDs and anchors, structural validation, optional typed presentation, user preference cascade, deterministic `.flow.json`, versioned canonicalization, SHA-256 integrity, a renderer-independent Flow layout, standalone semantic HTML, a sample book, a framework-free CLI, local RSA signature proof of concept and the first bounded EPUB importer.
 
 Those capabilities are implemented and covered by the numbered conformance suite. Their narrower interoperability, trust, rendering and publishing boundaries remain listed in `known-limitations.md`.
+
+### Windows installer release gate
+
+The draft-release pipeline now promotes one self-contained win-x64 payload into the portable ZIP and localized per-user MSI packages. Separate Windows jobs validate the ZIP, build the MSI, install an isolated older test package, execute the installed CLI, repair it, perform a major upgrade, reject a downgrade, uninstall it and check owned-component removal.
+
+Final evidence binds the canonical `.nupkg`, ZIP and MSI to one version and Git revision and compares the portable files with the hashes declared by the installer manifest. The MSI remains unsigned and experimental; code signing, public publication and other platforms remain current limitations.

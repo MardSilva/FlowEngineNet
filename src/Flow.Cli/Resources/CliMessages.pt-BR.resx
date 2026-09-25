@@ -722,4 +722,36 @@
   <data name="AssistantResultDiagnosticsTitle" xml:space="preserve"><value>Diagnósticos</value></data>
   <data name="ErrorInteractiveInputUnavailable" xml:space="preserve"><value>A entrada interativa terminou ou deixou de estar disponível. Nenhuma escolha foi presumida. Use 'flow help' e execute diretamente o comando equivalente.</value></data>
   <data name="ErrorPresentationFailed" xml:space="preserve"><value>A apresentação interativa falhou e foi encerrada com segurança: {0}</value></data>
+  <data name="ErrorInvalidUpdateChannel" xml:space="preserve"><value>O canal de atualização deve ser stable ou prerelease.</value></data>
+  <data name="ErrorUpdateTimeout" xml:space="preserve"><value>O serviço de releases não respondeu dentro do tempo limite da consulta.</value></data>
+  <data name="ErrorUpdateNetwork" xml:space="preserve"><value>Não foi possível acessar o serviço oficial de releases. O Flow continua disponível offline.</value></data>
+  <data name="ErrorUpdateInvalidResponse" xml:space="preserve"><value>O serviço oficial de releases retornou dados que o Flow não conseguiu validar.</value></data>
+  <data name="ErrorUpdateNoRelease" xml:space="preserve"><value>Não há release disponível no canal escolhido. Use o canal prerelease somente se quiser versões experimentais.</value></data>
+  <data name="Command_update_Title" xml:space="preserve"><value>Verificar se há atualização do Flow</value></data>
+  <data name="Command_update_Description" xml:space="preserve"><value>Consulta a origem oficial de releases quando solicitado e informa um caminho seguro de atualização, sem baixar nem instalar arquivos.</value></data>
+  <data name="CommandArgument_UpdateCheck" xml:space="preserve"><value>Solicita uma consulta explícita e somente leitura às releases.</value></data>
+  <data name="CommandOption_UpdateChannel" xml:space="preserve"><value>Seleciona releases estáveis ou inclui pré-releases; o padrão é stable.</value></data>
+  <data name="CommandOption_UpdateJson" xml:space="preserve"><value>Grava o resultado determinístico da consulta em JSON na saída padrão.</value></data>
+  <data name="CommandEffect_UpdateCheck" xml:space="preserve"><value>Usa a rede somente nesta execução; não cria arquivos nem instala nada.</value></data>
+  <data name="CommandSecurity_UpdateCheck" xml:space="preserve"><value>Apenas links HTTPS validados dentro do repositório oficial do Flow Engine .NET no GitHub são aceitos.</value></data>
+  <data name="ProgressPhaseCheckingUpdates" xml:space="preserve"><value>Consultando a origem oficial de releases</value></data>
+  <data name="LabelUpdateStatus" xml:space="preserve"><value>Status da atualização: {0}</value></data>
+  <data name="LabelUpdateChannel" xml:space="preserve"><value>Canal: {0}</value></data>
+  <data name="LabelUpdateCurrentVersion" xml:space="preserve"><value>Versão instalada: {0}</value></data>
+  <data name="LabelUpdateLatestVersion" xml:space="preserve"><value>Versão mais recente: {0}</value></data>
+  <data name="LabelUpdateInstallationMethod" xml:space="preserve"><value>Método de instalação: {0}</value></data>
+  <data name="LabelUpdateRelease" xml:space="preserve"><value>Release oficial: {0}</value></data>
+  <data name="LabelUpdateArtifact" xml:space="preserve"><value>Artefato: {0}</value></data>
+  <data name="LabelUpdateSha256" xml:space="preserve"><value>SHA-256 publicado: {0}</value></data>
+  <data name="LabelUpdateNextStep" xml:space="preserve"><value>Próximo passo: {0}</value></data>
+  <data name="ValueUpdateAvailable" xml:space="preserve"><value>há uma atualização disponível</value></data>
+  <data name="ValueUpdateCurrent" xml:space="preserve"><value>esta instalação está atualizada no canal escolhido</value></data>
+  <data name="ValueInstallationMethod_Unknown" xml:space="preserve"><value>desconhecido</value></data>
+  <data name="ValueInstallationMethod_Msi" xml:space="preserve"><value>MSI por utilizador</value></data>
+  <data name="ValueInstallationMethod_DotNetTool" xml:space="preserve"><value>ferramenta .NET</value></data>
+  <data name="ValueInstallationMethod_Portable" xml:space="preserve"><value>ZIP portátil</value></data>
+  <data name="UpdateInstructionMsi" xml:space="preserve"><value>Baixe o MSI indicado na página oficial da release e execute-o para fazer o upgrade. O Flow não baixa nem inicia o instalador.</value></data>
+  <data name="UpdateInstructionDotNetTool" xml:space="preserve"><value>Execute: dotnet tool update --global FlowEngineNet.Tool --version {0}</value></data>
+  <data name="UpdateInstructionPortable" xml:space="preserve"><value>Baixe o ZIP portátil indicado e substitua os arquivos manualmente depois de fechar o Flow.</value></data>
+  <data name="UpdateInstructionUnknown" xml:space="preserve"><value>Abra a página oficial da release e escolha o pacote correspondente à forma como o Flow foi instalado.</value></data>
 </root>

@@ -48,6 +48,10 @@ jobs:
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-release-proposal.ps1
 
+      - name: Verify editorial release introduction
+        shell: pwsh
+        run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-release-introduction.ps1
+
       - name: Build
         run: dotnet build Flow.sln --no-restore
 

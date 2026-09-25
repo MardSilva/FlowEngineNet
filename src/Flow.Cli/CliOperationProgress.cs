@@ -119,6 +119,7 @@ internal static class CliOperationProgressPlan
             (CliOperationPhase.ProcessingCorpus, "ProgressPhaseProcessingCorpus"),
         ExecutionStatusCommand or ExecutionCleanCommand =>
             (CliOperationPhase.MaintainingExecution, "ProgressPhaseMaintainingExecution"),
+        UpdateCheckCommand => (CliOperationPhase.Preparing, "ProgressPhaseCheckingUpdates"),
         SampleCommand => (CliOperationPhase.Writing, "ProgressPhaseWriting"),
         _ => (CliOperationPhase.Preparing, "ProgressPhasePreparing"),
     };

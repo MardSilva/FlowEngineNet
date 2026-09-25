@@ -165,6 +165,14 @@ public sealed class CliCommandParserTests
         var clean = Assert.IsType<ExecutionCleanCommand>(_parser.Parse(
             ["execution-clean", "gate.json", "--execution-id", executionId.ToString("N")]).Command);
         Assert.Equal(executionId, clean.ExecutionId);
+
+        var stableUpdate = Assert.IsType<UpdateCheckCommand>(_parser.Parse(["update", "check"]).Command);
+        Assert.Equal(UpdateChannel.Stable, stableUpdate.Channel);
+        Assert.False(stableUpdate.Json);
+        var prereleaseUpdate = Assert.IsType<UpdateCheckCommand>(
+            _parser.Parse(["update", "check", "--json", "--channel", "prerelease"]).Command);
+        Assert.Equal(UpdateChannel.Prerelease, prereleaseUpdate.Channel);
+        Assert.True(prereleaseUpdate.Json);
     }
 
     [Fact]
@@ -237,6 +245,15 @@ public sealed class CliCommandParserTests
                 "epub-inventory-qualify", "books", "--report", "qualification.json",
                 "--repository-root", "repository",
             ]).Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith("FLOWCLI_USAGE:", _parser.Parse(["update"]).Error, StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_INVALID_VALUE:",
+            _parser.Parse(["update", "check", "--channel", "nightly"]).Error,
+            StringComparison.Ordinal);
+        Assert.StartsWith(
+            "FLOWCLI_DUPLICATE_OPTION:",
+            _parser.Parse(["update", "check", "--json", "--json"]).Error,
             StringComparison.Ordinal);
         Assert.StartsWith(
             "FLOWCLI_INVALID_VALUE:",

@@ -1,0 +1,79 @@
+{
+  "format": "flow-windows-brand-assets-0.1",
+  "renderer": "Windows GDI+",
+  "sourceManifest": "assets/branding/brand-assets.json",
+  "framing": {
+    "canvas": 512,
+    "padding": 48,
+    "preserveAspectRatio": true,
+    "tileBackground": "#101828"
+  },
+  "contrast": {
+    "method": "WCAG relative luminance",
+    "minimum": 4.5,
+    "lightOnNavy": 15.2044,
+    "lightBlueOnNavy": 6.9802
+  },
+  "files": [
+    {
+      "path": "flow-app-symbol-on-light-512.png",
+      "width": 512,
+      "height": 512,
+      "alpha": "transparent",
+      "sha256": "88dca38f1e7b323fe7fa3d20a79b3bd726a0f8d4844e5f2bd2f06ad7b58d4f28"
+    },
+    {
+      "path": "flow-app-symbol-on-dark-512.png",
+      "width": 512,
+      "height": 512,
+      "alpha": "transparent",
+      "sha256": "6e9573c2dc3536807dcfc7728b88b4544ffa5855c616b9c05dd9e5658fdef9f8"
+    },
+    {
+      "path": "flow-app-tile-16.png",
+      "width": 16,
+      "height": 16,
+      "alpha": "opaque",
+      "sha256": "2f5e348937f9edb3a6588682e96c230072b688ee5b845369db516e9eca59eb34"
+    },
+    {
+      "path": "flow-app-tile-32.png",
+      "width": 32,
+      "height": 32,
+      "alpha": "opaque",
+      "sha256": "972c1a42d2521354792b1d5a6a67d6b611afffc7f333a640553f147b40b3b800"
+    },
+    {
+      "path": "flow-app-tile-48.png",
+      "width": 48,
+      "height": 48,
+      "alpha": "opaque",
+      "sha256": "7c80ec4482d542a5e7aa877a7dcd14cf2c7c1561ba212ee7c7a0328f205ac8b3"
+    },
+    {
+      "path": "flow-app-tile-256.png",
+      "width": 256,
+      "height": 256,
+      "alpha": "opaque",
+      "sha256": "74588b8328d37b28ce21aed5daa8d18ad66f117bb4a08037568c58a9a3613fd0"
+    },
+    {
+      "path": "flow-app-tile-512.png",
+      "width": 512,
+      "height": 512,
+      "alpha": "opaque",
+      "sha256": "3c241d15fd5512ddc0f5330180c6e1159f15634393d255c3ef6e4927a7fdf121"
+    },
+    {
+      "path": "flow.ico",
+      "sizes": [
+        16,
+        32,
+        48,
+        256
+      ],
+      "alpha": "opaque-png-frames",
+      "sha256": "f93e489247c2eac6cb3fe769b12d9c1f311259f51bfff5667d4a241894b6a5e5"
+    }
+  ]
+}
