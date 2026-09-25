@@ -14,4 +14,6 @@
     <VersionSuffix>alpha.3</VersionSuffix>
     <ContinuousIntegrationBuild Condition="'$(CI)' == 'true'">true</ContinuousIntegrationBuild>
   </PropertyGroup>
+
+  <Import Project="$(MSBuildThisFileDirectory)eng/Flow.WindowsProduct.props" />
 </Project>

@@ -119,6 +119,11 @@
       "sourceSha256": "4E0413D98D79FDC65AB65012B5D2772C5E5BCA0D3AC5EE435077B9B0C965D439"
     },
     {
+      "source": "docs/windows-distribution.md",
+      "translation": "docs/pt-BR/windows-distribution.md",
+      "sourceSha256": "B5E6FB62C63D693FF0F55076599980CE0420DFBAF5853D6F43B78B3991B718EF"
+    },
+    {
       "source": "samples/SampleBook/README.md",
       "translation": "samples/SampleBook/README.pt-BR.md",
       "sourceSha256": "B5DC98A6DCD8D30E187F21F071429D0CB951BF33C8910D6A9DFF7D2B1909F3FC"
