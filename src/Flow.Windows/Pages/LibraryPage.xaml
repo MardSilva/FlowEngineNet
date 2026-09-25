@@ -15,7 +15,7 @@
             </VisualState>
             <VisualState x:Name="Regular">
                 <VisualState.StateTriggers>
-                    <AdaptiveTrigger MinWindowWidth="720" />
+                    <AdaptiveTrigger MinWindowWidth="960" />
                 </VisualState.StateTriggers>
                 <VisualState.Setters>
                     <Setter Target="PageContent.Padding" Value="40,32,40,48" />
@@ -24,7 +24,7 @@
         </VisualStateGroup>
     </VisualStateManager.VisualStateGroups>
     <Grid x:Name="PageContent" Padding="40,32,40,48" RowSpacing="18"
-          MaxWidth="1400" HorizontalAlignment="Stretch">
+          MaxWidth="1200" HorizontalAlignment="Stretch">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -36,12 +36,16 @@
                        AutomationProperties.HeadingLevel="Level1" TextWrapping="Wrap" />
             <TextBlock x:Name="LeadText" TextWrapping="Wrap" MaxWidth="820" HorizontalAlignment="Left" />
         </StackPanel>
-        <Grid Grid.Row="1" ColumnSpacing="12">
+        <Grid x:Name="FolderControlsGrid" Grid.Row="1" ColumnSpacing="12" RowSpacing="8">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition x:Name="FolderPathColumn" Width="*" />
+                <ColumnDefinition x:Name="ChooseFolderColumn" Width="Auto" />
+                <ColumnDefinition x:Name="RefreshColumn" Width="Auto" />
             </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition x:Name="FolderActionsRow" Height="0" />
+            </Grid.RowDefinitions>
             <TextBox x:Name="FolderPathBox" IsReadOnly="True" />
             <Button x:Name="ChooseFolderButton" Grid.Column="1" Click="ChooseFolderButton_Click" />
             <Button x:Name="RefreshButton" Grid.Column="2" Click="RefreshButton_Click" />
@@ -50,11 +54,15 @@
             <ProgressBar x:Name="ScanProgress" />
             <TextBlock x:Name="ScanStatus" />
         </StackPanel>
-        <Grid Grid.Row="3" ColumnSpacing="20">
+        <Grid x:Name="BooksAndDetailsGrid" Grid.Row="3" ColumnSpacing="20">
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="2*" />
-                <ColumnDefinition Width="3*" />
+                <ColumnDefinition x:Name="BookListColumn" Width="2*" />
+                <ColumnDefinition x:Name="BookDetailsColumn" Width="3*" />
             </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition x:Name="BookListRow" Height="*" />
+                <RowDefinition x:Name="BookDetailsRow" Height="0" />
+            </Grid.RowDefinitions>
             <ListView x:Name="BookList" SelectionChanged="BookList_SelectionChanged">
                 <ListView.ItemTemplate>
                     <DataTemplate>
@@ -69,22 +77,53 @@
             </ListView>
             <Border Grid.Column="1" x:Name="DetailsCard" Visibility="Collapsed" Padding="20"
                     CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource FlowCardBorderBrush}"
-                    Background="{ThemeResource FlowCardBackgroundBrush}">
-                <ScrollViewer>
-                    <StackPanel Spacing="12">
-                        <Image x:Name="CoverImage" MaxWidth="180" MaxHeight="270" HorizontalAlignment="Left" Stretch="Uniform" />
-                        <TextBlock x:Name="BookTitle" Style="{ThemeResource SubtitleTextBlockStyle}"
-                                   AutomationProperties.HeadingLevel="Level2" TextWrapping="Wrap" />
-                        <TextBlock x:Name="BookMetadata" TextWrapping="Wrap" />
-                        <TextBlock x:Name="BookStatus" TextWrapping="Wrap" />
-                        <StackPanel Orientation="Horizontal" Spacing="8">
-                            <Button x:Name="InspectButton" Click="InspectButton_Click" />
-                            <Button x:Name="ImportButton" Click="ImportButton_Click" />
-                            <Button x:Name="ValidateButton" Click="ValidateButton_Click" />
-                            <Button x:Name="PreviewButton" Click="PreviewButton_Click" />
-                        </StackPanel>
-                    </StackPanel>
-                </ScrollViewer>
+                    Background="{ThemeResource FlowCardBackgroundBrush}" VerticalAlignment="Top">
+                <Grid RowSpacing="12">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
+                    <Button x:Name="BackToBooksButton" Visibility="Collapsed" HorizontalAlignment="Left"
+                            Click="BackToBooksButton_Click" />
+                    <ScrollViewer Grid.Row="1" HorizontalScrollMode="Disabled"
+                                  HorizontalScrollBarVisibility="Disabled">
+                        <Grid x:Name="DetailsContentGrid" ColumnSpacing="16" RowSpacing="10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Image x:Name="CoverImage" Grid.RowSpan="3" MaxWidth="180" MaxHeight="270"
+                                   HorizontalAlignment="Left" VerticalAlignment="Top" Stretch="Uniform" />
+                            <TextBlock x:Name="BookTitle" Grid.Column="1" Style="{ThemeResource SubtitleTextBlockStyle}"
+                                       AutomationProperties.HeadingLevel="Level2" TextWrapping="Wrap" />
+                            <TextBlock x:Name="BookMetadata" Grid.Row="1" Grid.Column="1" TextWrapping="Wrap" />
+                            <TextBlock x:Name="BookStatus" Grid.Row="2" Grid.Column="1" TextWrapping="Wrap" />
+                        </Grid>
+                    </ScrollViewer>
+                    <Grid x:Name="DetailsActionsGrid" Grid.Row="2" ColumnSpacing="8" RowSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <Button x:Name="InspectButton" HorizontalAlignment="Stretch" Click="InspectButton_Click" />
+                        <Button x:Name="ImportButton" Grid.Column="1" HorizontalAlignment="Stretch"
+                                Click="ImportButton_Click" />
+                        <Button x:Name="ValidateButton" Grid.Row="1" HorizontalAlignment="Stretch"
+                                Click="ValidateButton_Click" />
+                        <Button x:Name="PreviewButton" Grid.Row="1" Grid.Column="1" HorizontalAlignment="Stretch"
+                                Click="PreviewButton_Click" />
+                    </Grid>
+                </Grid>
             </Border>
         </Grid>
     </Grid>

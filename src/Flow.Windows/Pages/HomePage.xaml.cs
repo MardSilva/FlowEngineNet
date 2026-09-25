@@ -38,6 +38,8 @@ public sealed partial class HomePage : Page
             text["ValidateTitle"],
             text["ActionButton"],
             text["ActionUnavailable"]);
+        PageScrollViewer.SizeChanged += (_, args) => UpdateContentWidth(args.NewSize.Width);
+        Loaded += (_, _) => UpdateContentWidth(PageScrollViewer.ActualWidth);
     }
 
     private void InspectButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) =>
@@ -48,6 +50,14 @@ public sealed partial class HomePage : Page
 
     private void ValidateButton_Click(object sender, Microsoft.UI.Xaml.RoutedEventArgs e) =>
         _openOperation(FlowWindowsOperationKind.Validate);
+
+    private void UpdateContentWidth(double availableWidth)
+    {
+        if (availableWidth > 0)
+        {
+            PageContent.Width = Math.Min(PageContent.MaxWidth, availableWidth);
+        }
+    }
 
     private static void ConfigureUnavailableAction(
         Button button,

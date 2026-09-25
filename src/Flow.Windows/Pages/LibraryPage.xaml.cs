@@ -31,6 +31,8 @@ public sealed partial class LibraryPage : Page
         InitializeComponent();
         Localize();
         FolderPathBox.Text = viewModel.Settings.PersonalLibraryPath ?? string.Empty;
+        RefreshButton.IsEnabled = viewModel.Settings.PersonalLibraryPath is not null;
+        SizeChanged += (_, _) => UpdateResponsiveLayout();
         Loaded += async (_, _) =>
         {
             if (viewModel.Settings.PersonalLibraryPath is not null)
@@ -51,6 +53,7 @@ public sealed partial class LibraryPage : Page
 
         await _viewModel.SetPersonalLibraryPathAsync(path);
         FolderPathBox.Text = path;
+        RefreshButton.IsEnabled = true;
         await RefreshAsync();
     }
 
@@ -67,7 +70,11 @@ public sealed partial class LibraryPage : Page
         _scanCancellation?.Dispose();
         _scanCancellation = new CancellationTokenSource();
         ProgressPanel.Visibility = Visibility.Visible;
+        ScanProgress.Visibility = Visibility.Visible;
         ScanProgress.IsIndeterminate = true;
+        ChooseFolderButton.IsEnabled = false;
+        RefreshButton.IsEnabled = false;
+        BookList.IsEnabled = false;
         BookList.ItemsSource = null;
         DetailsCard.Visibility = Visibility.Collapsed;
         try
@@ -96,6 +103,10 @@ public sealed partial class LibraryPage : Page
         finally
         {
             ScanProgress.IsIndeterminate = false;
+            ScanProgress.Visibility = Visibility.Collapsed;
+            ChooseFolderButton.IsEnabled = true;
+            RefreshButton.IsEnabled = _viewModel.Settings.PersonalLibraryPath is not null;
+            BookList.IsEnabled = true;
         }
     }
 
@@ -104,16 +115,71 @@ public sealed partial class LibraryPage : Page
         if (BookList.SelectedItem is not LibraryDisplayItem selected)
         {
             DetailsCard.Visibility = Visibility.Collapsed;
+            UpdateResponsiveLayout();
             return;
         }
 
         DetailsCard.Visibility = Visibility.Visible;
+        UpdateResponsiveLayout();
         BookTitle.Text = selected.DisplayTitle;
         BookMetadata.Text = selected.DisplayMetadata;
         BookStatus.Text = selected.Item.IsUsable
             ? _viewModel.Text["LibraryUsable"]
             : _viewModel.Text["LibraryNeedsReview"];
         await SetCoverAsync(selected.Item.Summary);
+    }
+
+    private void UpdateResponsiveLayout()
+    {
+        var compact = ActualWidth < 720;
+        var narrow = compact;
+        var lowHeight = ActualHeight < 650;
+        var showingCompactDetails = compact && BookList.SelectedItem is not null;
+
+        LeadText.Visibility = showingCompactDetails ? Visibility.Collapsed : Visibility.Visible;
+        FolderControlsGrid.Visibility = showingCompactDetails ? Visibility.Collapsed : Visibility.Visible;
+        BackToBooksButton.Visibility = showingCompactDetails ? Visibility.Visible : Visibility.Collapsed;
+        BookList.Visibility = showingCompactDetails ? Visibility.Collapsed : Visibility.Visible;
+        FolderActionsRow.Height = narrow ? GridLength.Auto : new GridLength(0);
+        Grid.SetColumnSpan(FolderPathBox, narrow ? 3 : 1);
+        Grid.SetColumn(ChooseFolderButton, narrow ? 1 : 1);
+        Grid.SetRow(ChooseFolderButton, narrow ? 1 : 0);
+        Grid.SetColumn(RefreshButton, narrow ? 2 : 2);
+        Grid.SetRow(RefreshButton, narrow ? 1 : 0);
+        ChooseFolderButton.HorizontalAlignment = narrow ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
+        RefreshButton.HorizontalAlignment = narrow ? HorizontalAlignment.Stretch : HorizontalAlignment.Left;
+        BookListColumn.Width = compact ? new GridLength(1, GridUnitType.Star) : new GridLength(2, GridUnitType.Star);
+        BookDetailsColumn.Width = compact ? new GridLength(0) : new GridLength(3, GridUnitType.Star);
+        BooksAndDetailsGrid.ColumnSpacing = compact ? 0 : 20;
+        BooksAndDetailsGrid.RowSpacing = compact ? 12 : 0;
+
+        if (showingCompactDetails)
+        {
+            BookListRow.Height = new GridLength(0);
+            BookDetailsRow.Height = new GridLength(1, GridUnitType.Star);
+            Grid.SetColumn(DetailsCard, 0);
+            Grid.SetRow(DetailsCard, 1);
+            DetailsCard.VerticalAlignment = VerticalAlignment.Stretch;
+        }
+        else
+        {
+            BookListRow.Height = new GridLength(1, GridUnitType.Star);
+            BookDetailsRow.Height = new GridLength(0);
+            Grid.SetColumn(DetailsCard, 1);
+            Grid.SetRow(DetailsCard, 0);
+            DetailsCard.VerticalAlignment = VerticalAlignment.Top;
+        }
+
+        DetailsCard.Padding = new Thickness(lowHeight ? 12 : compact ? 16 : 20);
+        DetailsContentGrid.ColumnSpacing = lowHeight ? 10 : compact ? 12 : 16;
+        CoverImage.MaxWidth = lowHeight ? 56 : compact ? 120 : 180;
+        CoverImage.MaxHeight = lowHeight ? 84 : compact ? 180 : 270;
+    }
+
+    private void BackToBooksButton_Click(object sender, RoutedEventArgs e)
+    {
+        BookList.SelectedItem = null;
+        BookList.Focus(FocusState.Programmatic);
     }
 
     private void InspectButton_Click(object sender, RoutedEventArgs e) => Open(FlowWindowsOperationKind.Inspect);
@@ -176,11 +242,13 @@ public sealed partial class LibraryPage : Page
         FolderPathBox.PlaceholderText = text["LibraryNoFolder"];
         ChooseFolderButton.Content = text["LibraryChooseFolder"];
         RefreshButton.Content = text["LibraryRefresh"];
+        BackToBooksButton.Content = text["LibraryBackToList"];
         InspectButton.Content = text["InspectAction"];
         ImportButton.Content = text["ImportAction"];
         ValidateButton.Content = text["ValidateAction"];
         PreviewButton.Content = text["PreviewAction"];
         AutomationProperties.SetName(BookList, text["LibraryListName"]);
+        AutomationProperties.SetName(CoverImage, text["CoverLabel"]);
     }
 
     private sealed record LibraryDisplayItem(FlowWindowsLibraryItem Item)

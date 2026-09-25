@@ -39,6 +39,36 @@ public sealed class FlowWindowsShellViewModelTests
     }
 
     [Fact]
+    public void GraphicalDocumentWorkflowIsExplicitlyLimitedToEpubSources()
+    {
+        var english = new FlowWindowsTextCatalog(FlowWindowsSettings.English);
+        var portuguese = new FlowWindowsTextCatalog(FlowWindowsSettings.PortugueseBrazil);
+
+        Assert.Equal("Process EPUB", english["NavOperations"]);
+        Assert.Equal("Choose an EPUB", english["ChooseFile"]);
+        Assert.Equal("Processar EPUB", portuguese["NavOperations"]);
+        Assert.Equal("Escolher um EPUB", portuguese["ChooseFile"]);
+        Assert.Equal("Back to books", english["LibraryBackToList"]);
+        Assert.Equal("Voltar aos livros", portuguese["LibraryBackToList"]);
+        Assert.Contains("EPUB", english["InvalidSelection"], StringComparison.Ordinal);
+        Assert.Contains("EPUB", portuguese["InvalidSelection"], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void HowItWorksCatalogDistinguishesImplementedAndFutureFormats()
+    {
+        var english = new FlowWindowsTextCatalog(FlowWindowsSettings.English);
+        var portuguese = new FlowWindowsTextCatalog(FlowWindowsSettings.PortugueseBrazil);
+
+        Assert.Contains("not available", english["HowPdfText"], StringComparison.Ordinal);
+        Assert.Contains("não está disponível", portuguese["HowPdfText"], StringComparison.Ordinal);
+        Assert.Contains("read-only", english["HowSafetySourceTitle"], StringComparison.Ordinal);
+        Assert.Contains("somente para leitura", portuguese["HowSafetySourceTitle"], StringComparison.Ordinal);
+        Assert.StartsWith("No.", english["HowFaqReaderAnswer"], StringComparison.Ordinal);
+        Assert.StartsWith("Não.", portuguese["HowFaqReaderAnswer"], StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task ApplyingSameSettingsDoesNotRewriteStorage()
     {
         var store = new MemorySettingsStore();

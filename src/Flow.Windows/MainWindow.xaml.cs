@@ -17,6 +17,7 @@ public sealed partial class MainWindow : Window
     private readonly FlowWindowsShellViewModel _viewModel;
     private readonly IFlowWindowsOperationService _operations;
     private readonly AccessibilitySettings _accessibility = new();
+    private readonly NativeWindowSizing _windowSizing;
     private FlowWindowsOperationKind _initialOperation = FlowWindowsOperationKind.Inspect;
     private string? _initialSourcePath;
     private string? _previewSourcePath;
@@ -30,7 +31,9 @@ public sealed partial class MainWindow : Window
         _viewModel = viewModel;
         _operations = operations;
         InitializeComponent();
-        AppWindow.Resize(new SizeInt32(1180, 760));
+        var windowHandle = WinRT.Interop.WindowNative.GetWindowHandle(this);
+        _windowSizing = new NativeWindowSizing(windowHandle);
+        AppWindow.Resize(_windowSizing.AttachAndGetInitialSize());
         AppWindow.SetIcon(Path.Combine(AppContext.BaseDirectory, "Assets", "flow.ico"));
         Root.ActualThemeChanged += (_, _) => UpdateLogo();
         ApplySettings();
@@ -38,6 +41,7 @@ public sealed partial class MainWindow : Window
         Navigation.SelectedItem = HomeItem;
         ShowDestination(FlowWindowsDestination.Home);
         Activated += (_, _) => HomeItem.Focus(FocusState.Programmatic);
+        Closed += (_, _) => _windowSizing.Dispose();
     }
 
     private void Navigation_SelectionChanged(NavigationView sender, NavigationViewSelectionChangedEventArgs args)
@@ -151,20 +155,22 @@ public sealed partial class MainWindow : Window
         ShowDestination(FlowWindowsDestination.Preview);
     }
 
-    private async Task<string?> ChooseDocumentAsync()
+    private Task<string?> ChooseDocumentAsync()
     {
-        var picker = new FileOpenPicker
+        using var picker = new System.Windows.Forms.OpenFileDialog
         {
-            SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
-            ViewMode = PickerViewMode.List,
+            Title = _viewModel.Text["EpubPickerTitle"],
+            Filter = $"{_viewModel.Text["EpubFileFilter"]}|*.epub",
+            CheckFileExists = true,
+            CheckPathExists = true,
+            Multiselect = false,
+            RestoreDirectory = true,
+            AddExtension = true,
+            DefaultExt = "epub",
         };
-        picker.FileTypeFilter.Add(".epub");
-        picker.FileTypeFilter.Add(".json");
-        WinRT.Interop.InitializeWithWindow.Initialize(
-            picker,
-            WinRT.Interop.WindowNative.GetWindowHandle(this));
-        var file = await picker.PickSingleFileAsync();
-        return file?.Path;
+        var owner = new NativeWindowOwner(WinRT.Interop.WindowNative.GetWindowHandle(this));
+        var result = picker.ShowDialog(owner);
+        return Task.FromResult(result == System.Windows.Forms.DialogResult.OK ? picker.FileName : null);
     }
 
     private async Task<string?> ChooseFolderAsync()
@@ -223,4 +229,6 @@ public sealed partial class MainWindow : Window
         BrandImage.Source = new BitmapImage(new Uri($"ms-appx:///Assets/{asset}"));
         AutomationProperties.SetName(BrandImage, _viewModel.Text["AppName"]);
     }
+
+    private sealed record NativeWindowOwner(IntPtr Handle) : System.Windows.Forms.IWin32Window;
 }

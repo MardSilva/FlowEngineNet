@@ -32,12 +32,14 @@ public sealed class FlowWindowsProjectConformanceTests
         var window = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "MainWindow.xaml"));
         var app = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "App.xaml"));
         var home = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "Pages", "HomePage.xaml"));
+        var homeCode = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "Pages", "HomePage.xaml.cs"));
         var explanation = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "Pages", "HowItWorksPage.xaml"));
         var operations = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "Pages", "OperationsPage.xaml"));
         var operationsCode = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "Pages", "OperationsPage.xaml.cs"));
         var library = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "Pages", "LibraryPage.xaml"));
         var preview = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "Pages", "PreviewPage.xaml"));
         var previewCode = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "Pages", "PreviewPage.xaml.cs"));
+        var sizingCode = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "NativeWindowSizing.cs"));
 
         Assert.Contains("<NavigationView", window, StringComparison.Ordinal);
         Assert.Contains("PaneDisplayMode=\"Auto\"", window, StringComparison.Ordinal);
@@ -47,15 +49,47 @@ public sealed class FlowWindowsProjectConformanceTests
         Assert.Contains("x:Key=\"HighContrast\"", app, StringComparison.Ordinal);
         Assert.Contains("XamlControlsResources", app, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.HeadingLevel=\"Level1\"", home, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"PageScrollViewer\"", home, StringComparison.Ordinal);
+        Assert.Contains("HorizontalContentAlignment=\"Center\"", home, StringComparison.Ordinal);
+        Assert.Contains("UpdateContentWidth", homeCode, StringComparison.Ordinal);
+        Assert.Contains("PageContent.Width = Math.Min", homeCode, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.HeadingLevel=\"Level1\"", explanation, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"SectionList\"", explanation, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"CompactSectionPicker\"", explanation, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"SectionScrollViewer\"", explanation, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"SectionContent\"", explanation, StringComparison.Ordinal);
+        Assert.Contains("<Expander", explanation, StringComparison.Ordinal);
+        var explanationCode = File.ReadAllText(
+            Path.Combine(root, "src", "Flow.Windows", "Pages", "HowItWorksPage.xaml.cs"));
+        Assert.Contains("SelectSection", explanationCode, StringComparison.Ordinal);
+        Assert.Contains("UpdateSectionWidth", explanationCode, StringComparison.Ordinal);
+        Assert.Contains("SectionContent.Width = Math.Min", explanationCode, StringComparison.Ordinal);
+        Assert.Contains("_synchronizingSelection", explanationCode, StringComparison.Ordinal);
         Assert.Contains("AllowDrop=\"True\"", operations, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.HeadingLevel=\"Level1\"", operations, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"SourcePickerLayout\"", operations, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"PageScrollViewer\"", operations, StringComparison.Ordinal);
+        Assert.Contains("HorizontalContentAlignment=\"Center\"", operations, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"AdvancedActionsGrid\"", operations, StringComparison.Ordinal);
         Assert.Contains("CancelButton_Click", operationsCode, StringComparison.Ordinal);
         Assert.Contains("ContentDialog", operationsCode, StringComparison.Ordinal);
         Assert.Contains("if (_initialized)", operationsCode, StringComparison.Ordinal);
         Assert.Contains("AdvancedPanel is null", operationsCode, StringComparison.Ordinal);
+        Assert.Contains("UpdateImportOptionsVisibility", operationsCode, StringComparison.Ordinal);
+        Assert.Contains("PageScrollViewer.ActualWidth", operationsCode, StringComparison.Ordinal);
+        Assert.Contains("PageContent.Width = Math.Min", operationsCode, StringComparison.Ordinal);
+        Assert.Contains("viewportWidth < 720", operationsCode, StringComparison.Ordinal);
         Assert.DoesNotContain("Process.Start", operationsCode, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.HeadingLevel=\"Level1\"", library, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"BooksAndDetailsGrid\"", library, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"DetailsContentGrid\"", library, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"DetailsActionsGrid\"", library, StringComparison.Ordinal);
+        Assert.Contains("x:Name=\"BackToBooksButton\"", library, StringComparison.Ordinal);
+        var libraryCode = File.ReadAllText(
+            Path.Combine(root, "src", "Flow.Windows", "Pages", "LibraryPage.xaml.cs"));
+        Assert.Contains("UpdateResponsiveLayout", libraryCode, StringComparison.Ordinal);
+        Assert.Contains("showingCompactDetails", libraryCode, StringComparison.Ordinal);
+        Assert.Contains("BookList.Visibility", libraryCode, StringComparison.Ordinal);
         Assert.Contains("<WebView2", preview, StringComparison.Ordinal);
         Assert.Contains("SetVirtualHostNameToFolderMapping", previewCode, StringComparison.Ordinal);
         Assert.Contains("SelectInitialProfile(ActualWidth)", previewCode, StringComparison.Ordinal);
@@ -64,6 +98,9 @@ public sealed class FlowWindowsProjectConformanceTests
         Assert.Contains("PermissionRequested", previewCode, StringComparison.Ordinal);
         Assert.Contains("args.Cancel = true", previewCode, StringComparison.Ordinal);
         Assert.DoesNotContain("http://", previewCode, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("WmGetMinMaxInfo", sizingCode, StringComparison.Ordinal);
+        Assert.Contains("GetDpiForWindow", sizingCode, StringComparison.Ordinal);
+        Assert.Contains("FlowWindowsWindowSizePolicy.GetMinimumSize", sizingCode, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -73,6 +110,7 @@ public sealed class FlowWindowsProjectConformanceTests
         var windowsRoot = Path.Combine(root, "src", "Flow.Windows");
         var app = File.ReadAllText(Path.Combine(windowsRoot, "App.xaml"));
         var window = File.ReadAllText(Path.Combine(windowsRoot, "MainWindow.xaml"));
+        var windowCode = File.ReadAllText(Path.Combine(windowsRoot, "MainWindow.xaml.cs"));
 
         var surfaceKeys = new[]
         {
@@ -92,6 +130,9 @@ public sealed class FlowWindowsProjectConformanceTests
         Assert.Contains("x:Key=\"NavigationViewDefaultPaneBackground\"", app, StringComparison.Ordinal);
         Assert.Contains("x:Key=\"NavigationViewExpandedPaneBackground\"", app, StringComparison.Ordinal);
         Assert.Contains("Background=\"{ThemeResource FlowContentBackgroundBrush}\"", window, StringComparison.Ordinal);
+        Assert.Contains("System.Windows.Forms.OpenFileDialog", windowCode, StringComparison.Ordinal);
+        Assert.Contains("*.epub", windowCode, StringComparison.Ordinal);
+        Assert.DoesNotContain("*.json", windowCode, StringComparison.Ordinal);
 
         var pagePaths = Directory.GetFiles(Path.Combine(windowsRoot, "Pages"), "*Page.xaml");
         Assert.NotEmpty(pagePaths);
@@ -104,7 +145,7 @@ public sealed class FlowWindowsProjectConformanceTests
                 StringComparison.Ordinal);
             Assert.Contains("x:Name=\"PageContent\"", page, StringComparison.Ordinal);
             Assert.Contains("<AdaptiveTrigger MinWindowWidth=\"0\"", page, StringComparison.Ordinal);
-            Assert.Contains("<AdaptiveTrigger MinWindowWidth=\"720\"", page, StringComparison.Ordinal);
+            Assert.Contains("<AdaptiveTrigger MinWindowWidth=\"960\"", page, StringComparison.Ordinal);
         }
 
         var preview = File.ReadAllText(Path.Combine(windowsRoot, "Pages", "PreviewPage.xaml"));

@@ -24,7 +24,7 @@
             </VisualState>
             <VisualState x:Name="Regular">
                 <VisualState.StateTriggers>
-                    <AdaptiveTrigger MinWindowWidth="720" />
+                    <AdaptiveTrigger MinWindowWidth="960" />
                 </VisualState.StateTriggers>
                 <VisualState.Setters>
                     <Setter Target="PageContent.Padding" Value="40,32,40,48" />
@@ -32,15 +32,19 @@
             </VisualState>
         </VisualStateGroup>
     </VisualStateManager.VisualStateGroups>
-    <ScrollViewer HorizontalContentAlignment="Stretch" HorizontalScrollMode="Disabled" VerticalScrollBarVisibility="Auto">
+    <ScrollViewer x:Name="PageScrollViewer"
+                  HorizontalContentAlignment="Center"
+                  HorizontalScrollMode="Disabled"
+                  HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
         <StackPanel x:Name="PageContent" Spacing="20" Padding="40,32,40,48"
-                    MaxWidth="1180" HorizontalAlignment="Stretch">
+                    MaxWidth="1040" HorizontalAlignment="Center">
             <StackPanel Spacing="8">
                 <TextBlock x:Name="TitleText" Style="{ThemeResource TitleTextBlockStyle}"
                            TextWrapping="Wrap"
                            AutomationProperties.HeadingLevel="Level1" />
                 <TextBlock x:Name="LeadText" Style="{ThemeResource BodyTextBlockStyle}"
-                           TextWrapping="Wrap" MaxWidth="760" />
+                           TextWrapping="Wrap" MaxWidth="760" HorizontalAlignment="Left" />
             </StackPanel>
             <TextBlock x:Name="ActionsTitle" Style="{ThemeResource SubtitleTextBlockStyle}"
                        AutomationProperties.HeadingLevel="Level2" />

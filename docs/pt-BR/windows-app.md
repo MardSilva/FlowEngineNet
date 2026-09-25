@@ -8,7 +8,7 @@ A página inicial abre um fluxo visual para três operações comuns:
 
 - **Inspecionar EPUB** lê o pacote local e mostra título, autores, idioma, versão EPUB declarada e contagens do manifest e do spine. O arquivo de origem não é convertido nem modificado.
 - **Importar EPUB** cria um documento `.flow.json` e, opcionalmente, um relatório de diagnósticos e um livro HTML localizado e sem scripts. O destino inicial fica ao lado do EPUB; depois da inspeção, o nome portátil é derivado do título da publicação.
-- **Validar** aceita um EPUB local ou `.flow.json`, executa em memória as verificações aplicáveis e não grava saída.
+- **Validar EPUB** importa um EPUB local em memória, executa as verificações estruturais e semânticas e não grava saída. A validação direta de `.flow.json` continua disponível na CLI; o seletor gráfico aceita apenas EPUB enquanto esta interface estiver voltada para esse fluxo.
 
 O idioma dos controles do HTML gerado pode ser escolhido sem alterar o conteúdo do livro. As opções são seleção automática, inglês, português do Brasil e português de Portugal. Texto autoral, títulos e rótulos de navegação nunca são traduzidos silenciosamente.
 
@@ -16,7 +16,7 @@ As fases reais da operação alimentam o indicador de progresso. O cancelamento 
 
 Caminhos, metadados e bytes da capa permanecem no processo e no dispositivo local. O fluxo não acessa a rede, não executa scripts da publicação, não carrega recursos externos e não contorna DRM. Fechar a aplicação não deixa uma operação em segundo plano.
 
-As configurações continuam pequenas, locais e reconstruíveis. A gravação é atômica em `%LocalAppData%\FlowEngineNet\settings.json`; se o arquivo estiver ausente, malformado ou acima do limite, a aplicação volta aos padrões seguros. Esse arquivo não guarda caminhos de livros, conteúdo, identidade canônica nem preferências do documento.
+As configurações continuam pequenas, locais e reconstruíveis. A gravação é atômica em `%LocalAppData%\FlowEngineNet\settings.json`; se o arquivo estiver ausente, malformado ou acima do limite, a aplicação volta aos padrões seguros. O arquivo pode guardar o caminho da pasta pessoal escolhida, mas não registra o caminho de cada livro, conteúdo da publicação, identidade canônica nem preferências do documento.
 
 ## Segurança das saídas
 
@@ -43,7 +43,11 @@ A aplicação está dividida em dois projetos:
 - `Flow.Windows.Shell` contém configurações neutras, catálogos de texto, estado de navegação e a orquestração visual sobre `Flow.Application`;
 - `Flow.Windows` contém a composição WinUI 3 e as views XAML.
 
-O host usa `WinExe`, portanto não abre um terminal junto com a janela. Ele não referencia `Flow.Cli`, não inicia subprocessos, não usa WebView2 e não acessa a rede. O `NavigationView` se adapta à largura disponível, os destinos principais podem ser alcançados pelo teclado, os títulos expõem níveis de acessibilidade e os controles têm nomes ou descrições úteis para tecnologias assistivas. Os recursos de tema incluem alto contraste, e o logo muda conforme o tema claro ou escuro.
+O host usa `WinExe`, portanto não abre um terminal junto com a janela. Ele não referencia `Flow.Cli`, não inicia subprocessos nem acessa a rede. A prévia local restrita usa WebView2, como explicado acima. O `NavigationView` se adapta à largura disponível, os destinos principais podem ser alcançados pelo teclado, os títulos expõem níveis de acessibilidade e os controles têm nomes ou descrições úteis para tecnologias assistivas. Os recursos de tema incluem alto contraste, e o logo muda conforme o tema claro ou escuro.
+
+A janela preserva um mínimo de 1000 × 660 unidades lógicas. O host converte esse valor conforme o DPI do monitor, por isso a área visual mínima é a mesma em escalas de 100%, 150% e 200%. Em telas menores, o limite é reduzido à área útil do próprio monitor para manter a barra de título e os controles acessíveis.
+
+A página **Como funciona** é um guia dentro da aplicação, não uma cópia do site público. Em larguras maiores, um índice permanece ao lado da explicação escolhida. Quando falta espaço, ele vira um seletor acima do conteúdo. O guia apresenta a separação entre documento, layout e renderização, a identidade canônica, o pipeline do EPUB, o papel de cada formato, a fidelidade e o escopo experimental atual. As perguntas comuns usam seções expansíveis, sem esconder a explicação principal. A escolha das seções funciona pelo teclado, e as duas formas de navegação usam o mesmo conteúdo localizado em inglês e português do Brasil.
 
 O projeto usa o componente WinUI do Microsoft Windows App SDK sob a [licença do Microsoft Windows App SDK](https://github.com/microsoft/WindowsAppSDK/blob/main/LICENSE). A dependência fica fixada de forma central e restrita ao host Windows; ela não entra no modelo de documentos nem na CLI multiplataforma.
 

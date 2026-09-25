@@ -21,6 +21,7 @@ public sealed partial class OperationsPage : Page
     private readonly List<string> _advancedLog = [];
     private CancellationTokenSource? _cancellation;
     private bool _initialized;
+    private bool _isBusy;
     private string? _sourcePath;
     private FlowWindowsOperationKind _selectedOperation;
 
@@ -51,6 +52,9 @@ public sealed partial class OperationsPage : Page
         SelectOperation(initialOperation);
         AdvancedPanel.Visibility = advancedMode ? Visibility.Visible : Visibility.Collapsed;
         SetSource(initialSourcePath);
+        PageScrollViewer.SizeChanged += (_, args) => UpdateResponsiveLayout(args.NewSize.Width);
+        Loaded += (_, _) => UpdateResponsiveLayout(PageScrollViewer.ActualWidth);
+        UpdateResponsiveLayout();
     }
 
     private async void ChooseButton_Click(object sender, RoutedEventArgs e)
@@ -152,7 +156,8 @@ public sealed partial class OperationsPage : Page
         ValidateButton.Style = operation == FlowWindowsOperationKind.Validate
             ? Microsoft.UI.Xaml.Application.Current.Resources["AccentButtonStyle"] as Style
             : null;
-        ImportOptions.Visibility = operation == FlowWindowsOperationKind.Import ? Visibility.Visible : Visibility.Collapsed;
+        UpdateImportOptionsVisibility();
+        UpdateActionAvailability();
         UpdateAdvancedCommand();
     }
 
@@ -169,6 +174,8 @@ public sealed partial class OperationsPage : Page
         SummaryCard.Visibility = Visibility.Collapsed;
         DiagnosticsExpander.Visibility = Visibility.Collapsed;
         _advancedLog.Clear();
+        UpdateImportOptionsVisibility();
+        UpdateActionAvailability();
         UpdateAdvancedCommand();
     }
 
@@ -397,13 +404,72 @@ public sealed partial class OperationsPage : Page
 
     private void SetBusy(bool busy)
     {
+        _isBusy = busy;
         ChooseButton.IsEnabled = !busy;
         InspectButton.IsEnabled = !busy;
         ImportButton.IsEnabled = !busy;
         ValidateButton.IsEnabled = !busy;
         ImportOptions.IsEnabled = !busy;
-        RunButton.IsEnabled = !busy;
+        UpdateActionAvailability();
         ProgressPanel.Visibility = busy ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void UpdateActionAvailability()
+    {
+        var canRun = _sourcePath is not null && IsOperationSupported(_sourcePath, _selectedOperation);
+        RunButton.IsEnabled = !_isBusy && canRun;
+        PreviewButton.IsEnabled = !_isBusy && _sourcePath is not null && IsSupportedPath(_sourcePath);
+    }
+
+    private void UpdateImportOptionsVisibility() =>
+        ImportOptions.Visibility = _selectedOperation == FlowWindowsOperationKind.Import && _sourcePath is not null
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+    private void UpdateResponsiveLayout(double? availableWidth = null)
+    {
+        var viewportWidth = availableWidth.GetValueOrDefault();
+        if (viewportWidth <= 0)
+        {
+            viewportWidth = PageScrollViewer.ActualWidth > 0
+                ? PageScrollViewer.ActualWidth
+                : ActualWidth;
+        }
+
+        if (viewportWidth > 0)
+        {
+            PageContent.Width = Math.Min(PageContent.MaxWidth, viewportWidth);
+        }
+
+        var compact = viewportWidth < 720;
+
+        SourceActionColumn.Width = compact ? new GridLength(0) : GridLength.Auto;
+        SourceActionRow.Height = compact ? GridLength.Auto : new GridLength(0);
+        SourcePickerLayout.RowSpacing = compact ? 10 : 0;
+        Grid.SetRowSpan(SourceIcon, compact ? 2 : 1);
+        Grid.SetColumn(ChooseButton, compact ? 1 : 2);
+        Grid.SetRow(ChooseButton, compact ? 1 : 0);
+        ChooseButton.HorizontalAlignment = compact ? HorizontalAlignment.Left : HorizontalAlignment.Stretch;
+
+        ImportButtonColumn.Width = compact ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+        ValidateButtonColumn.Width = compact ? new GridLength(0) : new GridLength(1, GridUnitType.Star);
+        ImportButtonRow.Height = compact ? GridLength.Auto : new GridLength(0);
+        ValidateButtonRow.Height = compact ? GridLength.Auto : new GridLength(0);
+        OperationButtonsGrid.ColumnSpacing = compact ? 0 : 12;
+        Grid.SetColumn(ImportButton, compact ? 0 : 1);
+        Grid.SetRow(ImportButton, compact ? 1 : 0);
+        Grid.SetColumn(ValidateButton, compact ? 0 : 2);
+        Grid.SetRow(ValidateButton, compact ? 2 : 0);
+
+        SaveLogColumn.Width = compact ? new GridLength(0) : GridLength.Auto;
+        OpenPowerShellColumn.Width = compact ? new GridLength(0) : GridLength.Auto;
+        SaveLogRow.Height = compact ? GridLength.Auto : new GridLength(0);
+        OpenPowerShellRow.Height = compact ? GridLength.Auto : new GridLength(0);
+        AdvancedActionsGrid.ColumnSpacing = compact ? 0 : 8;
+        Grid.SetColumn(SaveLogButton, compact ? 0 : 1);
+        Grid.SetRow(SaveLogButton, compact ? 1 : 0);
+        Grid.SetColumn(OpenPowerShellButton, compact ? 0 : 2);
+        Grid.SetRow(OpenPowerShellButton, compact ? 2 : 0);
     }
 
     private void ShowInvalidSelection() =>
@@ -487,11 +553,8 @@ public sealed partial class OperationsPage : Page
     }
 
     private static bool IsSupportedPath(string path) =>
-        Path.GetExtension(path).Equals(".epub", StringComparison.OrdinalIgnoreCase)
-        || path.EndsWith(".flow.json", StringComparison.OrdinalIgnoreCase);
+        Path.GetExtension(path).Equals(".epub", StringComparison.OrdinalIgnoreCase);
 
-    private static bool IsOperationSupported(string path, FlowWindowsOperationKind operation) =>
-        operation == FlowWindowsOperationKind.Validate
-            ? IsSupportedPath(path)
-            : Path.GetExtension(path).Equals(".epub", StringComparison.OrdinalIgnoreCase);
+    private static bool IsOperationSupported(string path, FlowWindowsOperationKind _) =>
+        IsSupportedPath(path);
 }

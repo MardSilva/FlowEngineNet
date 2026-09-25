@@ -8,7 +8,7 @@ The home page opens a visual workflow for three common operations:
 
 - **Inspect EPUB** reads the local package and shows its title, authors, language, declared EPUB version, manifest and spine counts. It neither converts nor modifies the source file.
 - **Import EPUB** creates a `.flow.json` document and can also create a diagnostics report and a localized, script-free HTML book. The initial destination is beside the EPUB; after inspection, its portable name is derived from the publication title.
-- **Validate** accepts a local EPUB or `.flow.json`, runs the applicable semantic checks in memory, and writes no output.
+- **Validate EPUB** imports a local EPUB in memory, applies the structural and semantic checks, and writes no output. Direct `.flow.json` validation remains available in the CLI; the graphical picker is restricted to EPUB while this host is focused on the EPUB workflow.
 
 The user may choose the generated HTML interface language independently from authored content. Generated controls support automatic selection, English, Brazilian Portuguese and European Portuguese. Book text, titles and navigation labels are never translated silently.
 
@@ -16,7 +16,7 @@ Real application phases feed the progress indicator. An operation can be cancell
 
 Publication paths, metadata and cover bytes stay in process and on the local device. The workflow does not access the network, execute publication scripts, load external resources or bypass DRM. Closing the application does not leave a background operation running.
 
-Settings remain small, local and reconstructible. They are written atomically to `%LocalAppData%\FlowEngineNet\settings.json`; an absent, malformed or oversized file falls back to safe defaults. The settings file contains no book path, content, canonical identity or document preference.
+Settings remain small, local and reconstructible. They are written atomically to `%LocalAppData%\FlowEngineNet\settings.json`; an absent, malformed or oversized file falls back to safe defaults. The file may contain the chosen personal-folder path, but it contains no individual book path, publication content, canonical identity or document preference.
 
 ## Output safety
 
@@ -43,7 +43,11 @@ The application is split into two projects:
 - `Flow.Windows.Shell` contains platform-neutral settings, text catalogs, navigation state and visual-operation orchestration over `Flow.Application`;
 - `Flow.Windows` contains the WinUI 3 composition root and XAML views.
 
-The host is a graphical `WinExe`, so opening it does not create a terminal. It does not reference `Flow.Cli`, start subprocesses, use WebView2 or access the network. `NavigationView` adapts to the available width, primary destinations are keyboard reachable, headings expose accessibility levels, and controls have accessible names or help text. Theme resources include high-contrast values, and the logo changes between light and dark variants.
+The host is a graphical `WinExe`, so opening it does not create a terminal. It does not reference `Flow.Cli`, start subprocesses or access the network. The restricted local preview uses WebView2, as described above. `NavigationView` adapts to the available width, primary destinations are keyboard reachable, headings expose accessibility levels, and controls have accessible names or help text. Theme resources include high-contrast values, and the logo changes between light and dark variants.
+
+The window preserves a minimum size of 1000 × 660 logical units. The host converts that size for the current monitor DPI, so its minimum visual area remains consistent at 100%, 150% and 200% display scaling. On smaller displays, the limit is clamped to the monitor work area so the title bar and controls remain reachable.
+
+The **How it works** page is an in-application guide rather than a copy of the public website. At wider sizes, a section index stays beside the selected explanation; when space is limited, it becomes a selector above the content. The guide covers the document/layout/rendering boundary, canonical identity, the EPUB pipeline, format roles, fidelity and the current experimental scope. Frequently asked questions use expanders so the primary explanation remains visible. Section selection is keyboard accessible, and both navigation forms share the same localized content in English and Brazilian Portuguese.
 
 The project uses the Microsoft Windows App SDK WinUI component under the [Microsoft Windows App SDK license](https://github.com/microsoft/WindowsAppSDK/blob/main/LICENSE). The dependency is pinned centrally and limited to the Windows host; it does not enter the document model or cross-platform CLI.
 

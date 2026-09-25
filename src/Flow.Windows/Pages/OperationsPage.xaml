@@ -15,7 +15,7 @@
             </VisualState>
             <VisualState x:Name="Regular">
                 <VisualState.StateTriggers>
-                    <AdaptiveTrigger MinWindowWidth="720" />
+                    <AdaptiveTrigger MinWindowWidth="960" />
                 </VisualState.StateTriggers>
                 <VisualState.Setters>
                     <Setter Target="PageContent.Padding" Value="40,32,40,48" />
@@ -23,35 +23,58 @@
             </VisualState>
         </VisualStateGroup>
     </VisualStateManager.VisualStateGroups>
-    <ScrollViewer HorizontalContentAlignment="Stretch" HorizontalScrollMode="Disabled" VerticalScrollBarVisibility="Auto">
+    <ScrollViewer x:Name="PageScrollViewer"
+                  HorizontalContentAlignment="Center"
+                  HorizontalScrollMode="Disabled"
+                  HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
         <StackPanel x:Name="PageContent" Spacing="20" Padding="40,32,40,48"
-                    MaxWidth="1180" HorizontalAlignment="Stretch">
+                    MaxWidth="1040" HorizontalAlignment="Center">
             <StackPanel Spacing="8">
                 <TextBlock x:Name="TitleText" Style="{ThemeResource TitleTextBlockStyle}"
                            TextWrapping="Wrap" AutomationProperties.HeadingLevel="Level1" />
-                <TextBlock x:Name="LeadText" TextWrapping="Wrap" MaxWidth="800" />
+                <TextBlock x:Name="LeadText" TextWrapping="Wrap" MaxWidth="800" HorizontalAlignment="Left" />
             </StackPanel>
 
-            <Border x:Name="DropArea" Padding="24" CornerRadius="8" BorderThickness="2"
+            <Border x:Name="DropArea" Padding="16" CornerRadius="8" BorderThickness="1"
                     BorderBrush="{ThemeResource FlowAccentBrush}" AllowDrop="True"
                     DragOver="DropArea_DragOver" Drop="DropArea_Drop">
-                <StackPanel Spacing="12" HorizontalAlignment="Center">
-                    <FontIcon Glyph="&#xE898;" FontSize="28" Foreground="{ThemeResource FlowAccentBrush}" />
-                    <TextBlock x:Name="DropText" TextAlignment="Center" TextWrapping="Wrap" />
-                    <Button x:Name="ChooseButton" Click="ChooseButton_Click" />
-                    <TextBlock x:Name="SourcePathText" TextAlignment="Center" TextWrapping="Wrap"
-                               MaxWidth="760" FontFamily="Consolas" />
-                    <TextBlock x:Name="ReadOnlyNotice" TextAlignment="Center" TextWrapping="Wrap"
-                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                </StackPanel>
+                <Grid x:Name="SourcePickerLayout" ColumnSpacing="14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition x:Name="SourceIconColumn" Width="Auto" />
+                        <ColumnDefinition x:Name="SourceTextColumn" Width="*" />
+                        <ColumnDefinition x:Name="SourceActionColumn" Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition x:Name="SourceActionRow" Height="0" />
+                    </Grid.RowDefinitions>
+                    <FontIcon x:Name="SourceIcon" Glyph="&#xE898;" FontSize="24" VerticalAlignment="Center"
+                              Foreground="{ThemeResource FlowAccentBrush}" />
+                    <StackPanel x:Name="SourceTextPanel" Grid.Column="1" Spacing="3" VerticalAlignment="Center">
+                        <TextBlock x:Name="DropText" TextWrapping="Wrap"
+                                   Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                        <TextBlock x:Name="SourcePathText" TextTrimming="CharacterEllipsis"
+                                   MaxLines="1" FontFamily="Consolas" />
+                        <TextBlock x:Name="ReadOnlyNotice" TextWrapping="Wrap"
+                                   Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </StackPanel>
+                    <Button x:Name="ChooseButton" Grid.Column="2" VerticalAlignment="Center"
+                            Click="ChooseButton_Click" />
+                </Grid>
             </Border>
 
-            <Grid ColumnSpacing="12">
+            <Grid x:Name="OperationButtonsGrid" ColumnSpacing="12" RowSpacing="8">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition x:Name="InspectButtonColumn" Width="*" />
+                    <ColumnDefinition x:Name="ImportButtonColumn" Width="*" />
+                    <ColumnDefinition x:Name="ValidateButtonColumn" Width="*" />
                 </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition x:Name="ImportButtonRow" Height="0" />
+                    <RowDefinition x:Name="ValidateButtonRow" Height="0" />
+                </Grid.RowDefinitions>
                 <Button x:Name="InspectButton" HorizontalAlignment="Stretch" Click="InspectButton_Click" />
                 <Button x:Name="ImportButton" Grid.Column="1" HorizontalAlignment="Stretch" Click="ImportButton_Click" />
                 <Button x:Name="ValidateButton" Grid.Column="2" HorizontalAlignment="Stretch" Click="ValidateButton_Click" />
@@ -140,11 +163,21 @@
                     </ComboBox>
                     <TextBox x:Name="AdvancedCommandText" IsReadOnly="True" AcceptsReturn="True"
                              TextWrapping="Wrap" FontFamily="Consolas" MinHeight="72" />
-                    <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Grid x:Name="AdvancedActionsGrid" ColumnSpacing="8" RowSpacing="8">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition x:Name="CopyCommandColumn" Width="Auto" />
+                            <ColumnDefinition x:Name="SaveLogColumn" Width="Auto" />
+                            <ColumnDefinition x:Name="OpenPowerShellColumn" Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition x:Name="SaveLogRow" Height="0" />
+                            <RowDefinition x:Name="OpenPowerShellRow" Height="0" />
+                        </Grid.RowDefinitions>
                         <Button x:Name="CopyCommandButton" Click="CopyCommandButton_Click" />
-                        <Button x:Name="SaveLogButton" Click="SaveLogButton_Click" />
-                        <Button x:Name="OpenPowerShellButton" Click="OpenPowerShellButton_Click" />
-                    </StackPanel>
+                        <Button x:Name="SaveLogButton" Grid.Column="1" Click="SaveLogButton_Click" />
+                        <Button x:Name="OpenPowerShellButton" Grid.Column="2" Click="OpenPowerShellButton_Click" />
+                    </Grid>
                     <TextBox x:Name="AdvancedLogText" IsReadOnly="True" AcceptsReturn="True"
                              TextWrapping="Wrap" FontFamily="Consolas" MinHeight="100" />
                 </StackPanel>

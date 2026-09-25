@@ -15,7 +15,7 @@
             </VisualState>
             <VisualState x:Name="Regular">
                 <VisualState.StateTriggers>
-                    <AdaptiveTrigger MinWindowWidth="720" />
+                    <AdaptiveTrigger MinWindowWidth="960" />
                 </VisualState.StateTriggers>
                 <VisualState.Setters>
                     <Setter Target="PageContent.Padding" Value="32" />
