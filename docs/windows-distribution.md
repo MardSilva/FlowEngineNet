@@ -86,6 +86,12 @@ The installer is built with WiX Toolset 4.0.6, fixed in the project and licensed
 
 The MSI is built once for each release candidate and then identified by its checksum. Rebuilding the same source is not expected to reproduce identical MSI bytes because Windows Installer packages require package-level identity metadata for each build. The portable ZIP remains the byte-reproducible Windows artifact; the MSI manifest records the fixed product identity, source revision and payload version used for the installer.
 
+## Explicit update check
+
+Run `flow update check` to consult stable releases, or `flow update check --channel prerelease` to include prereleases. This is an explicit read-only network operation. It validates the official GitHub response and reports the release page, expected package and published SHA-256 when available. It never downloads or runs an installer.
+
+When the current executable matches the registered per-user MSI directory, the command identifies the installation as MSI and instructs the user to download and run the listed newer MSI. A major upgrade then uses the permanent `UpgradeCode` described above. The command also recognizes .NET tool and portable installations and presents the appropriate manual command or replacement procedure. If there is not enough evidence, it reports an unknown method instead of guessing.
+
 ## Current boundary
 
-The portable ZIP and MSI are local, unsigned development artifacts; neither is attached to a GitHub Release yet. There is still no MSIX, graphical application or file association. Automated release integration, code signing and update discovery remain separate increments.
+The portable ZIP and MSI are local, unsigned development artifacts; neither is attached to a GitHub Release yet. There is still no MSIX, graphical application or file association. The update command can inspect an existing official release but cannot update a local development artifact until matching packages are attached. Automated release integration and code signing remain separate increments.

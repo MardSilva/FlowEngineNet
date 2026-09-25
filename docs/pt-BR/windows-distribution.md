@@ -86,6 +86,12 @@ O instalador usa WiX Toolset 4.0.6, fixado no projeto e licenciado sob MS-RL. Wi
 
 O MSI deve ser gerado uma única vez para cada candidato a release e identificado pelo checksum. Compilar de novo a mesma revisão não produz necessariamente bytes idênticos, pois o Windows Installer usa metadados de identidade próprios para cada pacote gerado. O ZIP portátil continua sendo o artefato Windows reproduzível byte a byte. O manifesto do MSI registra a identidade fixa do produto, a revisão do código e a versão do payload usados no instalador.
 
+## Consulta explícita de atualização
+
+Execute `flow update check` para consultar releases estáveis ou `flow update check --channel prerelease` para incluir pré-releases. A rede só é acessada por essa ação explícita e somente para leitura. O comando valida a resposta oficial do GitHub e informa a página da release, o pacote esperado e o SHA-256 publicado, quando disponível. Nenhum instalador é baixado ou executado.
+
+Quando o executável atual corresponde ao diretório registrado pelo MSI por utilizador, o comando identifica esse método e orienta o download e a execução do MSI mais recente. O major upgrade usa o `UpgradeCode` permanente descrito acima. Instalações como ferramenta .NET ou pacote portátil também são reconhecidas e recebem o comando ou procedimento manual adequado. Sem evidência suficiente, o método fica como desconhecido, sem tentativa de adivinhação.
+
 ## Limite atual
 
-O ZIP portátil e o MSI ainda são artefatos locais de desenvolvimento, sem assinatura, e não foram anexados a uma GitHub Release. Ainda não existem MSIX, aplicação gráfica ou associação de arquivos. A integração automatizada com a release, a assinatura de código e a consulta de atualização continuam como incrementos separados.
+O ZIP portátil e o MSI ainda são artefatos locais de desenvolvimento, sem assinatura, e não foram anexados a uma GitHub Release. Ainda não existem MSIX, aplicação gráfica ou associação de arquivos. O comando de atualização consegue inspecionar uma release oficial existente, mas não pode atualizar um artefato local de desenvolvimento enquanto os pacotes correspondentes não forem anexados. A integração automatizada com a release e a assinatura de código continuam como incrementos separados.

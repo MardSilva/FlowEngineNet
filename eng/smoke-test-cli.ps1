@@ -183,6 +183,14 @@ try {
         throw 'Installed CLI command-specific help is incomplete.'
     }
 
+    $updateHelp = Invoke-InstalledFlow -Arguments @('--plain', 'help', 'update')
+    Assert-NoAnsi -Name 'update help' -Text $updateHelp
+    if ($updateHelp.IndexOf('flow update check', [System.StringComparison]::Ordinal) -lt 0 -or
+        $updateHelp.IndexOf('--channel <stable|prerelease>', [System.StringComparison]::Ordinal) -lt 0 -or
+        $updateHelp.IndexOf('installs nothing', [System.StringComparison]::Ordinal) -lt 0) {
+        throw 'Installed CLI update help is incomplete or does not state its non-installing behavior.'
+    }
+
     $portugueseHelp = Invoke-InstalledFlow -Arguments @('--language', 'pt-BR', '--plain', 'help')
     Assert-NoAnsi -Name 'pt-BR help' -Text $portugueseHelp
     if ($portugueseHelp.IndexOf('Comandos:', [System.StringComparison]::Ordinal) -lt 0 -or
@@ -235,6 +243,7 @@ try {
         commands = @(
             'help-plain',
             'help-import-plain',
+            'help-update-plain',
             'help-pt-BR-plain',
             'menu-redirected-refusal',
             'sample',

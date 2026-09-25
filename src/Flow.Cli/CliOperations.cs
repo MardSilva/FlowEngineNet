@@ -31,6 +31,7 @@ public sealed class CliOperations
     private readonly IEpubPrivateQualificationService _privateQualificationService;
     private readonly EpubPrivateDifferenceMatrixService _privateDifferenceMatrixService;
     private readonly IEpubPrivateVisualReviewService _privateVisualReviewService;
+    private readonly IFlowUpdateChecker _updateChecker;
 
     public CliOperations(
         IFlowDocumentSerializer serializer,
@@ -48,7 +49,8 @@ public sealed class CliOperations
         IEpubPrivateInventoryService? privateInventoryService = null,
         IEpubPrivateQualificationService? privateQualificationService = null,
         EpubPrivateDifferenceMatrixService? privateDifferenceMatrixService = null,
-        IEpubPrivateVisualReviewService? privateVisualReviewService = null)
+        IEpubPrivateVisualReviewService? privateVisualReviewService = null,
+        IFlowUpdateChecker? updateChecker = null)
     {
         ArgumentNullException.ThrowIfNull(serializer);
         ArgumentNullException.ThrowIfNull(epubImporter);
@@ -74,6 +76,7 @@ public sealed class CliOperations
         _privateQualificationService = privateQualificationService ?? new EpubPrivateQualificationService();
         _privateDifferenceMatrixService = privateDifferenceMatrixService ?? new EpubPrivateDifferenceMatrixService();
         _privateVisualReviewService = privateVisualReviewService ?? new EpubPrivateVisualReviewService();
+        _updateChecker = updateChecker ?? FlowUpdateChecker.CreateDefault();
     }
 
     /// <summary>Executes a parsed command and writes its normal output.</summary>
@@ -194,6 +197,13 @@ public sealed class CliOperations
             ExecutionStatusCommand status => await ExecutionStatusAsync(status, output, error, text, cancellationToken)
                 .ConfigureAwait(false),
             ExecutionCleanCommand clean => await ExecutionCleanAsync(clean, output, error, text).ConfigureAwait(false),
+            UpdateCheckCommand update => await CheckForUpdatesAsync(
+                    update,
+                    output,
+                    error,
+                    text,
+                    cancellationToken)
+                .ConfigureAwait(false),
             InspectCommand inspect => await InspectAsync(inspect, output, text, cancellationToken).ConfigureAwait(false),
             ValidateCommand validate => await ValidateAsync(validate, output, text, cancellationToken).ConfigureAwait(false),
             HashCommand hash => await HashAsync(hash, output, text, cancellationToken).ConfigureAwait(false),
@@ -208,6 +218,71 @@ public sealed class CliOperations
                 .ConfigureAwait(false),
             _ => throw new ArgumentOutOfRangeException(nameof(command), command, "Unknown CLI command."),
         };
+    }
+
+    private async Task<int> CheckForUpdatesAsync(
+        UpdateCheckCommand command,
+        TextWriter output,
+        TextWriter error,
+        CliTextCatalog text,
+        CancellationToken cancellationToken)
+    {
+        FlowUpdateCheckResult result;
+        try
+        {
+            result = await _updateChecker.CheckAsync(command.Channel, text.Culture.Name, cancellationToken)
+                .ConfigureAwait(false);
+        }
+        catch (UpdateCheckException exception)
+        {
+            var (code, resourceKey) = exception.Kind switch
+            {
+                UpdateCheckFailureKind.Timeout => ("FLOWCLI_UPDATE_TIMEOUT", "ErrorUpdateTimeout"),
+                UpdateCheckFailureKind.Network => ("FLOWCLI_UPDATE_NETWORK", "ErrorUpdateNetwork"),
+                UpdateCheckFailureKind.InvalidResponse => ("FLOWCLI_UPDATE_INVALID_RESPONSE", "ErrorUpdateInvalidResponse"),
+                UpdateCheckFailureKind.NoRelease => ("FLOWCLI_UPDATE_NO_RELEASE", "ErrorUpdateNoRelease"),
+                _ => throw new ArgumentOutOfRangeException(nameof(exception)),
+            };
+            await error.WriteLineAsync(text.Diagnostic(code, resourceKey)).ConfigureAwait(false);
+            return 1;
+        }
+
+        if (command.Json)
+        {
+            await output.WriteAsync(FlowUpdateJsonWriter.Serialize(result)).ConfigureAwait(false);
+            return 0;
+        }
+
+        await output.WriteLineAsync(text.Format("LabelUpdateStatus", text.Get(
+                result.Status == FlowUpdateStatus.Available ? "ValueUpdateAvailable" : "ValueUpdateCurrent")))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelUpdateChannel", result.Channel.ToString().ToLowerInvariant()))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelUpdateCurrentVersion", result.CurrentVersion)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelUpdateLatestVersion", result.LatestVersion)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format(
+                "LabelUpdateInstallationMethod",
+                text.Get($"ValueInstallationMethod_{result.InstallationMethod}")))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format("LabelUpdateRelease", result.ReleaseUrl.AbsoluteUri)).ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format(
+                "LabelUpdateArtifact",
+                result.ArtifactName ?? text.Get("ValueUnavailable")))
+            .ConfigureAwait(false);
+        await output.WriteLineAsync(text.Format(
+                "LabelUpdateSha256",
+                result.ArtifactSha256 ?? text.Get("ValueUnavailable")))
+            .ConfigureAwait(false);
+
+        var instruction = result.InstallationMethod switch
+        {
+            FlowInstallationMethod.Msi => text.Get("UpdateInstructionMsi"),
+            FlowInstallationMethod.DotNetTool => text.Format("UpdateInstructionDotNetTool", result.LatestVersion),
+            FlowInstallationMethod.Portable => text.Get("UpdateInstructionPortable"),
+            _ => text.Get("UpdateInstructionUnknown"),
+        };
+        await output.WriteLineAsync(text.Format("LabelUpdateNextStep", instruction)).ConfigureAwait(false);
+        return 0;
     }
 
     private static async Task<int> ShowHelpAsync(

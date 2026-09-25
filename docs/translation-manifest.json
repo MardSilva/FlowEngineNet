@@ -36,7 +36,7 @@
     {
       "source": "docs/cli.md",
       "translation": "docs/pt-BR/cli.md",
-      "sourceSha256": "A74DFF9B9D6234B05D081D11BC6560B5971A0D54CFDCA839CBCC091DCC05B1CD"
+      "sourceSha256": "2C2DD9469D0C27D942614E2C78AF52AAAC9F0DED999B013CEC1AE088F36B1FE7"
     },
     {
       "source": "docs/conformance.md",
@@ -121,7 +121,7 @@
     {
       "source": "docs/windows-distribution.md",
       "translation": "docs/pt-BR/windows-distribution.md",
-      "sourceSha256": "CDCD3E47348255C49A525495124DC1C691393351CF4E53A38E7C48183CC374DC"
+      "sourceSha256": "B257E0FA635FF8D9C1BDF10017AFF5FCE33D0A12BFBE400E0524B586C0667286"
     },
     {
       "source": "samples/SampleBook/README.md",

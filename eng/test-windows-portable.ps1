@@ -133,11 +133,14 @@ try {
     $englishHelp = Invoke-PortableFlow -Executable $executable -Arguments @('--plain', 'help') -WorkingDirectory $workRoot
     $portugueseHelp = Invoke-PortableFlow -Executable $executable -Arguments @('--language', 'pt-BR', '--plain', 'help') -WorkingDirectory $workRoot
     $defaultHelp = Invoke-PortableFlow -Executable $executable -Arguments @('help') -WorkingDirectory $workRoot
+    $updateHelp = Invoke-PortableFlow -Executable $executable -Arguments @('--plain', 'help', 'update') -WorkingDirectory $workRoot
     if ($englishHelp.IndexOf("Flow Engine .NET $($manifest.version)", [System.StringComparison]::Ordinal) -lt 0 -or
         $englishHelp.IndexOf('Commands:', [System.StringComparison]::Ordinal) -lt 0 -or
         $portugueseHelp.IndexOf('Comandos:', [System.StringComparison]::Ordinal) -lt 0 -or
         $portugueseHelp.IndexOf('Livros EPUB', [System.StringComparison]::Ordinal) -lt 0 -or
-        $defaultHelp.IndexOf('Flow Engine .NET', [System.StringComparison]::Ordinal) -lt 0) {
+        $defaultHelp.IndexOf('Flow Engine .NET', [System.StringComparison]::Ordinal) -lt 0 -or
+        $updateHelp.IndexOf('flow update check', [System.StringComparison]::Ordinal) -lt 0 -or
+        $updateHelp.IndexOf('installs nothing', [System.StringComparison]::Ordinal) -lt 0) {
         throw 'Portable help, version identity or localized Unicode output is incomplete.'
     }
 
@@ -164,7 +167,7 @@ try {
         sourceRevision = $manifest.sourceRevision
         runtimeIdentifier = $manifest.runtimeIdentifier
         dotnetRemovedFromPath = $true
-        commands = @('help-plain', 'help-default-safe', 'help-pt-BR', 'menu-redirected-refusal', 'sample', 'inspect', 'validate', 'render-html')
+        commands = @('help-plain', 'help-default-safe', 'help-pt-BR', 'help-update', 'menu-redirected-refusal', 'sample', 'inspect', 'validate', 'render-html')
         status = 'passed'
     }
     $resultPath = Join-Path $artifactsRoot 'portable-smoke-result.json'

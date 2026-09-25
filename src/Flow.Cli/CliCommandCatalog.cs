@@ -313,6 +313,25 @@ internal static class CliCommandCatalog
             ["CommandSecurity_ExecutionClean"],
             ExitCodes(0, 1)),
         Command(
+            CliCommandGroup.Maintenance,
+            "update",
+            "Command_update_Title",
+            "Command_update_Description",
+            "flow update check [--channel <stable|prerelease>] [--json]",
+            [Argument("check", CliRequirement.Required, "CommandArgument_UpdateCheck")],
+            [
+                Option("--channel", "<stable|prerelease>", CliRequirement.Optional, "CommandOption_UpdateChannel"),
+                Option("--json", null, CliRequirement.Optional, "CommandOption_UpdateJson"),
+            ],
+            [
+                "flow update check",
+                "flow update check --channel prerelease --json",
+            ],
+            "CommandEffect_UpdateCheck",
+            ["CommandSecurity_UpdateCheck"],
+            ExitCodes(0, 1, 130),
+            availableInMenu: false),
+        Command(
             CliCommandGroup.FlowDocuments,
             "inspect",
             "Command_inspect_Title",

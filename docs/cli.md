@@ -14,7 +14,7 @@ The help output identifies the CLI and `.flow.json` representation as experiment
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\eng\smoke-test-cli.ps1 -Configuration Release
 ```
 
-Use `pwsh` on PowerShell 7 or Linux. The script obtains the package identity from MSBuild, packs the current source, creates a NuGet configuration containing only that local package source, and installs it with `--tool-path`. It verifies Plain general and command-specific help, the Brazilian Portuguese catalog, ANSI-free redirected output, the packaged Spectre.Console assemblies, safe menu refusal without an interactive terminal, and the `sample`, `inspect`, `validate`, `hash`, and standalone HTML commands. Cleanup removes the isolated tool installation even when a command fails.
+Use `pwsh` on PowerShell 7 or Linux. The script obtains the package identity from MSBuild, packs the current source, creates a NuGet configuration containing only that local package source, and installs it with `--tool-path`. It verifies Plain general and command-specific help, including the non-installing update contract, the Brazilian Portuguese catalog, ANSI-free redirected output, the packaged Spectre.Console assemblies, safe menu refusal without an interactive terminal, and the `sample`, `inspect`, `validate`, `hash`, and standalone HTML commands. Cleanup removes the isolated tool installation even when a command fails.
 
 The deterministic summary is written to `artifacts/cli-smoke/smoke-result.json`; build products remain under the ignored `artifacts/` directory. The script requires the .NET 10 SDK selected by `global.json`. It does not publish, sign or install a machine-wide tool.
 
@@ -109,12 +109,19 @@ flow epub-qualify <book.epub> --candidate-id <id> --sha256 <hash> --report <repo
 flow epub-review <book.epub> --candidate-id <id> --sha256 <hash> --output <absolute-directory> --repository-root <absolute-directory> --legal-use --drm-free [--ui-language <auto|en|pt-PT|pt-BR>] [--force] [--resume]
 flow execution-status <destination> [--json <report.json>] [--force]
 flow execution-clean <destination> --execution-id <32-hex-id>
+flow update check [--channel <stable|prerelease>] [--json]
 flow inspect <document>
 flow validate <document>
 flow hash <document>
 flow render <document> --html <output> --width <n> --height <n>
 flow render <document> --html-book <output-directory> [--ui-language <auto|en|pt-PT|pt-BR>]
 ```
+
+`update check` is the only command that consults the network. It sends an identifiable User-Agent to the official GitHub releases API, applies a ten-second timeout, rejects redirects and links outside `MardSilva/FlowEngineNet`, and limits the response to 2 MiB. The default channel is `stable`; use `--channel prerelease` to include alpha, beta and release-candidate versions. No other command performs this check in the background.
+
+The result reports the installed and latest SemVer, the detected installation method, official release page, matching artifact name and its published SHA-256 when GitHub provides one. Detection recognizes the per-user MSI registration, the .NET tool package location and the portable `VERSION.json`; an uncertain result stays `unknown`. MSI users are directed to run the newer installer, .NET tool users receive the matching `dotnet tool update` command, and portable users receive manual replacement instructions. Flow does not download the artifact, open a browser, run an installer or change the system.
+
+`--json` writes the deterministic `flow-update-check-0.1` result to standard output with UTF-8-compatible text and LF line endings. It contains no path, machine identifier or private document data. Network failure and timeout return code `1` with `FLOWCLI_UPDATE_NETWORK` or `FLOWCLI_UPDATE_TIMEOUT`; a valid channel with no published release returns `FLOWCLI_UPDATE_NO_RELEASE`. Ordinary offline Flow commands remain available.
 
 `sample` writes “The Flow Experiment” to the optional output path or to `sample.flow.json` in the current directory. The command serializes the same typed sample factory used to generate the committed reference document.
 

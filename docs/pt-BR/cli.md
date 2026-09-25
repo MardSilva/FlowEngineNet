@@ -89,12 +89,19 @@ flow epub-qualify <book.epub> --candidate-id <id> --sha256 <hash> --report <repo
 flow epub-review <book.epub> --candidate-id <id> --sha256 <hash> --output <absolute-directory> --repository-root <absolute-directory> --legal-use --drm-free [--ui-language <auto|en|pt-PT|pt-BR>] [--force] [--resume]
 flow execution-status <destination> [--json <report.json>] [--force]
 flow execution-clean <destination> --execution-id <32-hex-id>
+flow update check [--channel <stable|prerelease>] [--json]
 flow inspect <document>
 flow validate <document>
 flow hash <document>
 flow render <document> --html <output> --width <n> --height <n>
 flow render <document> --html-book <output-directory> [--ui-language <auto|en|pt-PT|pt-BR>]
 ```
+
+`update check` é o único comando que consulta a rede. Ele envia um User-Agent identificável à API oficial de releases do GitHub, usa tempo limite de dez segundos, recusa redirecionamentos e links fora de `MardSilva/FlowEngineNet` e limita a resposta a 2 MiB. O canal padrão é `stable`; use `--channel prerelease` para incluir versões alpha, beta e release candidate. Nenhum outro comando faz essa consulta em segundo plano.
+
+O resultado informa as versões instalada e mais recente, o método de instalação detectado, a página oficial da release, o nome do artefato correspondente e o SHA-256 publicado pelo GitHub, quando existir. A detecção reconhece o registro do MSI por utilizador, a localização do pacote da ferramenta .NET e o `VERSION.json` da distribuição portátil. Quando não há evidência suficiente, o método permanece `unknown`. Quem instalou por MSI recebe a orientação de executar o instalador novo; a ferramenta .NET mostra o comando `dotnet tool update`; a distribuição portátil orienta a substituição manual. O Flow não baixa o artefato, não abre o navegador, não executa instaladores nem altera o sistema.
+
+`--json` grava o resultado determinístico `flow-update-check-0.1` na saída padrão, com texto compatível com UTF-8 e quebras LF. Não inclui caminhos, identificadores da máquina nem dados privados de documentos. Falha de rede e timeout retornam código `1` com `FLOWCLI_UPDATE_NETWORK` ou `FLOWCLI_UPDATE_TIMEOUT`; um canal válido sem release publicada retorna `FLOWCLI_UPDATE_NO_RELEASE`. Os demais comandos continuam disponíveis offline.
 
 `sample` grava "The Flow Experiment". `inspect`, `validate` e `hash` leem `.flow.json`. `validate` retorna `0` para documento válido e `2` para erros de validação; falhas de comando ou leitura retornam `1`.
 
@@ -122,7 +129,7 @@ Após interrupção, `--resume` reconhece o lock, remove apenas artefatos transa
 pwsh -NoProfile -File ./eng/smoke-test-cli.ps1 -Configuration Release
 ```
 
-O smoke test empacota `FlowEngineNet.Tool`, instala em diretório isolado e valida a ajuda Plain geral e específica, o catálogo `pt-BR`, a ausência de ANSI em saída redirecionada, as assemblies do Spectre.Console, a recusa segura do menu sem terminal interativo e o fluxo `sample`/`inspect`/`validate`/`hash`/`render`. No fim, desinstala a ferramenta sem tocar na instalação global. Ainda não há publicação, assinatura ou instalador.
+O smoke test empacota `FlowEngineNet.Tool`, instala em diretório isolado e valida a ajuda Plain geral e específica, inclusive o contrato de atualização que não instala arquivos, o catálogo `pt-BR`, a ausência de ANSI em saída redirecionada, as assemblies do Spectre.Console, a recusa segura do menu sem terminal interativo e o fluxo `sample`/`inspect`/`validate`/`hash`/`render`. No fim, desinstala a ferramenta sem tocar na instalação global. O pacote e o MSI continuam locais e sem assinatura; nenhum deles é publicado por esse teste.
 
 ## Separação e testes
 
