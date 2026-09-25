@@ -2,6 +2,7 @@ using System.Diagnostics;
 using System.Globalization;
 using System.Security.Cryptography;
 using System.Text.Json;
+using Flow.Application;
 using Flow.Documents;
 using Flow.Epub;
 using Flow.Epub.Corpus;
@@ -16,14 +17,8 @@ namespace Flow.Cli;
 public sealed class CliOperations
 {
     private readonly IFlowDocumentSerializer _serializer;
-    private readonly IEpubImporter _epubImporter;
-    private readonly IEpubPublicationInspector _epubInspector;
-    private readonly DocumentValidator _validator;
-    private readonly IDocumentIntegrityService _integrityService;
-    private readonly ILayoutEngine _layoutEngine;
-    private readonly IDocumentRenderer _htmlRenderer;
+    private readonly IFlowApplicationService _applicationService;
     private readonly IEpubFidelityAnalyzer _epubFidelityAnalyzer;
-    private readonly IHtmlBookPackageRenderer _htmlBookRenderer;
     private readonly EpubCorpusQualificationService _corpusQualificationService;
     private readonly IEpubLargePublicationGate _largePublicationGate;
     private readonly IEpubLargePublicationReviewPackageGenerator _reviewPackageGenerator;
@@ -50,7 +45,8 @@ public sealed class CliOperations
         IEpubPrivateQualificationService? privateQualificationService = null,
         EpubPrivateDifferenceMatrixService? privateDifferenceMatrixService = null,
         IEpubPrivateVisualReviewService? privateVisualReviewService = null,
-        IFlowUpdateChecker? updateChecker = null)
+        IFlowUpdateChecker? updateChecker = null,
+        IFlowApplicationService? applicationService = null)
     {
         ArgumentNullException.ThrowIfNull(serializer);
         ArgumentNullException.ThrowIfNull(epubImporter);
@@ -61,14 +57,15 @@ public sealed class CliOperations
         ArgumentNullException.ThrowIfNull(htmlRenderer);
 
         _serializer = serializer;
-        _epubImporter = epubImporter;
-        _epubInspector = epubInspector;
-        _validator = validator;
-        _integrityService = integrityService;
-        _layoutEngine = layoutEngine;
-        _htmlRenderer = htmlRenderer;
         _epubFidelityAnalyzer = epubFidelityAnalyzer ?? new EpubFidelityAnalyzer();
-        _htmlBookRenderer = htmlBookRenderer ?? new HtmlBookPackageRenderer();
+        _applicationService = applicationService ?? new FlowApplicationService(
+            epubImporter,
+            epubInspector,
+            validator,
+            integrityService,
+            layoutEngine,
+            htmlRenderer,
+            htmlBookRenderer ?? new HtmlBookPackageRenderer());
         _corpusQualificationService = corpusQualificationService ?? new EpubCorpusQualificationService();
         _largePublicationGate = largePublicationGate ?? new EpubLargePublicationGate();
         _reviewPackageGenerator = reviewPackageGenerator ?? new EpubLargePublicationReviewPackageGenerator();
@@ -784,7 +781,10 @@ public sealed class CliOperations
         }
 
         await using var source = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var inspection = await _epubInspector.InspectAsync(source, cancellationToken).ConfigureAwait(false);
+        var inspectionResult = await _applicationService
+            .InspectEpubAsync(new InspectEpubRequest(source), cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        var inspection = inspectionResult.Inspection;
         await WriteEpubInspectionAsync(inspection, sourcePath, output, text).ConfigureAwait(false);
         await WriteEpubDiagnosticsAsync(
                 inspection.Diagnostics,
@@ -1342,7 +1342,10 @@ public sealed class CliOperations
         }
 
         await using var source = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read);
-        var import = await _epubImporter.ImportAsync(source, progress: null, cancellationToken).ConfigureAwait(false);
+        var applicationResult = await _applicationService
+            .ImportEpubAsync(new ImportEpubRequest(source), cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        var import = applicationResult.Import;
         var pipelineMetrics = import.Metrics;
 
         if (import.Document is not null && outputPath is null)
@@ -1438,7 +1441,8 @@ public sealed class CliOperations
             throw new CliOperationException("ErrorImportOutputMissing");
         }
 
-        var validation = _validator.Validate(import.Document);
+        var validation = applicationResult.Validation
+                         ?? throw new InvalidOperationException("A successful import must include validation evidence.");
         if (!validation.IsValid)
         {
             foreach (var diagnostic in validation.Diagnostics)
@@ -1463,7 +1467,8 @@ public sealed class CliOperations
             .AddPhaseTiming(EpubImportPhase.SerializingDocument, Stopwatch.GetElapsedTime(serializationStarted))
             .WithOutputSizes(new FileInfo(outputPath).Length, null, null);
 
-        var hash = _integrityService.ComputeHash(import.Document);
+        var hash = applicationResult.Hash
+                   ?? throw new InvalidOperationException("A successful import must include canonical hash evidence.");
         await output.WriteLineAsync(text.Format("LabelImportedEpub", sourcePath)).ConfigureAwait(false);
         await output.WriteLineAsync(text.Format("LabelFlowDocument", outputPath)).ConfigureAwait(false);
         await output.WriteLineAsync(text.Format("LabelTitle", import.Document.Metadata.Title)).ConfigureAwait(false);
@@ -1540,7 +1545,10 @@ public sealed class CliOperations
         CancellationToken cancellationToken)
     {
         var document = await ReadDocumentAsync(command.DocumentPath, cancellationToken).ConfigureAwait(false);
-        var validation = _validator.Validate(document);
+        var validation = (await _applicationService
+                .ValidateDocumentAsync(new ValidateDocumentRequest(document), cancellationToken: cancellationToken)
+                .ConfigureAwait(false))
+            .Validation;
         if (validation.IsValid)
         {
             await output.WriteLineAsync(text.Get("ValidationValid")).ConfigureAwait(false);
@@ -1566,7 +1574,12 @@ public sealed class CliOperations
         CancellationToken cancellationToken)
     {
         var document = await ReadDocumentAsync(command.DocumentPath, cancellationToken).ConfigureAwait(false);
-        var hash = _integrityService.ComputeHash(document);
+        var hash = (await _applicationService
+                .CalculateDocumentHashAsync(
+                    new CalculateDocumentHashRequest(document),
+                    cancellationToken: cancellationToken)
+                .ConfigureAwait(false))
+            .Hash;
         await WriteHashAsync(output, hash, text).ConfigureAwait(false);
         return 0;
     }
@@ -1579,21 +1592,19 @@ public sealed class CliOperations
         CancellationToken cancellationToken)
     {
         var document = await ReadDocumentAsync(command.DocumentPath, cancellationToken).ConfigureAwait(false);
-        var preferences = new UserReadingPreferences();
-        var context = new LayoutContext(
-            command.ViewportWidth,
-            command.ViewportHeight,
-            GetDeviceClass(command.ViewportWidth),
-            ReadingMode.Flow,
-            userPreferences: preferences);
-        var layout = _layoutEngine.Layout(document, context);
-        var rendered = _htmlRenderer.Render(document, layout, preferences);
+        var applicationResult = await _applicationService
+            .RenderHtmlAsync(
+                new RenderHtmlRequest(document, command.ViewportWidth, command.ViewportHeight),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        var layout = applicationResult.Layout;
+        var rendered = applicationResult.RenderedDocument;
         var outputPath = Path.GetFullPath(command.OutputPath);
         EnsureParentDirectory(outputPath);
         rendered.WriteTo(outputPath);
         observer?.FileWritten(outputPath);
 
-        var hash = _integrityService.ComputeHash(document);
+        var hash = applicationResult.Hash;
         await output.WriteLineAsync(text.Format("LabelRendered", outputPath)).ConfigureAwait(false);
         await output.WriteLineAsync(text.Format("LabelDocumentId", document.Identity.Id)).ConfigureAwait(false);
         await WriteHashAsync(output, hash, text).ConfigureAwait(false);
@@ -1622,19 +1633,14 @@ public sealed class CliOperations
         ValidateHtmlBookOutputPath(documentPath, outputDirectory);
 
         var document = await ReadDocumentAsync(documentPath, cancellationToken).ConfigureAwait(false);
-        var preferences = new UserReadingPreferences();
-        var layout = _layoutEngine.Layout(
-            document,
-            new LayoutContext(width, height, GetDeviceClass(width), ReadingMode.Flow, userPreferences: preferences));
-        var hash = _integrityService.ComputeHash(document);
         var renderingStarted = Stopwatch.GetTimestamp();
-        var package = _htmlBookRenderer.Render(
-            document,
-            layout,
-            preferences,
-            new HtmlBookIntegrity(hash.Algorithm, hash.Hash, hash.CanonicalizationVersion),
-            new HtmlBookPackageOptions(command.UiLanguage),
-            cancellationToken);
+        var applicationResult = await _applicationService
+            .RenderHtmlBookAsync(
+                new RenderHtmlBookRequest(document, width, height, uiLanguage: command.UiLanguage),
+                cancellationToken: cancellationToken)
+            .ConfigureAwait(false);
+        var package = applicationResult.Package;
+        var hash = applicationResult.Hash;
         var renderingDuration = Stopwatch.GetElapsedTime(renderingStarted);
 
         var writingStarted = Stopwatch.GetTimestamp();

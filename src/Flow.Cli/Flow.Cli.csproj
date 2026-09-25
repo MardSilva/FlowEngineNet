@@ -32,6 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Flow.Application\Flow.Application.csproj" />
     <ProjectReference Include="..\Flow.Documents\Flow.Documents.csproj" />
     <ProjectReference Include="..\Flow.Epub\Flow.Epub.csproj" />
     <ProjectReference Include="..\Flow.Epub.Corpus\Flow.Epub.Corpus.csproj" />

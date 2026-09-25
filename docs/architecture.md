@@ -16,11 +16,14 @@ English | [Português (Brasil)](pt-BR/architecture.md)
 - `Flow.Security` owns canonicalization, hashing, and experimental signing abstractions.
 - `Flow.Epub` maps a deliberately limited EPUB subset into the semantic model.
 - `Flow.Epub.Corpus` orchestrates optional end-to-end EPUB evidence across import, validation, integrity, layout, and HTML without adding outward dependencies to `Flow.Epub`.
+- `Flow.Application` exposes presentation-neutral use cases shared by first-party hosts.
 - `Flow.Cli` is the command-line composition root.
+- `Flow.Windows.Shell` contains platform-neutral Windows-host state, localization, reconstructible settings, and local-file orchestration over the shared application boundary.
+- `Flow.Windows` is the native WinUI 3 composition root and references only `Flow.Windows.Shell`.
 
 Dependencies point inward: domain projects never reference presentation or infrastructure projects. The CLI may compose all projects, while HTML and EPUB remain adapters at the edge.
 
-The approved direct graph is executable evidence in `ProjectDependencyConformanceTests`: Core has no project dependency; Documents depends only on Core; Layout depends on Core and Documents; Rendering depends on Documents and Layout; HTML depends only on Rendering; Security depends only on Documents; and EPUB depends only on Core and Documents. `Flow.Epub.Corpus` is an outward orchestration layer over Documents, EPUB, Layout, HTML, and Security. It owns corpus execution, repeated-run qualification, noncanonical baselines, the large-publication gate, assisted-review generation and the optional EPUBCheck process adapter. None of that evidence flows back into the importer or domain model. As the composition root, `Flow.Cli` references this orchestration layer to expose those workflows without moving command-line concerns into it.
+The approved direct graph is executable evidence in `ProjectDependencyConformanceTests`: Core has no project dependency; Documents depends only on Core; Layout depends on Core and Documents; Rendering depends on Documents and Layout; HTML depends only on Rendering; Security depends only on Documents; and EPUB depends only on Core and Documents. `Flow.Epub.Corpus` is an outward orchestration layer over Documents, EPUB, Layout, HTML, and Security. It owns corpus execution, repeated-run qualification, noncanonical baselines, the large-publication gate, assisted-review generation and the optional EPUBCheck process adapter. None of that evidence flows back into the importer or domain model. `Flow.Application` coordinates in-process operations used by the CLI and graphical host. `Flow.Cli` remains the outer composition root for command-line and corpus workflows. `Flow.Windows.Shell` calls `Flow.Application` directly and owns the desktop-specific source, destination, confirmation, staging, and recovery policies; neither Windows project references or launches the CLI.
 
 ## Rendering pipeline
 
@@ -36,7 +39,9 @@ An importer or serializer creates a `FlowDocument`. The layout engine combines t
 
 ## Command-line composition
 
-`Flow.Cli` contains a framework-free parser that produces typed command records, operations that compose the domain services, and a thin application boundary for exit codes and diagnostics. It does not place command-line concerns in the document, layout, security, or rendering projects. See [cli.md](cli.md).
+`Flow.Application` accepts caller-owned streams or loaded `FlowDocument` values and returns typed inspection, import, validation, hash, layout and rendering results. Progress and cancellation are observable without `Console`, subprocesses or output paths. It also formats a shell-specific equivalent command for display and copying, but that text is never used to execute an operation.
+
+`Flow.Cli` contains the parser and remains responsible for paths supplied by the user, file I/O, atomic writes, Spectre.Console, confirmation, localization and exit codes. Its direct commands now call the shared application boundary while retaining their established output. See [cli.md](cli.md).
 
 ## Style cascade
 

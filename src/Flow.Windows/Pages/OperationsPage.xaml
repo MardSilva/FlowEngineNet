@@ -1,0 +1,108 @@
+<Page
+    x:Class="Flow.Windows.Pages.OperationsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <ScrollViewer HorizontalScrollMode="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="20" Padding="40,32,40,48" MaxWidth="980" HorizontalAlignment="Left">
+            <StackPanel Spacing="8">
+                <TextBlock x:Name="TitleText" Style="{ThemeResource TitleTextBlockStyle}"
+                           TextWrapping="Wrap" AutomationProperties.HeadingLevel="Level1" />
+                <TextBlock x:Name="LeadText" TextWrapping="Wrap" MaxWidth="800" />
+            </StackPanel>
+
+            <Border x:Name="DropArea" Padding="24" CornerRadius="8" BorderThickness="2"
+                    BorderBrush="{ThemeResource FlowAccentBrush}" AllowDrop="True"
+                    DragOver="DropArea_DragOver" Drop="DropArea_Drop">
+                <StackPanel Spacing="12" HorizontalAlignment="Center">
+                    <FontIcon Glyph="&#xE898;" FontSize="28" Foreground="{ThemeResource FlowAccentBrush}" />
+                    <TextBlock x:Name="DropText" TextAlignment="Center" TextWrapping="Wrap" />
+                    <Button x:Name="ChooseButton" Click="ChooseButton_Click" />
+                    <TextBlock x:Name="SourcePathText" TextAlignment="Center" TextWrapping="Wrap"
+                               MaxWidth="760" FontFamily="Consolas" />
+                    <TextBlock x:Name="ReadOnlyNotice" TextAlignment="Center" TextWrapping="Wrap"
+                               Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+            </Border>
+
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Button x:Name="InspectButton" HorizontalAlignment="Stretch" Click="InspectButton_Click" />
+                <Button x:Name="ImportButton" Grid.Column="1" HorizontalAlignment="Stretch" Click="ImportButton_Click" />
+                <Button x:Name="ValidateButton" Grid.Column="2" HorizontalAlignment="Stretch" Click="ValidateButton_Click" />
+            </Grid>
+
+            <Expander x:Name="ImportOptions" IsExpanded="True">
+                <Expander.Content>
+                    <StackPanel Spacing="14" Padding="0,12,0,4">
+                        <StackPanel Spacing="6">
+                            <TextBlock x:Name="OutputPathLabel" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                            <TextBox x:Name="OutputPathBox" TextWrapping="NoWrap" />
+                        </StackPanel>
+                        <CheckBox x:Name="DiagnosticsCheck" />
+                        <CheckBox x:Name="HtmlBookCheck" Checked="HtmlBookCheck_Changed" Unchecked="HtmlBookCheck_Changed" />
+                        <StackPanel x:Name="HtmlLanguagePanel" Spacing="6" Visibility="Collapsed">
+                            <TextBlock x:Name="HtmlLanguageLabel" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                            <ComboBox x:Name="HtmlLanguageSelector" MinWidth="260" SelectedIndex="0">
+                                <ComboBoxItem x:Name="AutomaticLanguageItem" Tag="Automatic" />
+                                <ComboBoxItem x:Name="EnglishLanguageItem" Tag="English" />
+                                <ComboBoxItem x:Name="PortugueseBrazilLanguageItem" Tag="PortugueseBrazil" />
+                                <ComboBoxItem x:Name="PortuguesePortugalLanguageItem" Tag="PortuguesePortugal" />
+                            </ComboBox>
+                        </StackPanel>
+                    </StackPanel>
+                </Expander.Content>
+            </Expander>
+
+            <Button x:Name="RunButton" HorizontalAlignment="Right" Click="RunButton_Click" />
+
+            <StackPanel x:Name="ProgressPanel" Spacing="10" Visibility="Collapsed">
+                <ProgressBar x:Name="OperationProgress" IsIndeterminate="True" />
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="ProgressText" TextWrapping="Wrap" VerticalAlignment="Center" />
+                    <Button x:Name="CancelButton" Grid.Column="1" Click="CancelButton_Click" />
+                </Grid>
+            </StackPanel>
+
+            <InfoBar x:Name="ResultBar" IsOpen="False" IsClosable="True" />
+
+            <Border x:Name="SummaryCard" Visibility="Collapsed" Padding="20" CornerRadius="8"
+                    BorderThickness="1" BorderBrush="{ThemeResource FlowCardBorderBrush}"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                <Grid ColumnSpacing="24">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid>
+                        <Image x:Name="CoverImage" MaxWidth="140" MaxHeight="210" Stretch="Uniform" />
+                        <TextBlock x:Name="NoCoverText" TextAlignment="Center" TextWrapping="Wrap"
+                                   VerticalAlignment="Center" />
+                    </Grid>
+                    <StackPanel Grid.Column="1" Spacing="8">
+                        <TextBlock x:Name="SummaryTitle" Style="{ThemeResource SubtitleTextBlockStyle}"
+                                   TextWrapping="Wrap" AutomationProperties.HeadingLevel="Level2" />
+                        <TextBlock x:Name="SummaryAuthors" TextWrapping="Wrap" />
+                        <TextBlock x:Name="SummaryLanguage" TextWrapping="Wrap" />
+                        <TextBlock x:Name="SummaryVersion" TextWrapping="Wrap" />
+                        <TextBlock x:Name="SummaryResources" TextWrapping="Wrap" />
+                        <TextBlock x:Name="SummaryOutputs" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Grid>
+            </Border>
+
+            <Expander x:Name="DiagnosticsExpander" Visibility="Collapsed">
+                <Expander.Content>
+                    <ItemsControl x:Name="DiagnosticsList" Margin="0,12,0,0" />
+                </Expander.Content>
+            </Expander>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

@@ -4,7 +4,7 @@
 
 A distribuição do Flow para Windows passa a ter uma identidade de produto estável antes da criação do primeiro instalador. A versão semântica continua definida em `Directory.Build.props`; `eng/Flow.WindowsProduct.props` acrescenta somente a identidade e a política de instalação específicas do Windows. Assim, não surge uma segunda fonte para a versão pública.
 
-O alvo inicial é `win-x64`, com instalação por utilizador no diretório de programas dos dados locais da aplicação. O código permanente de upgrade é `{C412C622-FA2F-400C-88EE-BA5D4A573F7D}`. O Windows Installer usa a versão numérica separada `0.2.3` para ordenar o pacote `0.2.0-alpha.3`. As próximas versões do instalador devem aumentar esse número, mesmo quando o SemVer público mudar entre os canais alpha, beta, release candidate e estável.
+O alvo inicial é `win-x64`, com instalação por utilizador no diretório de programas dos dados locais da aplicação. O código permanente de upgrade é `{C412C622-FA2F-400C-88EE-BA5D4A573F7D}`. O Windows Installer usa a versão numérica separada `0.2.4` para ordenar o pacote `0.2.0-alpha.4`. As próximas versões do instalador devem aumentar esse número, mesmo quando o SemVer público mudar entre os canais alpha, beta, release candidate e estável.
 
 O instalador poderá remover apenas o payload da aplicação, o alias de comando, o registro do instalador e os atalhos do produto. Livros, diretórios configurados, documentos `.flow.json`, preferências, relatórios e exportações pertencem ao utilizador. Upgrades e desinstalações normais devem preservá-los.
 
@@ -67,7 +67,7 @@ A saída fica em `artifacts/windows-installer/` e contém os dois arquivos MSI, 
 Para instalar sem interface:
 
 ```powershell
-msiexec.exe /i ".\FlowEngineNet.Setup.0.2.0-alpha.3.pt-BR.win-x64.msi" /qn /norestart
+msiexec.exe /i ".\FlowEngineNet.Setup.0.2.0-alpha.4.pt-BR.win-x64.msi" /qn /norestart
 ```
 
 O próprio Windows Installer cuida de reparo, upgrade e remoção. O reparo pode ser solicitado com `msiexec.exe /fa <código-do-produto> /qn /norestart`; a remoção normal deve ser feita em Aplicativos instalados ou Programas e Recursos. As duas variantes de idioma desta versão compartilham um `ProductCode` fixo. Cada versão pública futura do MSI deverá receber outro `ProductCode`, conservar o `UpgradeCode` permanente e aumentar a versão numérica do instalador. Dessa forma, o major upgrade substitui a versão anterior e impede a instalação de uma versão mais baixa sobre outra mais recente.
@@ -80,7 +80,7 @@ O teste que altera temporariamente o Windows deve ser executado apenas nesse sis
 pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-installer.ps1
 ```
 
-O teste gera identidades aleatórias para produto, upgrade, componente, Registro e diretório. Ele nunca usa o código do produto de produção nem uma instalação pessoal existente. Dentro dessa identidade isolada, verifica instalação limpa, execução sem .NET no `PATH`, reparo, major upgrade, recusa de downgrade e desinstalação. O diretório de teste contém espaços e Unicode, e o `PATH` original do utilizador precisa ser restaurado sem alterações.
+O teste gera identidades aleatórias para produto, upgrade, componente, Registro e diretório. Ele nunca usa o código do produto de produção nem uma instalação pessoal existente. Dentro dessa identidade isolada, verifica instalação limpa, execução sem .NET no `PATH`, reparo, major upgrade, recusa de downgrade e desinstalação. O diretório de teste contém espaços e Unicode. A conferência final compara as entradas normalizadas e ordenadas do `PATH`: diferenças inofensivas na formatação de separadores ou barras finais são aceitas, mas uma entrada alheia alterada, removida ou reordenada continua reprovando o gate.
 
 O instalador usa WiX Toolset 4.0.6, fixado no projeto e licenciado sob MS-RL. WiX 6 e 7 não foram adotados porque a distribuição atual dessas versões acrescenta uma EULA de Open Source Maintenance Fee. O WiX participa apenas do build e não é instalado com o Flow. Versão, licença e papel de ferramenta excluída da distribuição aparecem no SBOM do instalador. O MSI usa os mecanismos padrão de registro e major upgrade documentados pela [Microsoft](https://learn.microsoft.com/pt-br/windows/win32/msi/configuring-add-remove-programs-with-windows-installer) e pelo [WiX](https://docs.firegiant.com/wix/schema/wxs/majorupgrade/).
 
@@ -102,4 +102,8 @@ O workflow cria apenas uma GitHub Release em rascunho, depois da confirmação e
 
 ## Limite atual
 
-O ZIP portátil e o MSI continuam sendo artefatos experimentais sem assinatura, embora o workflow confirmado manualmente já possa anexá-los a uma release em rascunho. Por isso, o Windows pode mostrar um aviso de publicador desconhecido ou do SmartScreen. Ainda não existem MSIX, aplicação gráfica ou associação de arquivos. O comando de atualização informa o pacote disponível e seu checksum, mas nunca baixa ou executa o arquivo. Assinatura de código e instalação automatizada continuam como incrementos separados.
+`Flow.Application` oferece a fronteira em processo para inspecionar e importar EPUB, validar e calcular o hash de documentos Flow e renderizar HTML. A camada relata progresso, cancelamento, diagnósticos e resultados tipados sem depender da CLI, de um terminal ou da execução de subprocessos. A CLI continua responsável pelos caminhos, pela persistência, pelas confirmações e pelos códigos de saída.
+
+A aplicação WinUI 3 já roda como um `WinExe` gráfico separado, explica o Flow offline e executa inspeção, importação e validação local de EPUB pela fronteira tipada compartilhada. Ela mantém navegação acessível, textos localizados, temas e configurações reconstruíveis, sem iniciar a CLI. O MSI da alpha.3 continua contendo somente a CLI; a inclusão do host gráfico e o atalho do menu Iniciar ficam para a etapa final de integração do instalador. Consulte [windows-app.md](windows-app.md).
+
+O ZIP portátil e o MSI continuam sendo artefatos experimentais sem assinatura, embora o workflow confirmado manualmente já possa anexá-los a uma release em rascunho. Por isso, o Windows pode mostrar um aviso de publicador desconhecido ou do SmartScreen. Ainda não existem MSIX nem associação de arquivos. O comando de atualização informa o pacote disponível e seu checksum, mas nunca baixa ou executa o arquivo. Assinatura de código e instalação automatizada continuam como incrementos separados.

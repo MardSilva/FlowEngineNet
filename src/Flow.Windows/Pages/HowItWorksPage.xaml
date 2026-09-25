@@ -1,0 +1,66 @@
+<Page
+    x:Class="Flow.Windows.Pages.HowItWorksPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Page.Resources>
+        <Style x:Key="ConceptCardStyle" TargetType="Border">
+            <Setter Property="Padding" Value="20" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{ThemeResource FlowCardBorderBrush}" />
+            <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+        </Style>
+    </Page.Resources>
+    <ScrollViewer HorizontalScrollMode="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="22" Padding="40,32,40,48" MaxWidth="980" HorizontalAlignment="Left">
+            <StackPanel Spacing="8">
+                <TextBlock x:Name="TitleText" Style="{ThemeResource TitleTextBlockStyle}"
+                           TextWrapping="Wrap" AutomationProperties.HeadingLevel="Level1" />
+                <TextBlock x:Name="LeadText" TextWrapping="Wrap" MaxWidth="760" />
+            </StackPanel>
+            <Border Padding="24" CornerRadius="10" BorderThickness="2"
+                    BorderBrush="{ThemeResource FlowAccentBrush}"
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                <StackPanel Spacing="8" HorizontalAlignment="Center">
+                    <TextBlock x:Name="InvariantText" Style="{ThemeResource SubtitleTextBlockStyle}"
+                               TextAlignment="Center" TextWrapping="Wrap"
+                               AutomationProperties.HeadingLevel="Level2" />
+                    <TextBlock x:Name="InvariantExplanation" TextAlignment="Center"
+                               TextWrapping="Wrap" MaxWidth="720" />
+                </StackPanel>
+            </Border>
+            <StackPanel Spacing="10">
+                <Border Style="{StaticResource ConceptCardStyle}">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Name="DocumentTitle" Style="{ThemeResource BodyStrongTextBlockStyle}"
+                                   AutomationProperties.HeadingLevel="Level2" />
+                        <TextBlock x:Name="DocumentDescription" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+                <FontIcon Glyph="&#xE70D;" FontSize="18" Foreground="{ThemeResource FlowAccentBrush}"
+                          AutomationProperties.AccessibilityView="Raw" />
+                <Border Style="{StaticResource ConceptCardStyle}">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Name="LayoutTitle" Style="{ThemeResource BodyStrongTextBlockStyle}"
+                                   AutomationProperties.HeadingLevel="Level2" />
+                        <TextBlock x:Name="LayoutDescription" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+                <FontIcon Glyph="&#xE70D;" FontSize="18" Foreground="{ThemeResource FlowAccentBrush}"
+                          AutomationProperties.AccessibilityView="Raw" />
+                <Border Style="{StaticResource ConceptCardStyle}">
+                    <StackPanel Spacing="4">
+                        <TextBlock x:Name="RenderingTitle" Style="{ThemeResource BodyStrongTextBlockStyle}"
+                                   AutomationProperties.HeadingLevel="Level2" />
+                        <TextBlock x:Name="RenderingDescription" TextWrapping="Wrap" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+            <StackPanel Spacing="8">
+                <TextBlock x:Name="WhyTitle" Style="{ThemeResource SubtitleTextBlockStyle}"
+                           AutomationProperties.HeadingLevel="Level2" />
+                <TextBlock x:Name="WhyText" TextWrapping="Wrap" MaxWidth="800" />
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

@@ -1,0 +1,74 @@
+<Page
+    x:Class="Flow.Windows.Pages.HomePage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Page.Resources>
+        <Style x:Key="ActionCardStyle" TargetType="Border">
+            <Setter Property="Padding" Value="20" />
+            <Setter Property="CornerRadius" Value="8" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="BorderBrush" Value="{ThemeResource FlowCardBorderBrush}" />
+            <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+        </Style>
+    </Page.Resources>
+    <ScrollViewer HorizontalScrollMode="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel Spacing="20" Padding="40,32,40,48" MaxWidth="980" HorizontalAlignment="Left">
+            <StackPanel Spacing="8">
+                <TextBlock x:Name="TitleText" Style="{ThemeResource TitleTextBlockStyle}"
+                           TextWrapping="Wrap"
+                           AutomationProperties.HeadingLevel="Level1" />
+                <TextBlock x:Name="LeadText" Style="{ThemeResource BodyTextBlockStyle}"
+                           TextWrapping="Wrap" MaxWidth="760" />
+            </StackPanel>
+            <TextBlock x:Name="ActionsTitle" Style="{ThemeResource SubtitleTextBlockStyle}"
+                       AutomationProperties.HeadingLevel="Level2" />
+            <StackPanel Spacing="12">
+                <Border Style="{StaticResource ActionCardStyle}">
+                    <Grid ColumnSpacing="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="48" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE8A5;" FontSize="24" Foreground="{ThemeResource FlowAccentBrush}" />
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock x:Name="InspectTitle" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                            <TextBlock x:Name="InspectDescription" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button x:Name="InspectButton" Grid.Column="2" Click="InspectButton_Click" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource ActionCardStyle}">
+                    <Grid ColumnSpacing="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="48" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE8B5;" FontSize="24" Foreground="{ThemeResource FlowAccentBrush}" />
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock x:Name="ImportTitle" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                            <TextBlock x:Name="ImportDescription" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button x:Name="ImportButton" Grid.Column="2" Click="ImportButton_Click" />
+                    </Grid>
+                </Border>
+                <Border Style="{StaticResource ActionCardStyle}">
+                    <Grid ColumnSpacing="20">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="48" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE73E;" FontSize="24" Foreground="{ThemeResource FlowAccentBrush}" />
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock x:Name="ValidateTitle" Style="{ThemeResource BodyStrongTextBlockStyle}" />
+                            <TextBlock x:Name="ValidateDescription" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button x:Name="ValidateButton" Grid.Column="2" Click="ValidateButton_Click" />
+                    </Grid>
+                </Border>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</Page>
