@@ -20,6 +20,7 @@ public sealed partial class OperationsPage : Page
     private readonly Func<Task> _openPowerShell;
     private readonly List<string> _advancedLog = [];
     private CancellationTokenSource? _cancellation;
+    private bool _initialized;
     private string? _sourcePath;
     private FlowWindowsOperationKind _selectedOperation;
 
@@ -45,6 +46,7 @@ public sealed partial class OperationsPage : Page
         _openPowerShell = openPowerShell ?? (() => Task.CompletedTask);
         _selectedOperation = initialOperation;
         InitializeComponent();
+        _initialized = true;
         Localize();
         SelectOperation(initialOperation);
         AdvancedPanel.Visibility = advancedMode ? Visibility.Visible : Visibility.Collapsed;
@@ -106,7 +108,13 @@ public sealed partial class OperationsPage : Page
         }
     }
 
-    private void AdvancedOption_Changed(object sender, object e) => UpdateAdvancedCommand();
+    private void AdvancedOption_Changed(object sender, object e)
+    {
+        if (_initialized)
+        {
+            UpdateAdvancedCommand();
+        }
+    }
 
     private void CopyCommandButton_Click(object sender, RoutedEventArgs e)
     {
@@ -443,7 +451,7 @@ public sealed partial class OperationsPage : Page
 
     private void UpdateAdvancedCommand()
     {
-        if (AdvancedPanel.Visibility != Visibility.Visible || _sourcePath is null)
+        if (!_initialized || AdvancedPanel is null || AdvancedPanel.Visibility != Visibility.Visible || _sourcePath is null)
         {
             return;
         }

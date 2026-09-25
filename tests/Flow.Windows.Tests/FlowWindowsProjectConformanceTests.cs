@@ -52,6 +52,8 @@ public sealed class FlowWindowsProjectConformanceTests
         Assert.Contains("AutomationProperties.HeadingLevel=\"Level1\"", operations, StringComparison.Ordinal);
         Assert.Contains("CancelButton_Click", operationsCode, StringComparison.Ordinal);
         Assert.Contains("ContentDialog", operationsCode, StringComparison.Ordinal);
+        Assert.Contains("if (_initialized)", operationsCode, StringComparison.Ordinal);
+        Assert.Contains("AdvancedPanel is null", operationsCode, StringComparison.Ordinal);
         Assert.DoesNotContain("Process.Start", operationsCode, StringComparison.Ordinal);
         Assert.Contains("AutomationProperties.HeadingLevel=\"Level1\"", library, StringComparison.Ordinal);
         Assert.Contains("<WebView2", preview, StringComparison.Ordinal);
