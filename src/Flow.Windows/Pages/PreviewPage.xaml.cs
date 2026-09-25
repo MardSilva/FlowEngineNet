@@ -26,7 +26,7 @@ public sealed partial class PreviewPage : Page
         _sourcePath = sourcePath;
         InitializeComponent();
         Localize();
-        Loaded += async (_, _) => await LoadPreviewAsync(FlowWindowsPreviewProfile.Desktop);
+        Loaded += async (_, _) => await LoadPreviewAsync(SelectInitialProfile(ActualWidth));
         Unloaded += async (_, _) =>
         {
             _cancellation?.Cancel();
@@ -164,6 +164,14 @@ public sealed partial class PreviewPage : Page
         Uri.TryCreate(value, UriKind.Absolute, out var uri)
         && uri.Scheme == Uri.UriSchemeHttps
         && string.Equals(uri.Host, PreviewHost, StringComparison.OrdinalIgnoreCase);
+
+    private static FlowWindowsPreviewProfile SelectInitialProfile(double availableWidth) =>
+        availableWidth switch
+        {
+            >= 1180 => FlowWindowsPreviewProfile.Desktop,
+            >= 900 => FlowWindowsPreviewProfile.Tablet,
+            _ => FlowWindowsPreviewProfile.Phone,
+        };
 
     private void SetProfileSize(FlowWindowsPreviewProfile profile)
     {

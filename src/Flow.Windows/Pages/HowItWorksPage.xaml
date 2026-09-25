@@ -1,18 +1,40 @@
 <Page
     x:Class="Flow.Windows.Pages.HowItWorksPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{ThemeResource FlowContentBackgroundBrush}">
     <Page.Resources>
         <Style x:Key="ConceptCardStyle" TargetType="Border">
             <Setter Property="Padding" Value="20" />
             <Setter Property="CornerRadius" Value="8" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="BorderBrush" Value="{ThemeResource FlowCardBorderBrush}" />
-            <Setter Property="Background" Value="{ThemeResource CardBackgroundFillColorDefaultBrush}" />
+            <Setter Property="Background" Value="{ThemeResource FlowCardBackgroundBrush}" />
         </Style>
     </Page.Resources>
-    <ScrollViewer HorizontalScrollMode="Disabled" VerticalScrollBarVisibility="Auto">
-        <StackPanel Spacing="22" Padding="40,32,40,48" MaxWidth="980" HorizontalAlignment="Left">
+    <VisualStateManager.VisualStateGroups>
+        <VisualStateGroup x:Name="WidthStates">
+            <VisualState x:Name="Compact">
+                <VisualState.StateTriggers>
+                    <AdaptiveTrigger MinWindowWidth="0" />
+                </VisualState.StateTriggers>
+                <VisualState.Setters>
+                    <Setter Target="PageContent.Padding" Value="20,24,20,36" />
+                </VisualState.Setters>
+            </VisualState>
+            <VisualState x:Name="Regular">
+                <VisualState.StateTriggers>
+                    <AdaptiveTrigger MinWindowWidth="720" />
+                </VisualState.StateTriggers>
+                <VisualState.Setters>
+                    <Setter Target="PageContent.Padding" Value="40,32,40,48" />
+                </VisualState.Setters>
+            </VisualState>
+        </VisualStateGroup>
+    </VisualStateManager.VisualStateGroups>
+    <ScrollViewer HorizontalContentAlignment="Stretch" HorizontalScrollMode="Disabled" VerticalScrollBarVisibility="Auto">
+        <StackPanel x:Name="PageContent" Spacing="22" Padding="40,32,40,48"
+                    MaxWidth="1180" HorizontalAlignment="Stretch">
             <StackPanel Spacing="8">
                 <TextBlock x:Name="TitleText" Style="{ThemeResource TitleTextBlockStyle}"
                            TextWrapping="Wrap" AutomationProperties.HeadingLevel="Level1" />
@@ -20,7 +42,7 @@
             </StackPanel>
             <Border Padding="24" CornerRadius="10" BorderThickness="2"
                     BorderBrush="{ThemeResource FlowAccentBrush}"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    Background="{ThemeResource FlowCardBackgroundBrush}">
                 <StackPanel Spacing="8" HorizontalAlignment="Center">
                     <TextBlock x:Name="InvariantText" Style="{ThemeResource SubtitleTextBlockStyle}"
                                TextAlignment="Center" TextWrapping="Wrap"

@@ -37,6 +37,10 @@ jobs:
       - name: Restore
         run: dotnet restore Flow.sln
 
+      - name: Restore WinUI shell
+        if: runner.os == 'Windows'
+        run: dotnet restore src/Flow.Windows/Flow.Windows.csproj -p:Platform=x64
+
       - name: Verify formatting
         run: dotnet format Flow.sln --verify-no-changes --no-restore
 

@@ -1,8 +1,30 @@
 <Page
     x:Class="Flow.Windows.Pages.LibraryPage"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
-    <Grid Padding="40,32,40,48" RowSpacing="18">
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{ThemeResource FlowContentBackgroundBrush}">
+    <VisualStateManager.VisualStateGroups>
+        <VisualStateGroup x:Name="WidthStates">
+            <VisualState x:Name="Compact">
+                <VisualState.StateTriggers>
+                    <AdaptiveTrigger MinWindowWidth="0" />
+                </VisualState.StateTriggers>
+                <VisualState.Setters>
+                    <Setter Target="PageContent.Padding" Value="20,24,20,36" />
+                </VisualState.Setters>
+            </VisualState>
+            <VisualState x:Name="Regular">
+                <VisualState.StateTriggers>
+                    <AdaptiveTrigger MinWindowWidth="720" />
+                </VisualState.StateTriggers>
+                <VisualState.Setters>
+                    <Setter Target="PageContent.Padding" Value="40,32,40,48" />
+                </VisualState.Setters>
+            </VisualState>
+        </VisualStateGroup>
+    </VisualStateManager.VisualStateGroups>
+    <Grid x:Name="PageContent" Padding="40,32,40,48" RowSpacing="18"
+          MaxWidth="1400" HorizontalAlignment="Stretch">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
@@ -47,7 +69,7 @@
             </ListView>
             <Border Grid.Column="1" x:Name="DetailsCard" Visibility="Collapsed" Padding="20"
                     CornerRadius="8" BorderThickness="1" BorderBrush="{ThemeResource FlowCardBorderBrush}"
-                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                    Background="{ThemeResource FlowCardBackgroundBrush}">
                 <ScrollViewer>
                     <StackPanel Spacing="12">
                         <Image x:Name="CoverImage" MaxWidth="180" MaxHeight="270" HorizontalAlignment="Left" Stretch="Uniform" />

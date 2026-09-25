@@ -12,18 +12,50 @@
                 <ResourceDictionary x:Key="Default">
                     <SolidColorBrush x:Key="FlowAccentBrush" Color="#2563EB" />
                     <SolidColorBrush x:Key="FlowCardBorderBrush" Color="#D0D5DD" />
+                    <SolidColorBrush x:Key="FlowWindowBackgroundBrush" Color="#F3F6FA" />
+                    <SolidColorBrush x:Key="FlowNavigationBackgroundBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="FlowContentBackgroundBrush" Color="#F7F9FC" />
+                    <SolidColorBrush x:Key="FlowCardBackgroundBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="FlowPreviewBackgroundBrush" Color="#FFFFFF" />
+                    <StaticResource x:Key="NavigationViewDefaultPaneBackground" ResourceKey="FlowNavigationBackgroundBrush" />
+                    <StaticResource x:Key="NavigationViewExpandedPaneBackground" ResourceKey="FlowNavigationBackgroundBrush" />
+                    <StaticResource x:Key="NavigationViewTopPaneBackground" ResourceKey="FlowNavigationBackgroundBrush" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Light">
                     <SolidColorBrush x:Key="FlowAccentBrush" Color="#2563EB" />
                     <SolidColorBrush x:Key="FlowCardBorderBrush" Color="#D0D5DD" />
+                    <SolidColorBrush x:Key="FlowWindowBackgroundBrush" Color="#F3F6FA" />
+                    <SolidColorBrush x:Key="FlowNavigationBackgroundBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="FlowContentBackgroundBrush" Color="#F7F9FC" />
+                    <SolidColorBrush x:Key="FlowCardBackgroundBrush" Color="#FFFFFF" />
+                    <SolidColorBrush x:Key="FlowPreviewBackgroundBrush" Color="#FFFFFF" />
+                    <StaticResource x:Key="NavigationViewDefaultPaneBackground" ResourceKey="FlowNavigationBackgroundBrush" />
+                    <StaticResource x:Key="NavigationViewExpandedPaneBackground" ResourceKey="FlowNavigationBackgroundBrush" />
+                    <StaticResource x:Key="NavigationViewTopPaneBackground" ResourceKey="FlowNavigationBackgroundBrush" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
                     <SolidColorBrush x:Key="FlowAccentBrush" Color="#60A5FA" />
                     <SolidColorBrush x:Key="FlowCardBorderBrush" Color="#475467" />
+                    <SolidColorBrush x:Key="FlowWindowBackgroundBrush" Color="#0C111D" />
+                    <SolidColorBrush x:Key="FlowNavigationBackgroundBrush" Color="#101828" />
+                    <SolidColorBrush x:Key="FlowContentBackgroundBrush" Color="#151B26" />
+                    <SolidColorBrush x:Key="FlowCardBackgroundBrush" Color="#1D2939" />
+                    <SolidColorBrush x:Key="FlowPreviewBackgroundBrush" Color="#101828" />
+                    <StaticResource x:Key="NavigationViewDefaultPaneBackground" ResourceKey="FlowNavigationBackgroundBrush" />
+                    <StaticResource x:Key="NavigationViewExpandedPaneBackground" ResourceKey="FlowNavigationBackgroundBrush" />
+                    <StaticResource x:Key="NavigationViewTopPaneBackground" ResourceKey="FlowNavigationBackgroundBrush" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="HighContrast">
                     <SolidColorBrush x:Key="FlowAccentBrush" Color="{ThemeResource SystemColorHighlightColor}" />
                     <SolidColorBrush x:Key="FlowCardBorderBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush x:Key="FlowWindowBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="FlowNavigationBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="FlowContentBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="FlowCardBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="FlowPreviewBackgroundBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <StaticResource x:Key="NavigationViewDefaultPaneBackground" ResourceKey="FlowNavigationBackgroundBrush" />
+                    <StaticResource x:Key="NavigationViewExpandedPaneBackground" ResourceKey="FlowNavigationBackgroundBrush" />
+                    <StaticResource x:Key="NavigationViewTopPaneBackground" ResourceKey="FlowNavigationBackgroundBrush" />
                 </ResourceDictionary>
             </ResourceDictionary.ThemeDictionaries>
         </ResourceDictionary>

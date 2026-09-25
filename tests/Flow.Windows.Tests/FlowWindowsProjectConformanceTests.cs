@@ -58,11 +58,73 @@ public sealed class FlowWindowsProjectConformanceTests
         Assert.Contains("AutomationProperties.HeadingLevel=\"Level1\"", library, StringComparison.Ordinal);
         Assert.Contains("<WebView2", preview, StringComparison.Ordinal);
         Assert.Contains("SetVirtualHostNameToFolderMapping", previewCode, StringComparison.Ordinal);
+        Assert.Contains("SelectInitialProfile(ActualWidth)", previewCode, StringComparison.Ordinal);
         Assert.Contains("WebResourceRequested", previewCode, StringComparison.Ordinal);
         Assert.Contains("DownloadStarting", previewCode, StringComparison.Ordinal);
         Assert.Contains("PermissionRequested", previewCode, StringComparison.Ordinal);
         Assert.Contains("args.Cancel = true", previewCode, StringComparison.Ordinal);
         Assert.DoesNotContain("http://", previewCode, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void EveryScreenUsesTheSharedThemeSurfaces()
+    {
+        var root = FindRepositoryRoot();
+        var windowsRoot = Path.Combine(root, "src", "Flow.Windows");
+        var app = File.ReadAllText(Path.Combine(windowsRoot, "App.xaml"));
+        var window = File.ReadAllText(Path.Combine(windowsRoot, "MainWindow.xaml"));
+
+        var surfaceKeys = new[]
+        {
+            "FlowWindowBackgroundBrush",
+            "FlowNavigationBackgroundBrush",
+            "FlowContentBackgroundBrush",
+            "FlowCardBackgroundBrush",
+            "FlowPreviewBackgroundBrush",
+        };
+
+        foreach (var key in surfaceKeys)
+        {
+            Assert.Contains($"x:Key=\"{key}\"", app, StringComparison.Ordinal);
+        }
+
+        Assert.Contains("Background=\"{ThemeResource FlowWindowBackgroundBrush}\"", window, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"NavigationViewDefaultPaneBackground\"", app, StringComparison.Ordinal);
+        Assert.Contains("x:Key=\"NavigationViewExpandedPaneBackground\"", app, StringComparison.Ordinal);
+        Assert.Contains("Background=\"{ThemeResource FlowContentBackgroundBrush}\"", window, StringComparison.Ordinal);
+
+        var pagePaths = Directory.GetFiles(Path.Combine(windowsRoot, "Pages"), "*Page.xaml");
+        Assert.NotEmpty(pagePaths);
+        foreach (var pagePath in pagePaths)
+        {
+            var page = File.ReadAllText(pagePath);
+            Assert.Contains(
+                "Background=\"{ThemeResource FlowContentBackgroundBrush}\"",
+                page,
+                StringComparison.Ordinal);
+            Assert.Contains("x:Name=\"PageContent\"", page, StringComparison.Ordinal);
+            Assert.Contains("<AdaptiveTrigger MinWindowWidth=\"0\"", page, StringComparison.Ordinal);
+            Assert.Contains("<AdaptiveTrigger MinWindowWidth=\"720\"", page, StringComparison.Ordinal);
+        }
+
+        var preview = File.ReadAllText(Path.Combine(windowsRoot, "Pages", "PreviewPage.xaml"));
+        Assert.Contains("Background=\"{ThemeResource FlowPreviewBackgroundBrush}\"", preview, StringComparison.Ordinal);
+        Assert.DoesNotContain("Background=\"White\"", preview, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WindowsCiRestoresTheWinUiProjectBeforeBuildingWithoutRestore()
+    {
+        var root = FindRepositoryRoot();
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "ci.yml"));
+        var restore = "dotnet restore src/Flow.Windows/Flow.Windows.csproj -p:Platform=x64";
+        var build = "dotnet build src/Flow.Windows/Flow.Windows.csproj --no-restore -p:Platform=x64";
+
+        var restoreIndex = workflow.IndexOf(restore, StringComparison.Ordinal);
+        var buildIndex = workflow.IndexOf(build, StringComparison.Ordinal);
+
+        Assert.True(restoreIndex >= 0, "The workflow must restore the WinUI project explicitly.");
+        Assert.True(buildIndex > restoreIndex, "The WinUI restore must run before its no-restore build.");
     }
 
     [Fact]

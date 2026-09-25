@@ -13,7 +13,7 @@ public sealed class FlowCommandDisplayFormatterTests
             ["import", "C:\\Books\\Autor's book.epub", "--output", "C:\\Output\\book.flow.json"]);
 
         Assert.Equal(FlowCommandShell.PowerShell, result.Shell);
-        Assert.Equal("Autor's book.epub", Path.GetFileName(result.Arguments[1]));
+        Assert.Equal("C:\\Books\\Autor's book.epub", result.Arguments[1]);
         Assert.Equal(
             "& 'flow' 'import' 'C:\\Books\\Autor''s book.epub' '--output' 'C:\\Output\\book.flow.json'",
             result.Text);
