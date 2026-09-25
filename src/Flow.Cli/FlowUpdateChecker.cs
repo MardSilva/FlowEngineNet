@@ -224,15 +224,41 @@ internal sealed class DefaultInstallationMethodDetector : IInstallationMethodDet
     {
         try
         {
+            if (windows)
+            {
+                return string.Equals(
+                    NormalizeWindowsPath(left),
+                    NormalizeWindowsPath(right),
+                    StringComparison.OrdinalIgnoreCase);
+            }
+
             return string.Equals(
                 Path.GetFullPath(left).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
                 Path.GetFullPath(right).TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar),
-                windows ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+                StringComparison.Ordinal);
         }
         catch (Exception exception) when (exception is ArgumentException or NotSupportedException or PathTooLongException)
         {
             return false;
         }
+    }
+
+    private static string NormalizeWindowsPath(string path)
+    {
+        var normalized = path.Replace('/', '\\');
+        if (OperatingSystem.IsWindows())
+        {
+            normalized = Path.GetFullPath(normalized);
+        }
+
+        var rootLength = normalized.StartsWith("\\\\", StringComparison.Ordinal)
+            ? 2
+            : normalized.Length >= 3 && normalized[1] == ':' && normalized[2] == '\\'
+                ? 3
+                : 0;
+        return normalized.Length > rootLength
+            ? normalized.TrimEnd('\\')
+            : normalized;
     }
 }
 

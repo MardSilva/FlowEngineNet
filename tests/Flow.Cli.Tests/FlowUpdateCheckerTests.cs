@@ -179,6 +179,8 @@ public sealed class FlowUpdateCheckerTests
 
     [Theory]
     [InlineData(true, "C:\\Users\\Flow\\App", "C:\\other", "C:\\Users\\Flow\\App\\", true, FlowInstallationMethod.Msi)]
+    [InlineData(true, "c:/users/flow/app/", "C:\\other", "C:\\Users\\Flow\\App", false, FlowInstallationMethod.Msi)]
+    [InlineData(true, "C:\\Users\\Flow\\App", "C:\\other", "C:\\Users\\Flow\\AnotherApp", true, FlowInstallationMethod.Portable)]
     [InlineData(false, "/home/user/.dotnet/tools", "/home/user/.dotnet/tools/.store/flowenginenet.tool/0.2.0/", null, false, FlowInstallationMethod.DotNetTool)]
     [InlineData(true, "C:\\Flow", "C:\\Flow", null, true, FlowInstallationMethod.Portable)]
     [InlineData(false, "/opt/flow", "/opt/flow", null, false, FlowInstallationMethod.Unknown)]
