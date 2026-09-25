@@ -12,7 +12,7 @@
            Scope="perUser">
     <SummaryInformation Description="!(loc.ProductDescription)" Manufacturer="$(var.Manufacturer)" />
     <MajorUpgrade DowngradeErrorMessage="!(loc.DowngradeError)" IgnoreLanguage="yes" Schedule="afterInstallInitialize" />
-    <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
+    <MediaTemplate EmbedCab="yes" CompressionLevel="$(var.CompressionLevel)" />
     <Icon Id="FlowProductIcon.ico" SourceFile="$(var.ProductIcon)" />
     <Property Id="ARPPRODUCTICON" Value="FlowProductIcon.ico" />
     <Property Id="ARPURLINFOABOUT" Value="$(var.SupportUrl)" />

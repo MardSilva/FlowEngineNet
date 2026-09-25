@@ -15,6 +15,7 @@ param(
     [string]$ProductRegistryKey = 'Software\FlowEngineNet\Installer',
     [string]$ProductName,
     [ValidateSet('en-US', 'pt-BR')][string[]]$Cultures = @('en-US', 'pt-BR'),
+    [ValidateSet('none', 'low', 'medium', 'high', 'mszip')][string]$CompressionLevel = 'high',
     [switch]$Force
 )
 
@@ -158,12 +159,14 @@ function New-WixApplicationFragment {
 function Invoke-WixBuild {
     param([string]$Culture, [string]$Language, [string]$BuildDirectory, [string]$Payload, [string]$PayloadFragment,
         [string]$Version, [string]$PublicVersion, [string]$Upgrade, [string]$Product, [string]$CliComponent,
-        [string]$RegistrationComponent, [string]$MetadataComponent, [string]$StartMenuComponent, [string]$Name)
+        [string]$RegistrationComponent, [string]$MetadataComponent, [string]$StartMenuComponent, [string]$Name,
+        [string]$Compression)
     $outputName = "FlowEngineNet.Setup.$Culture"
     & dotnet build $projectPath --configuration $Configuration --no-incremental --output $BuildDirectory `
         "-p:PayloadDirectory=$Payload" "-p:PayloadFragment=$PayloadFragment" "-p:ProductName=$Name" `
         '-p:Manufacturer=Flow Engine contributors' '-p:SupportUrl=https://github.com/MardSilva/FlowEngineNet' `
-        "-p:PublicVersion=$PublicVersion" "-p:InstallerVersion=$Version" "-p:UpgradeCode=$Upgrade" "-p:ProductCode=$Product" `
+        "-p:PublicVersion=$PublicVersion" "-p:InstallerVersion=$Version" "-p:CompressionLevel=$Compression" `
+        "-p:UpgradeCode=$Upgrade" "-p:ProductCode=$Product" `
         "-p:ExecutableComponentGuid=$CliComponent" "-p:RegistrationComponentGuid=$RegistrationComponent" `
         "-p:MetadataComponentGuid=$MetadataComponent" "-p:StartMenuComponentGuid=$StartMenuComponent" `
         "-p:ProductLanguage=$Language" "-p:InstallerCulture=$Culture" "-p:InstallDirectoryName=$InstallDirectoryName" `
@@ -255,7 +258,8 @@ try {
         New-Item -ItemType Directory -Path $cultureBuildDirectory -Force | Out-Null
         $builtMsi = Invoke-WixBuild -Culture $culture -Language $language -BuildDirectory $cultureBuildDirectory -Payload $payloadRoot -PayloadFragment $payloadFragment `
             -Version $InstallerVersion -PublicVersion $publicVersion -Upgrade $UpgradeCode -Product $ProductCode -CliComponent $ExecutableComponentGuid `
-            -RegistrationComponent $RegistrationComponentGuid -MetadataComponent $MetadataComponentGuid -StartMenuComponent $StartMenuComponentGuid -Name $ProductName
+            -RegistrationComponent $RegistrationComponentGuid -MetadataComponent $MetadataComponentGuid -StartMenuComponent $StartMenuComponentGuid `
+            -Name $ProductName -Compression $CompressionLevel
         $fileName = "FlowEngineNet.Setup.$publicVersion.$culture.$runtimeIdentifier.msi"
         $destination = Join-Path $resultDirectory $fileName
         Copy-Item -LiteralPath $builtMsi -Destination $destination
@@ -286,6 +290,7 @@ try {
         runtimeIdentifier = $runtimeIdentifier; architecture = 'x64'; scope = 'perUser'; installRoot = 'LocalAppDataFolder\Programs'; installDirectoryName = $InstallDirectoryName
         entryPoints = [ordered]@{ application = 'app/Flow.Windows.exe'; cli = 'flow.exe' }; startMenuShortcut = [ordered]@{ name = $ProductName; target = 'app/Flow.Windows.exe'; cliShortcut = $false }
         pathRegistration = [ordered]@{ scope = 'current-user'; directory = '.' }; signed = $false; cultures = @($Cultures)
+        compressionLevel = $CompressionLevel
         payloadFormat = [string]$combinedManifest.format; payloadFiles = @($combinedManifest.files); files = $installerFiles
         buildTool = [ordered]@{ name = 'WixToolset.Sdk'; version = $wixVersion; license = $wixLicense }
     }

@@ -37,10 +37,6 @@ jobs:
       - name: Restore
         run: dotnet restore Flow.sln
 
-      - name: Restore WinUI shell
-        if: runner.os == 'Windows'
-        run: dotnet restore src/Flow.Windows/Flow.Windows.csproj -p:Platform=x64
-
       - name: Verify formatting
         run: dotnet format Flow.sln --verify-no-changes --no-restore
 
@@ -59,10 +55,6 @@ jobs:
       - name: Build
         run: dotnet build Flow.sln --no-restore
 
-      - name: Build WinUI shell
-        if: runner.os == 'Windows'
-        run: dotnet build src/Flow.Windows/Flow.Windows.csproj --no-restore -p:Platform=x64
-
       - name: Test
         run: dotnet test Flow.sln --no-build
 
@@ -72,7 +64,6 @@ jobs:
 
   release-proposal:
     name: Suggest release candidate
-    needs: validate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -123,7 +114,6 @@ jobs:
 
   windows-installer-integration:
     name: Windows application and installer integration
-    needs: validate
     runs-on: windows-latest
     timeout-minutes: 40
     steps:
@@ -170,6 +160,8 @@ jobs:
           pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/build-windows-installer.ps1
           -PayloadDirectory ./artifacts/windows-combined-payload
           -OutputDirectory ./artifacts/windows-installer
+          -Cultures en-US
+          -CompressionLevel none
 
       - name: Install, repair, upgrade and remove isolated MSI
         shell: pwsh
@@ -191,7 +183,6 @@ jobs:
 
   canonical-release:
     name: Build canonical CLI release
-    needs: validate
     if: github.event_name == 'pull_request' || github.ref_name == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -225,6 +216,7 @@ jobs:
           path: artifacts/release
           if-no-files-found: error
           retention-days: 1
+          compression-level: 0
 
   verify-release:
     name: Verify canonical CLI / ${{ matrix.os }}
@@ -270,7 +262,7 @@ jobs:
 
   compare-release:
     name: Confirm canonical Windows/Linux validation
-    needs: [canonical-release, verify-release]
+    needs: [validate, canonical-release, verify-release]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

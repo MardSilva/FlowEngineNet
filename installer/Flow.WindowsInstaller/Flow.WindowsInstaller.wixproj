@@ -13,6 +13,7 @@
       SupportUrl=$(SupportUrl);
       PublicVersion=$(PublicVersion);
       InstallerVersion=$(InstallerVersion);
+      CompressionLevel=$(CompressionLevel);
       UpgradeCode=$(UpgradeCode);
       ProductCode=$(ProductCode);
       ExecutableComponentGuid=$(ExecutableComponentGuid);

@@ -247,7 +247,8 @@ try {
 
     $builder = Join-Path $PSScriptRoot 'build-windows-installer.ps1'
     $componentArguments = @('-RegistrationComponentGuid', $registrationComponentGuid, '-MetadataComponentGuid', $metadataComponentGuid,
-        '-StartMenuComponentGuid', $startMenuComponentGuid, '-PayloadComponentNamespace', $payloadComponentNamespace)
+        '-StartMenuComponentGuid', $startMenuComponentGuid, '-PayloadComponentNamespace', $payloadComponentNamespace,
+        '-CompressionLevel', 'none')
     & pwsh -NoProfile -ExecutionPolicy Bypass -File $builder -PayloadDirectory $payloadRoot -OutputDirectory $oldArtifacts -InstallerVersion '0.2.2' -UpgradeCode $upgradeCode -ProductCode $oldAuthoredProductCode -ExecutableComponentGuid $componentGuid -InstallDirectoryName $installDirectoryName -ProductRegistryKey $registryKey -ProductName $productName -Cultures en-US @componentArguments
     if ($LASTEXITCODE -ne 0) { throw 'Could not build the isolated older MSI.' }
     & pwsh -NoProfile -ExecutionPolicy Bypass -File $builder -PayloadDirectory $payloadRoot -OutputDirectory $newArtifacts -InstallerVersion '0.2.3' -UpgradeCode $upgradeCode -ProductCode $newAuthoredProductCode -ExecutableComponentGuid $componentGuid -InstallDirectoryName $installDirectoryName -ProductRegistryKey $registryKey -ProductName $productName -Cultures en-US @componentArguments

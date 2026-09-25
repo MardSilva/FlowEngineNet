@@ -243,6 +243,7 @@ public sealed class WindowsDistributionFoundationTests
         Assert.DoesNotContain("Extension", source, StringComparison.Ordinal);
 
         Assert.Contains("WixToolset.Sdk", buildScript, StringComparison.Ordinal);
+        Assert.Contains("CompressionLevel", buildScript, StringComparison.Ordinal);
         Assert.Contains(
             windowsProperties.Descendants("FlowWindowsInstallerToolLicense"),
             static license => license.Value == "MS-RL");
@@ -256,6 +257,7 @@ public sealed class WindowsDistributionFoundationTests
         Assert.Contains("start-menu-launch", testScript, StringComparison.Ordinal);
         Assert.Contains("user-data-preserved", testScript, StringComparison.Ordinal);
         Assert.Contains("'/famus'", testScript, StringComparison.Ordinal);
+        Assert.Contains("'-CompressionLevel', 'none'", testScript, StringComparison.Ordinal);
         Assert.Contains("downgrade-refused", testScript, StringComparison.Ordinal);
         Assert.Contains("path-preserved", testScript, StringComparison.Ordinal);
         Assert.Contains("ConvertTo-ComparableUserPath", testScript, StringComparison.Ordinal);
@@ -301,13 +303,16 @@ public sealed class WindowsDistributionFoundationTests
         Assert.Contains("build-windows-installer.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("test-windows-installer.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("verify-windows-release-artifacts.ps1", workflow, StringComparison.Ordinal);
-        Assert.Contains("needs: [resolve, build, windows-release-evidence]", workflow, StringComparison.Ordinal);
+        Assert.Contains("needs: [resolve, validate, build, windows-release-evidence]", workflow, StringComparison.Ordinal);
+        Assert.Contains("build:\n    name: Build draft artifacts\n    needs: resolve", workflow, StringComparison.Ordinal);
+        Assert.Contains("windows-portable:\n    name: Build and smoke test Windows portable\n    needs: resolve", workflow, StringComparison.Ordinal);
         Assert.Contains("'--draft'", workflow, StringComparison.Ordinal);
         Assert.Contains("'--latest=false'", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("--draft=false", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("dotnet nuget push", workflow, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("windows-installer-payload", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("Extract-Archive", workflow, StringComparison.Ordinal);
+        Assert.Contains("compression-level: 0", workflow, StringComparison.Ordinal);
 
         Assert.Contains("flow-windows-release-evidence-0.2", verifier, StringComparison.Ordinal);
         Assert.Contains("CombinedPayloadDirectory", verifier, StringComparison.Ordinal);
@@ -332,8 +337,10 @@ public sealed class WindowsDistributionFoundationTests
         Assert.Contains("-PortableArtifactsDirectory ./artifacts/windows-portable", workflow, StringComparison.Ordinal);
         Assert.Contains("build-windows-installer.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("test-windows-installer.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("-Cultures en-US", workflow, StringComparison.Ordinal);
+        Assert.Contains("-CompressionLevel none", workflow, StringComparison.Ordinal);
         Assert.Contains("installer-smoke-result.json", workflow, StringComparison.Ordinal);
-        Assert.Contains("dotnet restore src/Flow.Windows/Flow.Windows.csproj -p:Platform=x64", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("Build WinUI shell", workflow, StringComparison.Ordinal);
     }
 
     [Fact]

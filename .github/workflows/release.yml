@@ -101,10 +101,6 @@ jobs:
       - name: Restore
         run: dotnet restore Flow.sln
 
-      - name: Restore WinUI shell
-        if: runner.os == 'Windows'
-        run: dotnet restore src/Flow.Windows/Flow.Windows.csproj -p:Platform=x64
-
       - name: Verify formatting
         run: dotnet format Flow.sln --verify-no-changes --no-restore
 
@@ -119,10 +115,6 @@ jobs:
       - name: Build
         run: dotnet build Flow.sln --no-restore
 
-      - name: Build WinUI shell
-        if: runner.os == 'Windows'
-        run: dotnet build src/Flow.Windows/Flow.Windows.csproj --no-restore -p:Platform=x64
-
       - name: Test
         run: dotnet test Flow.sln --no-build
 
@@ -132,7 +124,7 @@ jobs:
 
   build:
     name: Build draft artifacts
-    needs: [resolve, validate]
+    needs: resolve
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -166,10 +158,11 @@ jobs:
           path: artifacts/release
           if-no-files-found: error
           retention-days: 7
+          compression-level: 0
 
   windows-portable:
     name: Build and smoke test Windows portable
-    needs: [resolve, validate]
+    needs: resolve
     runs-on: windows-latest
     timeout-minutes: 20
     steps:
@@ -200,10 +193,11 @@ jobs:
           path: artifacts/windows-portable
           if-no-files-found: error
           retention-days: 7
+          compression-level: 0
 
   windows-combined-payload:
     name: Build and validate combined Windows payload
-    needs: [resolve, validate, windows-portable]
+    needs: [resolve, windows-portable]
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
@@ -251,6 +245,7 @@ jobs:
           path: artifacts/windows-combined-payload
           if-no-files-found: error
           retention-days: 7
+          compression-level: 0
 
   windows-installer:
     name: Build Windows MSI from promoted payload
@@ -290,6 +285,7 @@ jobs:
           path: artifacts/windows-installer
           if-no-files-found: error
           retention-days: 1
+          compression-level: 0
 
   windows-installer-smoke:
     name: Install, upgrade and remove Windows MSI
@@ -335,6 +331,7 @@ jobs:
           path: artifacts/windows-installer
           if-no-files-found: error
           retention-days: 7
+          compression-level: 0
 
   windows-release-evidence:
     name: Bind Windows artifacts to canonical release
@@ -411,10 +408,11 @@ jobs:
           path: artifacts/windows-release-assets
           if-no-files-found: error
           retention-days: 7
+          compression-level: 0
 
   create-draft:
     name: Create draft GitHub Release
-    needs: [resolve, build, windows-release-evidence]
+    needs: [resolve, validate, build, windows-release-evidence]
     runs-on: ubuntu-latest
     environment: draft-release
     permissions:
