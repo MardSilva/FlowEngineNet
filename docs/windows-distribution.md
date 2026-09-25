@@ -52,9 +52,31 @@ The test validates checksums and the SBOM, extracts the ZIP to an isolated tempo
 
 The CycloneDX document is derived from the RID-specific dependency graph created by publish. It covers Flow assemblies, Spectre.Console and the bundled .NET runtime pack. All currently shipped components use the MIT license. The SBOM does not describe Windows system libraries, the build host, test-only dependencies or GitHub Actions.
 
+## Combined application and CLI payload
+
+The alpha.4 integration starts with a local combined payload, before any MSI change. It places the unpackaged WinUI 3 application and the existing single-file CLI under one versioned contract. Both entry points are self-contained for `win-x64`; the graphical application remains multi-file because the Windows App SDK requires native libraries, compiled XAML and resource indexes beside the executable.
+
+Build it from the repository root:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/build-windows-combined-payload.ps1
+```
+
+The output is written atomically to `artifacts/windows-combined-payload/`. The `payload/app/` directory contains `Flow.Windows.exe` and its runtime files. `payload/cli/flow.exe` is copied from the independently reproducible portable CLI build. `LICENSE.txt` and `VERSION.json` apply to both entry points. `combined-payload-manifest.json` records the public version, Git revision, source-tree state, RID, architecture, packaging method, locales, roles, sizes and SHA-256 of every installable file. `SHA256SUMS` also covers the detached manifest.
+
+The builder publishes the graphical application twice and requires the same file set and hashes. It keeps only the `en-US` and `pt-BR` resource directories, rejects debug and cache files, and does not copy build directories, tests or private EPUBs. The CLI still comes from `build-windows-portable.ps1`, so this increment does not create a second CLI publication policy.
+
+Run the combined smoke test with:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-combined-payload.ps1
+```
+
+The test checks complete manifest coverage, file hashes, entry-point versions and private path leakage. It runs the CLI after removing .NET runtime hints from the child environment, starts the WinUI application, waits for its native main window and closes only that process. The script does not write the Registry, alter `PATH`, create shortcuts or change installed state. This combined payload is the reviewed input consumed by the MSI builder.
+
 ## Per-user MSI
 
-The repository can also build localized `en-US` and `pt-BR` MSI packages. They are language alternatives for the same release, not packages to install side by side. Both install the same reviewed self-contained payload under `%LocalAppData%\Programs\FlowEngineNet`, add that directory to the current user's `PATH`, and register Flow in Installed Apps and Programs and Features. No administrator elevation is intended. Open a new terminal after installation before running `flow` by name.
+The repository can also build localized `en-US` and `pt-BR` MSI packages. They are language alternatives for the same release, not packages to install side by side. Both consume the reviewed combined payload and install the graphical application under `%LocalAppData%\Programs\FlowEngineNet\app`. The CLI remains available as `%LocalAppData%\Programs\FlowEngineNet\flow.exe`, preserving the alpha.3 command location and the current user's `PATH` entry. Flow is registered in Installed Apps and Programs and Features without requesting administrator elevation. Open a new terminal after installation before running `flow` by name.
 
 Build both variants with:
 
@@ -70,9 +92,9 @@ For an unattended installation:
 msiexec.exe /i ".\FlowEngineNet.Setup.0.2.0-alpha.4.en-US.win-x64.msi" /qn /norestart
 ```
 
-Windows Installer owns repair, upgrade and removal. A repair can be requested with `msiexec.exe /fa <product-code> /qn /norestart`; normal removal should use Windows Installed Apps or Programs and Features. Both localized variants of this release share one fixed `ProductCode`. A future public MSI release must use a new `ProductCode`, keep the permanent `UpgradeCode`, and increase the numeric installer version. This allows a major upgrade to replace the older release and blocks installation of a lower version over a newer one.
+Windows Installer owns repair, upgrade and removal. A complete repair can be requested with `msiexec.exe /famus <product-code> /qn /norestart`; normal removal should use Windows Installed Apps or Programs and Features. Both localized variants of this release share one fixed `ProductCode`. A future public MSI release must use a new `ProductCode`, keep the permanent `UpgradeCode`, and increase the numeric installer version. This allows a major upgrade to replace the older release and blocks installation of a lower version over a newer one.
 
-The uninstaller removes `flow.exe`, its license and version document, the product registration and only the `PATH` segment created by this MSI. It does not know about or remove books, configured directories, `.flow.json` documents, reports, exports or preferences. There are no Start menu shortcuts and no `.epub` or `.flow.json` associations in this release.
+The installer creates one Start menu shortcut, and it opens `Flow.Windows.exe` directly without showing a console. It does not create a CLI shortcut, file association, service, scheduled task or automatic-start entry. The uninstaller removes the application and CLI payloads, license, version document, product registration, product shortcut and only the `PATH` segment created by this MSI. It does not know about or remove books, configured directories, `.flow.json` documents, reports, HTML exports or preferences.
 
 Run the destructive installation test only on Windows:
 
@@ -104,6 +126,6 @@ The workflow can create only a draft GitHub Release after explicit confirmation 
 
 `Flow.Application` provides the in-process boundary for EPUB inspection and import, Flow validation and hashing, and HTML rendering. It reports typed progress, cancellation, diagnostics and results without depending on the CLI, a terminal or subprocess execution. The CLI owns file paths, persistence, confirmation and exit codes.
 
-The WinUI 3 application now runs as a separate graphical `WinExe`, explains Flow offline and performs local EPUB inspection, import and validation through the shared typed application boundary. It also provides a reconstructible personal-folder index, restricted local preview and opt-in advanced command/log details. It never invokes the CLI; opening PowerShell is a separate explicit action and does not execute the displayed command. The alpha.3 MSI still contains only the CLI; packaging the graphical host and adding its Start-menu shortcut are deferred to the final installer-integration step. See [windows-app.md](windows-app.md).
+The WinUI 3 application runs as a separate graphical `WinExe`, explains Flow offline and performs local EPUB inspection, import and validation through the shared typed application boundary. It also provides a reconstructible personal-folder index, restricted local preview and opt-in advanced command/log details. It never invokes the CLI; opening PowerShell is a separate explicit action and does not execute the displayed command. The alpha.4 MSI installs this host and the CLI from the same combined payload and exposes only the graphical application through the Start menu. See [windows-app.md](windows-app.md).
 
 The portable ZIP and MSI remain unsigned experimental artifacts, although the manually confirmed workflow can attach them to a draft release. Windows may therefore show an unknown-publisher or SmartScreen warning. There is still no MSIX or file association. The update command reports an available package and its checksum but never downloads or executes it. Code signing and automated installation remain separate increments.

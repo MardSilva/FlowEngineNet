@@ -46,4 +46,16 @@
              CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
+  <Target Name="CopyUnpackagedWinUIResourcesToPublish"
+          AfterTargets="Publish"
+          Condition="'$(WindowsPackageType)' == 'None'">
+    <ItemGroup>
+      <_FlowWinUICompiledResource Include="$(TargetDir)**\*.xbf" />
+      <_FlowWinUICompiledResource Include="$(TargetDir)$(AssemblyName).pri" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_FlowWinUICompiledResource)"
+          DestinationFiles="@(_FlowWinUICompiledResource->'$(PublishDir)%(RecursiveDir)%(Filename)%(Extension)')"
+          SkipUnchangedFiles="true" />
+  </Target>
+
 </Project>

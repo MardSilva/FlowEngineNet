@@ -61,7 +61,7 @@ dotnet build .\src\Flow.Windows\Flow.Windows.csproj --no-restore -p:Platform=x64
 dotnet run --project .\src\Flow.Windows\Flow.Windows.csproj -p:Platform=x64
 ```
 
-Por enquanto, a aplicação roda a partir da saída do build. O MSI da alpha.3 ainda instala apenas a CLI. A inclusão da interface gráfica no instalador, o atalho do menu Iniciar, o upgrade da alpha.3 e a remoção dos dois executáveis pertencem à etapa final de integração do instalador Windows.
+A aplicação pode rodar a partir da saída do build ou do payload combinado self-contained gerado por `eng/build-windows-combined-payload.ps1`. Esse artefato também inclui a CLI portátil sem alterações e um manifesto auditável. O MSI da alpha.4 consome o artefato, instala os dois pontos de entrada por utilizador e cria um único atalho no menu Iniciar para a aplicação gráfica. A CLI não recebe atalho e continua disponível pelo comando `flow` num terminal novo.
 
 Os testes automatizados cobrem recuperação e persistência atômica das configurações, descoberta da pasta pessoal, natureza não canônica do índice, navegação, os dois catálogos de idioma, escolha de tema, contratos das operações, preservação da origem, políticas de saída, limpeza após cancelamento, descarte e hash da prévia, escaping dos comandos, validação de EPUB e Flow, estrutura de segurança do XAML, acessibilidade, alto contraste e limites entre projetos. Testes locais de abertura e UI Automation confirmam que o processo cria uma janela nativa responsiva e expõe a página de processamento. A revisão visual nas escalas de 100%, 150% e 200% continua manual, pois testes unitários não comprovam ausência de cortes nem legibilidade física.
 

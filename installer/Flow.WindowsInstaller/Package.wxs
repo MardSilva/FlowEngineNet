@@ -10,55 +10,56 @@
            InstallerVersion="500"
            Compressed="yes"
            Scope="perUser">
-
-    <SummaryInformation Description="!(loc.ProductDescription)"
-                        Manufacturer="$(var.Manufacturer)" />
-    <MajorUpgrade DowngradeErrorMessage="!(loc.DowngradeError)"
-                  IgnoreLanguage="yes"
-                  Schedule="afterInstallInitialize" />
+    <SummaryInformation Description="!(loc.ProductDescription)" Manufacturer="$(var.Manufacturer)" />
+    <MajorUpgrade DowngradeErrorMessage="!(loc.DowngradeError)" IgnoreLanguage="yes" Schedule="afterInstallInitialize" />
     <MediaTemplate EmbedCab="yes" CompressionLevel="high" />
-
     <Icon Id="FlowProductIcon.ico" SourceFile="$(var.ProductIcon)" />
     <Property Id="ARPPRODUCTICON" Value="FlowProductIcon.ico" />
     <Property Id="ARPURLINFOABOUT" Value="$(var.SupportUrl)" />
     <Property Id="ARPHELPLINK" Value="$(var.SupportUrl)" />
     <Property Id="ARPCONTACT" Value="$(var.Manufacturer)" />
     <Property Id="ARPCOMMENTS" Value="!(loc.ProductDescription) $(var.PublicVersion)" />
-    <SetProperty Id="ARPINSTALLLOCATION"
-                 Value="[INSTALLFOLDER]"
-                 Before="RegisterProduct"
-                 Sequence="execute" />
+    <SetProperty Id="ARPINSTALLLOCATION" Value="[INSTALLFOLDER]" Before="RegisterProduct" Sequence="execute" />
 
     <StandardDirectory Id="LocalAppDataFolder">
       <Directory Id="FlowProgramsFolder" Name="Programs">
         <Directory Id="INSTALLFOLDER" Name="$(var.InstallDirectoryName)">
-          <Component Id="FlowExecutableComponent" Guid="$(var.ExecutableComponentGuid)">
-            <File Id="FlowExecutable" Source="$(var.PayloadDirectory)\flow.exe" Checksum="yes" />
+          <Component Id="FlowCliComponent" Guid="$(var.ExecutableComponentGuid)">
+            <File Id="FlowCliExecutable" Source="$(var.PayloadDirectory)\cli\flow.exe" Name="flow.exe" Checksum="yes" />
+            <RegistryValue Root="HKCU" Key="$(var.ProductRegistryKey)" Name="InstallPath" Type="string" Value="[INSTALLFOLDER]" KeyPath="yes" />
+            <Environment Id="FlowPathEnvironment" Name="PATH" Action="set" Part="last" Permanent="no" System="no" Value="[INSTALLFOLDER]" />
+          </Component>
+          <Component Id="FlowMetadataComponent" Guid="$(var.MetadataComponentGuid)">
             <File Id="FlowLicense" Source="$(var.PayloadDirectory)\LICENSE.txt" />
             <File Id="FlowVersion" Source="$(var.PayloadDirectory)\VERSION.json" />
-            <RegistryValue Root="HKCU"
-                           Key="$(var.ProductRegistryKey)"
-                           Name="InstallPath"
-                           Type="string"
-                           Value="[INSTALLFOLDER]"
-                           KeyPath="yes" />
-            <Environment Id="FlowPathEnvironment"
-                         Name="PATH"
-                         Action="set"
-                         Part="last"
-                         Permanent="no"
-                         System="no"
-                         Value="[INSTALLFOLDER]" />
+            <RegistryValue Root="HKCU" Key="$(var.ProductRegistryKey)\Components" Name="Metadata" Type="integer" Value="1" KeyPath="yes" />
+          </Component>
+          <Component Id="FlowRegistrationComponent" Guid="$(var.RegistrationComponentGuid)">
+            <RegistryValue Root="HKCU" Key="$(var.ProductRegistryKey)" Name="PublicVersion" Type="string" Value="$(var.PublicVersion)" KeyPath="yes" />
             <RemoveFolder Id="RemoveFlowInstallFolder" On="uninstall" />
           </Component>
         </Directory>
       </Directory>
     </StandardDirectory>
 
-    <Feature Id="Complete" Title="!(loc.FeatureTitle)" Description="!(loc.FeatureDescription)" Level="1">
-      <ComponentRef Id="FlowExecutableComponent" />
-    </Feature>
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="FlowProgramMenuFolder" Name="$(var.ProductName)">
+        <Component Id="FlowStartMenuComponent" Guid="$(var.StartMenuComponentGuid)">
+          <Shortcut Id="FlowApplicationShortcut" Name="$(var.ProductName)" Description="!(loc.ShortcutDescription)"
+                    Target="[APPLICATIONFOLDER]Flow.Windows.exe" WorkingDirectory="APPLICATIONFOLDER" Icon="FlowProductIcon.ico" />
+          <RemoveFolder Id="RemoveFlowProgramMenuFolder" On="uninstall" />
+          <RegistryValue Root="HKCU" Key="$(var.ProductRegistryKey)" Name="StartMenuShortcut" Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
 
+    <Feature Id="Complete" Title="!(loc.FeatureTitle)" Description="!(loc.FeatureDescription)" Level="1">
+      <ComponentRef Id="FlowCliComponent" />
+      <ComponentRef Id="FlowMetadataComponent" />
+      <ComponentRef Id="FlowRegistrationComponent" />
+      <ComponentRef Id="FlowStartMenuComponent" />
+      <ComponentGroupRef Id="FlowApplicationComponents" />
+    </Feature>
     <WixVariable Id="WixUILicenseRtf" Value="$(var.LicenseRtf)" />
     <ui:WixUI Id="WixUI_Minimal" />
   </Package>

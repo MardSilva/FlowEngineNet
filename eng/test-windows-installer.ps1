@@ -98,6 +98,46 @@ function Invoke-InstalledFlow {
     }
 }
 
+function Invoke-InstalledApplicationShortcut {
+    param([Parameter(Mandatory)][string]$ShortcutPath, [Parameter(Mandatory)][string]$ExpectedExecutable)
+
+    $shell = New-Object -ComObject WScript.Shell
+    try {
+        $shortcut = $shell.CreateShortcut($ShortcutPath)
+        if (-not [string]::Equals($shortcut.TargetPath, $ExpectedExecutable, [System.StringComparison]::OrdinalIgnoreCase)) {
+            throw "The Start-menu shortcut targets an unexpected executable: $($shortcut.TargetPath)"
+        }
+    }
+    finally {
+        [Runtime.InteropServices.Marshal]::FinalReleaseComObject($shell) | Out-Null
+    }
+
+    $existingIds = @((Get-Process -Name 'Flow.Windows' -ErrorAction SilentlyContinue).Id)
+    Start-Process -FilePath $ShortcutPath
+    $deadline = [DateTime]::UtcNow.AddSeconds(20)
+    $process = $null
+    do {
+        $process = @(Get-Process -Name 'Flow.Windows' -ErrorAction SilentlyContinue | Where-Object Id -NotIn $existingIds | Select-Object -First 1)
+        if ($process.Count -ne 0) { $process = $process[0]; break }
+        Start-Sleep -Milliseconds 200
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($null -eq $process) { throw 'The Start-menu shortcut did not start Flow.Windows.' }
+    try {
+        do {
+            $process.Refresh()
+            if ($process.HasExited) { throw "The installed application exited during launch with code $($process.ExitCode)." }
+            if ($process.MainWindowHandle -ne [IntPtr]::Zero) { break }
+            Start-Sleep -Milliseconds 200
+        } while ([DateTime]::UtcNow -lt $deadline)
+        if ($process.MainWindowHandle -eq [IntPtr]::Zero) { throw 'The installed application did not create a main window.' }
+        if (-not $process.CloseMainWindow() -or -not $process.WaitForExit(5000)) { throw 'The installed application did not close normally.' }
+    }
+    finally {
+        if (-not $process.HasExited) { $process.Kill($true); $process.WaitForExit() }
+        $process.Dispose()
+    }
+}
+
 function Get-UserPath {
     $item = Get-ItemProperty -LiteralPath 'HKCU:\Environment' -Name Path -ErrorAction SilentlyContinue
     if ($null -eq $item) {
@@ -141,7 +181,9 @@ if (-not (Test-Path -LiteralPath $manifestPath -PathType Leaf) -or -not (Test-Pa
     throw 'Installer manifest or SHA256SUMS is missing.'
 }
 $manifest = Get-Content -LiteralPath $manifestPath -Raw | ConvertFrom-Json
-if ($manifest.format -ne 'flow-windows-installer-0.1' -or $manifest.scope -ne 'perUser' -or $manifest.signed) {
+if ($manifest.format -ne 'flow-windows-installer-0.2' -or $manifest.scope -ne 'perUser' -or $manifest.signed -or
+    $manifest.entryPoints.application -ne 'app/Flow.Windows.exe' -or $manifest.entryPoints.cli -ne 'flow.exe' -or
+    $manifest.startMenuShortcut.cliShortcut) {
     throw 'Installer manifest identity or signing claim is invalid.'
 }
 foreach ($line in Get-Content -LiteralPath $checksumsPath) {
@@ -164,7 +206,7 @@ foreach ($msi in $productionMsis) {
 
 $runId = [Guid]::NewGuid().ToString('N')
 $testRoot = Join-Path $allowedArtifactsRoot "windows-installer-test-$runId"
-$portableRoot = Join-Path $testRoot 'portable'
+$combinedRoot = Join-Path $testRoot 'combined'
 $payloadRoot = Join-Path $testRoot 'payload'
 $oldArtifacts = Join-Path $testRoot 'Pacote antigo com espaço Árvore'
 $newArtifacts = Join-Path $testRoot 'Pacote novo com espaço Árvore'
@@ -176,18 +218,25 @@ $upgradeCode = "{$([Guid]::NewGuid().ToString().ToUpperInvariant())}"
 $oldAuthoredProductCode = "{$([Guid]::NewGuid().ToString().ToUpperInvariant())}"
 $newAuthoredProductCode = "{$([Guid]::NewGuid().ToString().ToUpperInvariant())}"
 $componentGuid = "{$([Guid]::NewGuid().ToString().ToUpperInvariant())}"
+$registrationComponentGuid = "{$([Guid]::NewGuid().ToString().ToUpperInvariant())}"
+$metadataComponentGuid = "{$([Guid]::NewGuid().ToString().ToUpperInvariant())}"
+$startMenuComponentGuid = "{$([Guid]::NewGuid().ToString().ToUpperInvariant())}"
+$payloadComponentNamespace = "{$([Guid]::NewGuid().ToString().ToUpperInvariant())}"
 $productName = "Flow Engine .NET Test $runId"
 $oldProductCode = $null
 $newProductCode = $null
 $pathBefore = Get-UserPath
+$shortcutDirectory = Join-Path ([Environment]::GetFolderPath([Environment+SpecialFolder]::Programs)) $productName
+$shortcutPath = Join-Path $shortcutDirectory "$productName.lnk"
+$sentinelDirectory = Join-Path $env:LOCALAPPDATA "FlowEngineNet/Tests/$runId"
+$sentinelPath = Join-Path $sentinelDirectory 'user-settings-sentinel.json'
 
 try {
     New-Item -ItemType Directory -Path $testRoot, $logRoot -Force | Out-Null
     if ([string]::IsNullOrWhiteSpace($PayloadDirectory)) {
-        & pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'build-windows-portable.ps1') -OutputDirectory $portableRoot
-        if ($LASTEXITCODE -ne 0) { throw 'Could not build the isolated portable test payload.' }
-        $zip = @(Get-ChildItem -LiteralPath $portableRoot -Filter '*.zip' -File)
-        [System.IO.Compression.ZipFile]::ExtractToDirectory($zip[0].FullName, $payloadRoot)
+        & pwsh -NoProfile -ExecutionPolicy Bypass -File (Join-Path $PSScriptRoot 'build-windows-combined-payload.ps1') -OutputDirectory $combinedRoot
+        if ($LASTEXITCODE -ne 0) { throw 'Could not build the isolated combined test payload.' }
+        $payloadRoot = $combinedRoot
     }
     else {
         $payloadRoot = [System.IO.Path]::GetFullPath($PayloadDirectory)
@@ -197,9 +246,11 @@ try {
     }
 
     $builder = Join-Path $PSScriptRoot 'build-windows-installer.ps1'
-    & pwsh -NoProfile -ExecutionPolicy Bypass -File $builder -PayloadDirectory $payloadRoot -OutputDirectory $oldArtifacts -InstallerVersion '0.2.2' -UpgradeCode $upgradeCode -ProductCode $oldAuthoredProductCode -ExecutableComponentGuid $componentGuid -InstallDirectoryName $installDirectoryName -ProductRegistryKey $registryKey -ProductName $productName -Cultures en-US
+    $componentArguments = @('-RegistrationComponentGuid', $registrationComponentGuid, '-MetadataComponentGuid', $metadataComponentGuid,
+        '-StartMenuComponentGuid', $startMenuComponentGuid, '-PayloadComponentNamespace', $payloadComponentNamespace)
+    & pwsh -NoProfile -ExecutionPolicy Bypass -File $builder -PayloadDirectory $payloadRoot -OutputDirectory $oldArtifacts -InstallerVersion '0.2.2' -UpgradeCode $upgradeCode -ProductCode $oldAuthoredProductCode -ExecutableComponentGuid $componentGuid -InstallDirectoryName $installDirectoryName -ProductRegistryKey $registryKey -ProductName $productName -Cultures en-US @componentArguments
     if ($LASTEXITCODE -ne 0) { throw 'Could not build the isolated older MSI.' }
-    & pwsh -NoProfile -ExecutionPolicy Bypass -File $builder -PayloadDirectory $payloadRoot -OutputDirectory $newArtifacts -InstallerVersion '0.2.3' -UpgradeCode $upgradeCode -ProductCode $newAuthoredProductCode -ExecutableComponentGuid $componentGuid -InstallDirectoryName $installDirectoryName -ProductRegistryKey $registryKey -ProductName $productName -Cultures en-US
+    & pwsh -NoProfile -ExecutionPolicy Bypass -File $builder -PayloadDirectory $payloadRoot -OutputDirectory $newArtifacts -InstallerVersion '0.2.3' -UpgradeCode $upgradeCode -ProductCode $newAuthoredProductCode -ExecutableComponentGuid $componentGuid -InstallDirectoryName $installDirectoryName -ProductRegistryKey $registryKey -ProductName $productName -Cultures en-US @componentArguments
     if ($LASTEXITCODE -ne 0) { throw 'Could not build the isolated newer MSI.' }
 
     $oldMsi = @(Get-ChildItem -LiteralPath $oldArtifacts -Filter '*.msi' -File)[0].FullName
@@ -216,28 +267,39 @@ try {
 
     Invoke-MsiExec -Arguments @('/i', $oldMsi) -LogPath (Join-Path $logRoot 'install-old.log') | Out-Null
     $executable = Join-Path $installDirectory 'flow.exe'
-    if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw 'Clean installation did not create flow.exe.' }
+    $applicationExecutable = Join-Path $installDirectory 'app/Flow.Windows.exe'
+    if (-not (Test-Path -LiteralPath $executable -PathType Leaf) -or -not (Test-Path -LiteralPath $applicationExecutable -PathType Leaf)) { throw 'Clean installation did not create both entry points.' }
     Invoke-InstalledFlow -Executable $executable -WorkingDirectory $installDirectory
+    if (-not (Test-Path -LiteralPath $shortcutPath -PathType Leaf)) { throw 'Clean installation did not create the Start-menu shortcut.' }
+    Invoke-InstalledApplicationShortcut -ShortcutPath $shortcutPath -ExpectedExecutable $applicationExecutable
     if (-not (Test-PathEntry -PathValue (Get-UserPath) -ExpectedEntry $installDirectory)) { throw 'Clean installation did not add its own user PATH entry.' }
+    New-Item -ItemType Directory -Path $sentinelDirectory -Force | Out-Null
+    [System.IO.File]::WriteAllText($sentinelPath, '{"ownedBy":"user"}', [System.Text.UTF8Encoding]::new($false))
 
     Remove-Item -LiteralPath $executable -Force
-    Invoke-MsiExec -Arguments @('/fa', $oldProductCode) -LogPath (Join-Path $logRoot 'repair-old.log') | Out-Null
-    if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) { throw 'MSI repair did not restore flow.exe.' }
+    Remove-Item -LiteralPath $applicationExecutable -Force
+    Remove-Item -LiteralPath $shortcutPath -Force
+    Invoke-MsiExec -Arguments @('/famus', $oldProductCode) -LogPath (Join-Path $logRoot 'repair-old.log') | Out-Null
+    if (-not (Test-Path -LiteralPath $executable -PathType Leaf) -or -not (Test-Path -LiteralPath $applicationExecutable -PathType Leaf) -or
+        -not (Test-Path -LiteralPath $shortcutPath -PathType Leaf)) { throw 'MSI repair did not restore the application, CLI and shortcut.' }
 
     Invoke-MsiExec -Arguments @('/i', $newMsi) -LogPath (Join-Path $logRoot 'upgrade.log') | Out-Null
     if ((Get-MsiProductState -ProductCode $oldProductCode) -ne -1) { throw 'Major upgrade left the older product registered.' }
     if ((Get-MsiProductState -ProductCode $newProductCode) -ne 5) { throw 'Major upgrade did not register the newer product.' }
+    Invoke-InstalledFlow -Executable $executable -WorkingDirectory $installDirectory
+    Invoke-InstalledApplicationShortcut -ShortcutPath $shortcutPath -ExpectedExecutable $applicationExecutable
 
     Invoke-MsiExec -Arguments @('/i', $oldMsi) -LogPath (Join-Path $logRoot 'downgrade.log') -ExpectedExitCodes @(1603, 1638) | Out-Null
     if ((Get-MsiProductState -ProductCode $newProductCode) -ne 5 -or -not (Test-Path -LiteralPath $executable)) { throw 'Rejected downgrade changed the current installation.' }
 
     Invoke-MsiExec -Arguments @('/x', $newProductCode) -LogPath (Join-Path $logRoot 'uninstall.log') | Out-Null
     if ((Get-MsiProductState -ProductCode $newProductCode) -ne -1) { throw 'Uninstallation left the product registered with Windows Installer.' }
-    if ((Test-Path -LiteralPath $installDirectory) -or
+    if ((Test-Path -LiteralPath $installDirectory) -or (Test-Path -LiteralPath $shortcutDirectory) -or
         (Test-Path -LiteralPath "HKCU:\$registryKey") -or
         (Test-PathEntry -PathValue (Get-UserPath) -ExpectedEntry $installDirectory)) {
         throw 'Uninstallation left owned files, registry data or PATH entry behind.'
     }
+    if (-not (Test-Path -LiteralPath $sentinelPath -PathType Leaf)) { throw 'Uninstallation removed user-owned data.' }
     if (-not (Test-UserPathPreserved -Before $pathBefore -After (Get-UserPath))) {
         throw 'Uninstallation changed an unrelated user PATH entry.'
     }
@@ -245,7 +307,7 @@ try {
     $result = [ordered]@{
         format = 'flow-windows-installer-smoke-0.1'; productionVersion = $manifest.publicVersion; productionInstallerVersion = $manifest.installerVersion
         isolatedUpgradeCode = $upgradeCode; installDirectoryIncludedSpacesAndUnicode = $true; dotnetRemovedFromPath = $true
-        operations = @('clean-install', 'installed-cli', 'repair', 'major-upgrade', 'downgrade-refused', 'uninstall', 'path-preserved'); status = 'passed'
+        operations = @('clean-install', 'installed-application', 'start-menu-launch', 'installed-cli', 'repair', 'major-upgrade', 'downgrade-refused', 'uninstall', 'user-data-preserved', 'path-preserved'); status = 'passed'
     }
     [System.IO.File]::WriteAllText((Join-Path $artifactsRoot 'installer-smoke-result.json'), (($result | ConvertTo-Json -Depth 5).Replace("`r`n", "`n") + "`n"), [System.Text.UTF8Encoding]::new($false))
     Write-Output "Windows installer smoke test passed: $($manifest.publicVersion)"
@@ -264,4 +326,5 @@ finally {
     if (Test-PathEntry -PathValue (Get-UserPath) -ExpectedEntry $installDirectory) {
         throw "The isolated MSI PATH entry remains after cleanup: $installDirectory"
     }
+    if (Test-Path -LiteralPath $sentinelDirectory) { Remove-Item -LiteralPath $sentinelDirectory -Recurse -Force }
 }

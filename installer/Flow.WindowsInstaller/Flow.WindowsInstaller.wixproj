@@ -16,6 +16,9 @@
       UpgradeCode=$(UpgradeCode);
       ProductCode=$(ProductCode);
       ExecutableComponentGuid=$(ExecutableComponentGuid);
+      RegistrationComponentGuid=$(RegistrationComponentGuid);
+      MetadataComponentGuid=$(MetadataComponentGuid);
+      StartMenuComponentGuid=$(StartMenuComponentGuid);
       ProductLanguage=$(ProductLanguage);
       InstallDirectoryName=$(InstallDirectoryName);
       ProductRegistryKey=$(ProductRegistryKey);
@@ -29,6 +32,7 @@
 
   <ItemGroup>
     <PackageReference Include="WixToolset.UI.wixext" />
+    <Compile Include="$(PayloadFragment)" />
   </ItemGroup>
 
 </Project>
