@@ -80,6 +80,7 @@ public sealed partial class MainWindow : Window
             FlowWindowsDestination.Preview when _previewSourcePath is not null =>
                 new PreviewPage(_viewModel.Text, _operations, _previewSourcePath),
             FlowWindowsDestination.HowItWorks => new HowItWorksPage(_viewModel.Text),
+            FlowWindowsDestination.About => new AboutPage(_viewModel.Text),
             FlowWindowsDestination.Settings => new SettingsPage(_viewModel, ApplySettingsAsync),
             _ => throw new ArgumentOutOfRangeException(nameof(destination)),
         };
@@ -117,6 +118,7 @@ public sealed partial class MainWindow : Window
         OperationsItem.Content = _viewModel.Text["NavOperations"];
         HowItem.Content = _viewModel.Text["NavHowItWorks"];
         SettingsItem.Content = _viewModel.Text["NavSettings"];
+        AboutItem.Content = _viewModel.Text["NavAbout"];
         AutomationProperties.SetName(Navigation, _viewModel.Text["NavigationName"]);
         AutomationProperties.SetName(ContentFrame, _viewModel.Text[_viewModel.Destination switch
         {
@@ -125,6 +127,7 @@ public sealed partial class MainWindow : Window
             FlowWindowsDestination.Operations => "OperationsTitle",
             FlowWindowsDestination.Preview => "PreviewTitle",
             FlowWindowsDestination.HowItWorks => "HowTitle",
+            FlowWindowsDestination.About => "NavAbout",
             _ => "SettingsTitle",
         }]);
     }

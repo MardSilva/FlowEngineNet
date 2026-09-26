@@ -52,9 +52,31 @@ O `PublishSingleFile` ficou habilitado porque a CLI atual, o Spectre.Console e o
 
 O documento CycloneDX é criado a partir do grafo de dependências específico do RID produzido pelo publish. Ele cobre os assemblies do Flow, o Spectre.Console e o runtime do .NET incluído no executável. Todos os componentes distribuídos atualmente usam a licença MIT. O SBOM não descreve bibliotecas do sistema Windows, o host de build, dependências exclusivas de teste nem o GitHub Actions.
 
+## Payload combinado da aplicação e da CLI
+
+A integração da alpha.4 começa por um payload local combinado, antes de qualquer alteração no MSI. Ele reúne a aplicação WinUI 3 unpackaged e a CLI single-file existente sob o mesmo contrato de versão. Os dois pontos de entrada são self-contained para `win-x64`. A aplicação gráfica continua com vários arquivos porque o Windows App SDK precisa de bibliotecas nativas, XAML compilado e índices de recursos ao lado do executável.
+
+Gere o payload na raiz do repositório:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/build-windows-combined-payload.ps1
+```
+
+A saída é gravada de forma atômica em `artifacts/windows-combined-payload/`. O diretório `payload/app/` contém `Flow.Windows.exe` e seus arquivos de runtime. `payload/cli/flow.exe` vem do build portátil reproduzível da CLI. `LICENSE.txt` e `VERSION.json` valem para os dois pontos de entrada. O arquivo `combined-payload-manifest.json` registra versão pública, revisão do Git, estado da árvore de trabalho, RID, arquitetura, método de empacotamento, idiomas, finalidade, tamanho e SHA-256 de cada arquivo instalável. `SHA256SUMS` também cobre o manifesto separado.
+
+O builder publica a aplicação gráfica duas vezes e exige o mesmo conjunto de arquivos e hashes. Ele mantém somente os diretórios de recursos `en-US` e `pt-BR`, rejeita arquivos de depuração e cache e não copia diretórios de build, testes nem EPUBs privados. A CLI continua vindo de `build-windows-portable.ps1`, portanto este incremento não cria uma segunda política de publicação para ela.
+
+Execute o smoke test combinado com:
+
+```powershell
+pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-combined-payload.ps1
+```
+
+O teste confere a cobertura completa do manifesto, os hashes, as versões dos pontos de entrada e a ausência de caminhos privados. Ele executa a CLI sem as indicações do runtime .NET no ambiente do processo filho, abre a aplicação WinUI, espera pela janela nativa principal e fecha somente esse processo. O script não grava no Registro, não altera o `PATH`, não cria atalhos e não muda o estado de instalação. Esse payload combinado é a entrada revisada que o builder do MSI consome.
+
 ## MSI por utilizador
 
-O repositório também gera pacotes MSI em `en-US` e `pt-BR`. Eles são alternativas de idioma da mesma versão, não pacotes para instalar lado a lado. Os dois instalam o mesmo payload self-contained em `%LocalAppData%\Programs\FlowEngineNet`, acrescentam esse diretório ao `PATH` do utilizador atual e registram o Flow em Aplicativos instalados e Programas e Recursos. A instalação não deve pedir privilégios de administrador. Depois de instalar, abra um terminal novo antes de executar `flow` pelo nome.
+O repositório também gera pacotes MSI em `en-US` e `pt-BR`. Eles são alternativas de idioma da mesma versão, não pacotes para instalar lado a lado. Os dois consomem o payload combinado revisado e instalam a aplicação gráfica em `%LocalAppData%\Programs\FlowEngineNet\app`. A CLI continua disponível em `%LocalAppData%\Programs\FlowEngineNet\flow.exe`, preservando o caminho usado na alpha.3 e a entrada no `PATH` do utilizador atual. O Flow aparece em Aplicativos instalados e Programas e Recursos sem exigir privilégios de administrador. Depois de instalar, abra um terminal novo antes de executar `flow` pelo nome.
 
 Gere as duas variantes com:
 
@@ -70,9 +92,9 @@ Para instalar sem interface:
 msiexec.exe /i ".\FlowEngineNet.Setup.0.2.0-alpha.4.pt-BR.win-x64.msi" /qn /norestart
 ```
 
-O próprio Windows Installer cuida de reparo, upgrade e remoção. O reparo pode ser solicitado com `msiexec.exe /fa <código-do-produto> /qn /norestart`; a remoção normal deve ser feita em Aplicativos instalados ou Programas e Recursos. As duas variantes de idioma desta versão compartilham um `ProductCode` fixo. Cada versão pública futura do MSI deverá receber outro `ProductCode`, conservar o `UpgradeCode` permanente e aumentar a versão numérica do instalador. Dessa forma, o major upgrade substitui a versão anterior e impede a instalação de uma versão mais baixa sobre outra mais recente.
+O próprio Windows Installer cuida de reparo, upgrade e remoção. O reparo completo pode ser solicitado com `msiexec.exe /famus <código-do-produto> /qn /norestart`; a remoção normal deve ser feita em Aplicativos instalados ou Programas e Recursos. As duas variantes de idioma desta versão compartilham um `ProductCode` fixo. Cada versão pública futura do MSI deverá receber outro `ProductCode`, conservar o `UpgradeCode` permanente e aumentar a versão numérica do instalador. Dessa forma, o major upgrade substitui a versão anterior e impede a instalação de uma versão mais baixa sobre outra mais recente.
 
-A desinstalação remove `flow.exe`, licença, documento de versão, registro do produto e somente o segmento de `PATH` criado pelo MSI. Livros, diretórios configurados, documentos `.flow.json`, relatórios, exportações e preferências ficam intactos. Esta versão não cria atalho no menu Iniciar nem associa arquivos `.epub` ou `.flow.json`.
+O instalador cria um único atalho no menu Iniciar, que abre `Flow.Windows.exe` diretamente sem mostrar um terminal. Ele não cria atalho para a CLI, associação de arquivos, serviço, tarefa agendada nem inicialização automática. A desinstalação remove os payloads da aplicação e da CLI, licença, documento de versão, registro do produto, atalho do produto e somente o segmento de `PATH` criado pelo MSI. Livros, diretórios configurados, documentos `.flow.json`, relatórios, exportações HTML e preferências ficam intactos.
 
 O teste que altera temporariamente o Windows deve ser executado apenas nesse sistema:
 
@@ -81,6 +103,10 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-installer.ps1
 ```
 
 O teste gera identidades aleatórias para produto, upgrade, componente, Registro e diretório. Ele nunca usa o código do produto de produção nem uma instalação pessoal existente. Dentro dessa identidade isolada, verifica instalação limpa, execução sem .NET no `PATH`, reparo, major upgrade, recusa de downgrade e desinstalação. O diretório de teste contém espaços e Unicode. A conferência final compara as entradas normalizadas e ordenadas do `PATH`: diferenças inofensivas na formatação de separadores ou barras finais são aceitas, mas uma entrada alheia alterada, removida ou reordenada continua reprovando o gate.
+
+O teste de ciclo de instalação começa pela alpha.4: abre o atalho gráfico e verifica a CLI no PowerShell e no cmd. Também inspeciona, importa e valida um EPUB público gerado pelo próprio teste. Depois, remove arquivos controlados da aplicação e o atalho, faz o reparo e desinstala essa instalação limpa. O upgrade parte do código real da alpha.3, que tinha apenas CLI, na revisão `1a2fbc50a7a79bc1f9fdccbb7347b39949743bbe`, com a estrutura original do instalador e identidades isoladas. O teste não altera o rótulo do executável atual para simular uma versão anterior. Após o upgrade para alpha.4, repete as verificações da aplicação e da CLI, recusa o downgrade e remove o produto. Os arquivos-sentinela, o EPUB de teste e os documentos gerados devem permanecer; as configurações pessoais existentes são comparadas sem alteração.
+
+Para reaproveitar artefatos locais, use `-PayloadDirectory <artefatos-combinados>` e, opcionalmente, `-BaselinePortableArtifactsDirectory <artefatos-portateis-alpha3>`. O script confere manifestos, revisões e hashes antes de aceitar as entradas. Sem o diretório opcional da versão anterior, ele publica uma vez a CLI da revisão histórica fixada. Essa revisão precisa existir no checkout do Git. Diagnósticos e arquivos de teste permanecem em `artifacts/windows-installer-test-*/` para consulta.
 
 O instalador usa WiX Toolset 4.0.6, fixado no projeto e licenciado sob MS-RL. WiX 6 e 7 não foram adotados porque a distribuição atual dessas versões acrescenta uma EULA de Open Source Maintenance Fee. O WiX participa apenas do build e não é instalado com o Flow. Versão, licença e papel de ferramenta excluída da distribuição aparecem no SBOM do instalador. O MSI usa os mecanismos padrão de registro e major upgrade documentados pela [Microsoft](https://learn.microsoft.com/pt-br/windows/win32/msi/configuring-add-remove-programs-with-windows-installer) e pelo [WiX](https://docs.firegiant.com/wix/schema/wxs/majorupgrade/).
 
@@ -94,16 +120,41 @@ Quando o executável atual corresponde ao diretório registrado pelo MSI por uti
 
 ## Gate de release
 
-O workflow manual **Draft release** gera o ZIP portátil no Windows, testa sua execução sem um runtime do .NET no `PATH` e entrega exatamente esse payload ao builder do MSI. Outro runner Windows instala silenciosamente um pacote de teste anterior com identidade isolada, exercita a CLI instalada, faz o reparo e o upgrade, recusa o downgrade, desinstala o produto e confirma a remoção dos arquivos, registros e segmento de `PATH` pertencentes ao instalador. Identidades aleatórias impedem que o teste alcance o código de produto da release ou uma instalação pessoal do Flow.
+O workflow manual **Draft release** gera a CLI portátil uma vez, testa sua execução sem um runtime do .NET no `PATH` e usa esse executável revisado para criar o payload combinado da aplicação. O payload combinado também é produzido uma única vez. Os jobs seguintes baixam o mesmo artefato imutável para construir os MSIs localizados, executar o smoke test de instalação e gerar as evidências finais. Eles não publicam a aplicação WinUI novamente nem remontam a entrada do instalador a partir do ZIP portátil. O transporte dos artefatos no GitHub não tenta comprimir outra vez esses diretórios formados principalmente por binários; a integridade dos arquivos continua vinculada aos hashes SHA-256 registrados.
 
-O gate final exige que `.nupkg`, ZIP e MSI indiquem a mesma versão pública e a mesma revisão do Git. Também compara os três arquivos extraídos do ZIP promovido com os hashes do payload registrados no manifesto do MSI. Os formatos não precisam ter bytes iguais. Evidências do instalador, manifestos de distribuição, SBOMs separados e um arquivo consolidado de checksums do Windows só seguem para o draft depois dessas verificações.
+Pull requests e branches protegidas percorrem a integração Windows antes de qualquer tentativa de release. O CI constrói a CLI portátil, o payload combinado e um MSI `en-US`. Em seguida, instala um pacote isolado, faz o reparo e o major upgrade, recusa o downgrade e remove o produto. O Draft release gera os dois MSIs localizados. A validação e os builds dos artefatos começam em paralelo assim que a revisão do código é fixada; a criação da release continua esperando todos os gates. Identidades aleatórias mantêm o teste afastado de uma instalação pessoal do Flow. O Draft release repete o build a partir da revisão imutável escolhida de forma explícita; ele não confia em um artefato produzido por outro workflow.
+
+O gate final exige que `.nupkg`, ZIP portátil, payload combinado e MSI indiquem a mesma versão pública e a mesma revisão do Git. Ele verifica o hash de cada arquivo do payload combinado, confere se o manifesto do instalador declara exatamente esse conjunto e confirma que a CLI e a licença continuam iguais às do pacote portátil promovido. Os formatos não precisam ter bytes iguais. Evidências do instalador, manifestos de distribuição, SBOMs separados e um arquivo consolidado de checksums do Windows só seguem para o draft depois dessas verificações.
+
+O CI passa explicitamente `-ExpectedCultures en-US` ao teste do instalador. Na release, o padrão continua exigindo `en-US` e `pt-BR`; um pacote ausente, extra ou alterado reprova a validação. O script `eng/test-windows-installer-contract.ps1` exercita essas verificações sem instalar nada. O ciclo isolado de instalação roda em inglês; conferir os metadados dos dois MSIs não substitui o teste visual do instalador em português.
+
+A evidência `flow-windows-installer-smoke-0.2` vincula o resultado ao SHA-256 do manifesto do instalador e à revisão do código, registrando as sete fases do MSI e seus códigos de saída. O sucesso só é gravado após a limpeza. O gate de release rejeita evidências incompletas ou de outro candidato. Os dois workflows preservam os logs de diagnóstico do MSI mesmo quando uma verificação posterior falha.
 
 O workflow cria apenas uma GitHub Release em rascunho, depois da confirmação explícita e do environment protegido `draft-release`. Ele não publica no NuGet, não cria uma release pública e não marca uma pré-release como `Latest`.
+
+## Revisão do candidato final
+
+O workflow de draft gera um pacote canônico da CLI e valida esse mesmo pacote no Windows e no Linux, sem empacotá-lo novamente. As evidências dos dois sistemas precisam concordar antes da criação do draft. O gate Windows também exige abertura bem-sucedida da aplicação vinculada ao hash do manifesto combinado, os dois idiomas do MSI e um SBOM com checksum cujos hashes dos executáveis correspondam ao payload. O relatório do smoke combinado acompanha o manifesto nos anexos. Essas verificações não aprovam automaticamente a experiência visual.
+
+Antes de solicitar o draft, registre a revisão exata do candidato e conclua esta revisão em uma instalação isolada:
+
+| Revisão | Verificações necessárias |
+| --- | --- |
+| Temas claro, escuro e alto contraste do Windows | Texto, foco, ícones, controles desabilitados e seções expandidas legíveis em todas as páginas. |
+| Escalas de 100%, 150% e 200% | Janela mínima, maximizada, transições da navegação, textos longos e diálogos sem ações cortadas. Apenas redimensionar a janela não testa mudança de DPI. |
+| Teclado | Tab/Shift+Tab, navegação, seções expansíveis, cancelamento do seletor e das operações, retorno do foco. |
+| EPUB local | Inspeção, importação, validação e prévia de um arquivo público de teste, sem alterar o original. |
+| Instalação | Atalho sem terminal, CLI num terminal novo, reparo, upgrade da alpha.3, recusa de downgrade e remoção com preservação dos dados. |
+| Sobre e atualizações | Versão correta, licenças offline legíveis, nenhuma consulta automática; falhas na consulta explícita não interrompem operações com documentos. |
+
+Para remover, use a entrada do produto nos aplicativos instalados do Windows; não apague manualmente o diretório. Para atualizar, escolha o MSI oficial mais recente após uma consulta explícita. Não desative SmartScreen nem antivírus para concluir a revisão: os pacotes sem assinatura continuam experimentais, e os avisos precisam ser avaliados pelo utilizador.
+
+O ensaio local com `invoke-release-dry-run.ps1 -AllowDirty` verifica o empacotamento, mas produz evidência explicitamente imprópria para publicação. Alterações sem commit, ausência de resultado Windows/Linux para a revisão final, falha nos gates ou revisão visual incompleta continuam bloqueando a aprovação. Registre o que falta como pendente, não como aprovado. Commit e merge são decisões humanas separadas; o ensaio não cria tag nem publica nada.
 
 ## Limite atual
 
 `Flow.Application` oferece a fronteira em processo para inspecionar e importar EPUB, validar e calcular o hash de documentos Flow e renderizar HTML. A camada relata progresso, cancelamento, diagnósticos e resultados tipados sem depender da CLI, de um terminal ou da execução de subprocessos. A CLI continua responsável pelos caminhos, pela persistência, pelas confirmações e pelos códigos de saída.
 
-A aplicação WinUI 3 já roda como um `WinExe` gráfico separado, explica o Flow offline e executa inspeção, importação e validação local de EPUB pela fronteira tipada compartilhada. Ela também oferece índice reconstruível da pasta pessoal, prévia local restrita e detalhes avançados de comando e log por adesão. A CLI nunca é iniciada; abrir o PowerShell exige uma ação separada e não executa o comando exibido. O MSI da alpha.3 continua contendo somente a CLI; a inclusão do host gráfico e o atalho do menu Iniciar ficam para a etapa final de integração do instalador. Consulte [windows-app.md](windows-app.md).
+A aplicação WinUI 3 roda como um `WinExe` gráfico separado, explica o Flow offline e executa inspeção, importação e validação local de EPUB pela fronteira tipada compartilhada. Ela também oferece índice reconstruível da pasta pessoal, prévia local restrita e detalhes avançados de comando e log por adesão. A CLI nunca é iniciada; abrir o PowerShell exige uma ação separada e não executa o comando exibido. O MSI da alpha.4 instala esse host e a CLI a partir do mesmo payload combinado e expõe somente a aplicação gráfica no menu Iniciar. Consulte [windows-app.md](windows-app.md).
 
 O ZIP portátil e o MSI continuam sendo artefatos experimentais sem assinatura, embora o workflow confirmado manualmente já possa anexá-los a uma release em rascunho. Por isso, o Windows pode mostrar um aviso de publicador desconhecido ou do SmartScreen. Ainda não existem MSIX nem associação de arquivos. O comando de atualização informa o pacote disponível e seu checksum, mas nunca baixa ou executa o arquivo. Assinatura de código e instalação automatizada continuam como incrementos separados.

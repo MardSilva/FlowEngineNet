@@ -19,7 +19,8 @@ English | [Português (Brasil)](pt-BR/architecture.md)
 - `Flow.Application` exposes presentation-neutral use cases shared by first-party hosts.
 - `Flow.Cli` is the command-line composition root.
 - `Flow.Windows.Shell` contains platform-neutral Windows-host state, localization, reconstructible settings and folder indexes, temporary preview sessions, and local-file orchestration over the shared application boundary.
-- `Flow.Windows` is the native WinUI 3 composition root and references only `Flow.Windows.Shell`.
+- `Flow.Windows` is the native WinUI 3 composition root and references `Flow.Windows.Shell` and `Flow.Updates`.
+- `Flow.Updates` is host infrastructure shared by the CLI and Windows app for explicit, read-only release checks. It has no domain-project dependencies and never downloads or executes installers.
 
 Dependencies point inward: domain projects never reference presentation or infrastructure projects. The CLI may compose all projects, while HTML and EPUB remain adapters at the edge.
 

@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <InternalsVisibleTo Include="flow" />
+    <InternalsVisibleTo Include="Flow.Cli.Tests" />
+    <InternalsVisibleTo Include="Flow.Windows.Tests" />
+  </ItemGroup>
+</Project>

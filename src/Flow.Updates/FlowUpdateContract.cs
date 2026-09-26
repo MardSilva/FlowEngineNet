@@ -1,4 +1,4 @@
-namespace Flow.Cli;
+namespace Flow.Updates;
 
 internal static class FlowUpdateContract
 {

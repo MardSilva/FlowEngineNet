@@ -37,10 +37,6 @@ jobs:
       - name: Restore
         run: dotnet restore Flow.sln
 
-      - name: Restore WinUI shell
-        if: runner.os == 'Windows'
-        run: dotnet restore src/Flow.Windows/Flow.Windows.csproj -p:Platform=x64
-
       - name: Verify formatting
         run: dotnet format Flow.sln --verify-no-changes --no-restore
 
@@ -56,12 +52,12 @@ jobs:
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-release-introduction.ps1
 
+      - name: Verify Windows release evidence contract
+        shell: pwsh
+        run: pwsh -NoProfile -File ./eng/test-windows-release-contract.ps1
+
       - name: Build
         run: dotnet build Flow.sln --no-restore
-
-      - name: Build WinUI shell
-        if: runner.os == 'Windows'
-        run: dotnet build src/Flow.Windows/Flow.Windows.csproj --no-restore -p:Platform=x64
 
       - name: Test
         run: dotnet test Flow.sln --no-build
@@ -72,7 +68,6 @@ jobs:
 
   release-proposal:
     name: Suggest release candidate
-    needs: validate
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -121,9 +116,93 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  windows-installer-integration:
+    name: Windows application and installer integration
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+
+      - name: Verify installer culture gate
+        shell: pwsh
+        run: pwsh -NoProfile -File ./eng/test-windows-installer-contract.ps1
+
+      - name: Build portable CLI once
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/build-windows-portable.ps1
+          -Configuration Release
+          -OutputDirectory ./artifacts/windows-portable
+
+      - name: Smoke test portable CLI
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-portable.ps1
+          -ArtifactsDirectory ./artifacts/windows-portable
+
+      - name: Build combined payload from promoted CLI
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/build-windows-combined-payload.ps1
+          -PortableArtifactsDirectory ./artifacts/windows-portable
+          -OutputDirectory ./artifacts/windows-combined-payload
+
+      - name: Smoke test combined payload
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-combined-payload.ps1
+          -ArtifactsDirectory ./artifacts/windows-combined-payload
+
+      - name: Build localized MSI packages from promoted payload
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/build-windows-installer.ps1
+          -PayloadDirectory ./artifacts/windows-combined-payload
+          -OutputDirectory ./artifacts/windows-installer
+          -Cultures en-US
+          -CompressionLevel none
+
+      - name: Install, repair, upgrade and remove isolated MSI
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-installer.ps1
+          -ArtifactsDirectory ./artifacts/windows-installer
+          -PayloadDirectory ./artifacts/windows-combined-payload
+          -ExpectedCultures en-US
+
+      - name: Store Windows validation evidence
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer-integration-evidence
+          path: |
+            artifacts/windows-combined-payload/combined-payload-manifest.json
+            artifacts/windows-installer/installer-manifest.json
+            artifacts/windows-installer/installer-smoke-result.json
+          if-no-files-found: error
+          retention-days: 1
+
+      - name: Preserve installer diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer-diagnostics
+          path: |
+            artifacts/windows-installer-test-*/logs/*.log
+            artifacts/windows-installer/installer-smoke-result.json
+          if-no-files-found: warn
+          retention-days: 7
+
   canonical-release:
     name: Build canonical CLI release
-    needs: validate
     if: github.event_name == 'pull_request' || github.ref_name == 'main'
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -157,6 +236,7 @@ jobs:
           path: artifacts/release
           if-no-files-found: error
           retention-days: 1
+          compression-level: 0
 
   verify-release:
     name: Verify canonical CLI / ${{ matrix.os }}
@@ -202,7 +282,7 @@ jobs:
 
   compare-release:
     name: Confirm canonical Windows/Linux validation
-    needs: [canonical-release, verify-release]
+    needs: [validate, canonical-release, verify-release]
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:

@@ -120,8 +120,8 @@ Duas qualificações completas foram byte a byte idênticas, com SHA-256 `29EFF3
 
 O ciclo 0.1 encerrou a ausência de modelo semântico, IDs e âncoras tipados, validação, apresentação opcional, preferências, `.flow.json`, canonicalização, SHA-256, layout independente, HTML, livro de exemplo, CLI, assinatura local e importador EPUB inicial. As limitações de interoperabilidade, confiança, renderização e publicação que restam estão no documento atual de limitações.
 
-### Gate de release do instalador Windows
+## Distribuição Windows alpha.4
 
-A pipeline de draft release agora promove um único payload self-contained para win-x64 ao ZIP portátil e aos MSI localizados por utilizador. Jobs Windows separados validam o ZIP, geram o MSI, instalam um pacote de teste anterior com identidade isolada, executam a CLI instalada, fazem reparo e major upgrade, recusam downgrade, desinstalam e verificam a remoção dos componentes pertencentes ao instalador.
+O MSI da alpha.4 instala a aplicação WinUI e a CLI juntas, cria um atalho gráfico no menu Iniciar e registra a remoção nos aplicativos instalados do Windows. O teste isolado cobre instalação limpa, abertura gráfica e nos shells, um EPUB gerado, reparo e upgrade a partir do código real da alpha.3, que tinha apenas CLI. Depois, recusa o downgrade e remove o produto, preservando configurações e arquivos-sentinela. A página Sobre apresenta versão e licenças offline; a consulta compartilhada de atualizações só ocorre por solicitação e nunca instala pacotes.
 
-A evidência final vincula `.nupkg` canônico, ZIP e MSI à mesma versão e revisão do Git e compara os arquivos portáteis com os hashes declarados no manifesto do instalador. O MSI continua experimental e sem assinatura; assinatura de código, publicação pública e outras plataformas permanecem como limitações atuais.
+A evidência final vincula `.nupkg` canônico, ZIP, payload combinado e MSI à mesma versão e revisão do Git. Os mesmos binários passam entre os jobs sem nova publicação da aplicação. O MSI continua experimental, sem assinatura e restrito a x64. Avisos do SmartScreen, instalação manual de atualizações e revisão visual final permanecem como fronteiras atuais; testes automatizados aprovados não são certificação de acessibilidade.

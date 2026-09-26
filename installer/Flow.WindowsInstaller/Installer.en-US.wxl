@@ -1,6 +1,7 @@
 <WixLocalization xmlns="http://wixtoolset.org/schemas/v4/wxl" Culture="en-US" Codepage="1252">
   <String Id="ProductDescription" Value="Experimental tools for semantic Flow documents and EPUB processing." />
   <String Id="DowngradeError" Value="A newer version of Flow Engine .NET is already installed." />
-  <String Id="FeatureTitle" Value="Flow command-line tools" />
-  <String Id="FeatureDescription" Value="Installs the self-contained Flow CLI for the current user." />
+  <String Id="FeatureTitle" Value="Flow application and command-line tools" />
+  <String Id="FeatureDescription" Value="Installs the Flow Windows application and self-contained CLI for the current user." />
+  <String Id="ShortcutDescription" Value="Open the Flow Engine .NET application." />
 </WixLocalization>

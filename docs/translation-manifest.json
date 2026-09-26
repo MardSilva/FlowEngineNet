@@ -26,7 +26,7 @@
     {
       "source": "docs/architecture.md",
       "translation": "docs/pt-BR/architecture.md",
-      "sourceSha256": "0C73EBEE76558638368AF0270BAFC5CDE3EFD22470A4BD1554D2B78583819ECD"
+        "sourceSha256": "8E63632F1FD51FB906EE44920035E29B421987E26F2D1E3CB75114E5FC5BD49A"
     },
     {
       "source": "docs/canonicalization.md",
@@ -86,7 +86,7 @@
     {
       "source": "docs/known-limitations.md",
       "translation": "docs/pt-BR/known-limitations.md",
-      "sourceSha256": "C4EFBA1B204060AA47FFC7FD75A0BDBC9491DB62ADAA56D577C8DFA8AD8C8274"
+      "sourceSha256": "6FF1E1A47BAE1595B4FA5EB9A8D256DF939693C15AD3628F3E7FF1F2DE5FDF4F"
     },
     {
       "source": "docs/release-artifacts.md",
@@ -101,7 +101,7 @@
     {
       "source": "docs/resolved-limitations.md",
       "translation": "docs/pt-BR/resolved-limitations.md",
-      "sourceSha256": "4D6BDB767C76624785F0845212DDE4B560E20DEF458AC887FF6B490D44E45E7F"
+      "sourceSha256": "C33F12A4870DEA17CC8021854CEFB0B0A39946100D7C1421B4BFEB4D39D4C460"
     },
     {
       "source": "docs/roadmap.md",
@@ -121,12 +121,12 @@
     {
       "source": "docs/windows-app.md",
       "translation": "docs/pt-BR/windows-app.md",
-      "sourceSha256": "105146E00881E5563C26E88023DC1BD66725FCEB7A63856088ABA766321B2833"
+        "sourceSha256": "E87DCF7EBB884E03EEA8341184868DA8D58D9DB639298A0FEE3EFC9D421568FF"
     },
     {
       "source": "docs/windows-distribution.md",
       "translation": "docs/pt-BR/windows-distribution.md",
-      "sourceSha256": "4C86D78ED089F6EEBE40A001865B4E6A9910B238E4B6D16A712941F18BCA54DE"
+      "sourceSha256": "13BC72D0F6CC797FD796B84EE83B297F116261E9311A7E12D12F6C60F31BFB8D"
     },
     {
       "source": "samples/SampleBook/README.md",

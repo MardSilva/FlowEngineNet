@@ -1,0 +1,65 @@
+<Project>
+  <UsingTask TaskName="CollectFlowWindowsLicenses" TaskFactory="RoslynCodeTaskFactory"
+             AssemblyFile="$(MSBuildToolsPath)/Microsoft.Build.Tasks.Core.dll">
+    <ParameterGroup>
+      <Directories ParameterType="Microsoft.Build.Framework.ITaskItem[]" Required="true" />
+      <ProductLicense ParameterType="System.String" Required="true" />
+      <OutputFile ParameterType="System.String" Required="true" />
+    </ParameterGroup>
+    <Task>
+      <Using Namespace="System.IO" />
+      <Using Namespace="System.Linq" />
+      <Using Namespace="System.Text" />
+      <Using Namespace="System.Xml" />
+      <Code Type="Fragment" Language="cs"><![CDATA[
+        var result = new StringBuilder("Flow Engine .NET — MIT\n\n");
+        result.Append(File.ReadAllText(ProductLicense)).Append("\n\n");
+        foreach (var directory in Directories.Select(item => Path.GetFullPath(item.ItemSpec))
+                     .Distinct(StringComparer.OrdinalIgnoreCase)
+                     .OrderBy(path => new DirectoryInfo(path).Parent.Name + "/" + new DirectoryInfo(path).Name, StringComparer.Ordinal))
+        {
+            var spec = Directory.GetFiles(directory, "*.nuspec").Single();
+            var xml = new XmlDocument { XmlResolver = null };
+            xml.Load(spec);
+            var metadata = xml.DocumentElement.ChildNodes.Cast<XmlNode>().Single(node => node.LocalName == "metadata");
+            Func<string, string> value = name => metadata.ChildNodes.Cast<XmlNode>()
+                .Where(node => node.LocalName == name).Select(node => node.InnerText).FirstOrDefault();
+            result.Append(value("id")).Append(' ').Append(value("version")).Append('\n');
+            var files = Directory.GetFiles(directory).Where(path =>
+                Path.GetFileName(path).StartsWith("LICENSE", StringComparison.OrdinalIgnoreCase) ||
+                Path.GetFileName(path).IndexOf("NOTICE", StringComparison.OrdinalIgnoreCase) >= 0)
+                .OrderBy(path => Path.GetFileName(path), StringComparer.Ordinal).ToArray();
+            if (files.Length == 0)
+            {
+                // Some targeting packs supply only a license URL in their package metadata.
+                var reference = value("license") ?? value("licenseUrl");
+                if (String.IsNullOrWhiteSpace(reference))
+                    throw new InvalidOperationException("Missing license metadata for " + value("id"));
+                result.Append(reference).Append("\n\n");
+            }
+            foreach (var file in files)
+                result.Append(Path.GetFileName(file)).Append('\n').Append(File.ReadAllText(file)).Append("\n\n");
+        }
+        var text = result.ToString().Replace("\r\n", "\n").Replace("\r", "\n");
+        Directory.CreateDirectory(Path.GetDirectoryName(OutputFile));
+        if (!File.Exists(OutputFile) || File.ReadAllText(OutputFile) != text)
+            File.WriteAllText(OutputFile, text, new UTF8Encoding(false));
+      ]]></Code>
+    </Task>
+  </UsingTask>
+  <Target Name="GenerateFlowWindowsLicenses" BeforeTargets="AssignTargetPaths"
+          DependsOnTargets="ResolveReferences" Condition="'$(DesignTimeBuild)' != 'true'">
+    <ItemGroup>
+      <_FlowLicenseDirectory Include="@(WindowsAppSdkComponentPackages);$(PkgMicrosoft_Web_WebView2)" />
+      <_FlowLicenseDirectory Include="@(ResolvedRuntimePack->'%(PackageDirectory)')" />
+    </ItemGroup>
+    <CollectFlowWindowsLicenses Directories="@(_FlowLicenseDirectory)"
+                               ProductLicense="$(MSBuildThisFileDirectory)../LICENSE"
+                               OutputFile="$(IntermediateOutputPath)FlowLicenses/LICENSES.txt" />
+    <ItemGroup>
+      <Content Include="$(IntermediateOutputPath)FlowLicenses/LICENSES.txt"
+               Link="Assets/LICENSES.txt" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+      <FileWrites Include="$(IntermediateOutputPath)FlowLicenses/LICENSES.txt" />
+    </ItemGroup>
+  </Target>
+</Project>

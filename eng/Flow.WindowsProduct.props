@@ -10,6 +10,10 @@
     <FlowWindowsUpgradeCode>{C412C622-FA2F-400C-88EE-BA5D4A573F7D}</FlowWindowsUpgradeCode>
     <FlowWindowsProductCode>{2072AAB6-E0D0-446D-BB8E-9555DA3F1838}</FlowWindowsProductCode>
     <FlowWindowsExecutableComponentGuid>{CF740E81-C89A-4F66-9748-42E3296D1FD7}</FlowWindowsExecutableComponentGuid>
+    <FlowWindowsRegistrationComponentGuid>{22D49CFB-AE0F-4834-B791-9DD7575A6CD6}</FlowWindowsRegistrationComponentGuid>
+    <FlowWindowsMetadataComponentGuid>{9D2346D8-B71C-431E-B62D-FA4D28341DFA}</FlowWindowsMetadataComponentGuid>
+    <FlowWindowsStartMenuComponentGuid>{2025FF68-646D-44AC-9E27-6B933439DFB2}</FlowWindowsStartMenuComponentGuid>
+    <FlowWindowsPayloadComponentNamespace>{A6870996-F954-492E-9238-06A1FE099D56}</FlowWindowsPayloadComponentNamespace>
     <FlowWindowsRuntimeIdentifier>win-x64</FlowWindowsRuntimeIdentifier>
     <FlowWindowsArchitecture>x64</FlowWindowsArchitecture>
     <FlowWindowsInstallScope>perUser</FlowWindowsInstallScope>
@@ -18,6 +22,9 @@
     <FlowWindowsPortableFormat>flow-windows-portable-0.1</FlowWindowsPortableFormat>
     <FlowWindowsPortableSingleFile>true</FlowWindowsPortableSingleFile>
     <FlowWindowsPortableSelfContained>true</FlowWindowsPortableSelfContained>
+    <FlowWindowsCombinedPayloadFormat>flow-windows-combined-payload-0.1</FlowWindowsCombinedPayloadFormat>
+    <FlowWindowsApplicationEntryPoint>app\Flow.Windows.exe</FlowWindowsApplicationEntryPoint>
+    <FlowWindowsCliEntryPoint>cli\flow.exe</FlowWindowsCliEntryPoint>
     <FlowWindowsInstallerTool>WixToolset.Sdk</FlowWindowsInstallerTool>
     <FlowWindowsInstallerToolVersion>4.0.6</FlowWindowsInstallerToolVersion>
     <FlowWindowsInstallerToolLicense>MS-RL</FlowWindowsInstallerToolLicense>

@@ -159,7 +159,55 @@ public sealed class WindowsDistributionFoundationTests
     }
 
     [Fact]
-    public void WindowsInstallerContract_IsPerUserUpgradeableAndSafelyRemovable()
+    public void WindowsCombinedPayloadContract_KeepsApplicationAndCliAuditableWithoutInstalling()
+    {
+        var root = FindRepositoryRoot();
+        var windowsProperties = XDocument.Load(Path.Combine(root, "eng", "Flow.WindowsProduct.props"));
+        var properties = windowsProperties.Descendants("PropertyGroup").Elements()
+            .Where(static element => element.Name.LocalName is not "FlowPublicVersion")
+            .ToDictionary(static element => element.Name.LocalName, static element => element.Value, StringComparer.Ordinal);
+        var applicationProject = XDocument.Load(Path.Combine(root, "src", "Flow.Windows", "Flow.Windows.csproj"));
+        var buildScript = File.ReadAllText(Path.Combine(root, "eng", "build-windows-combined-payload.ps1"));
+        var testScript = File.ReadAllText(Path.Combine(root, "eng", "test-windows-combined-payload.ps1"));
+
+        Assert.Equal("flow-windows-combined-payload-0.1", properties["FlowWindowsCombinedPayloadFormat"]);
+        Assert.Equal("app\\Flow.Windows.exe", properties["FlowWindowsApplicationEntryPoint"]);
+        Assert.Equal("cli\\flow.exe", properties["FlowWindowsCliEntryPoint"]);
+        Assert.Contains(
+            applicationProject.Descendants("WindowsPackageType"),
+            static property => property.Value == "None");
+        Assert.Contains(
+            applicationProject.Descendants("WindowsAppSDKSelfContained"),
+            static property => property.Value == "true");
+        Assert.Contains(
+            applicationProject.Descendants("Target"),
+            static target => (string?)target.Attribute("Name") == "CopyUnpackagedWinUIResourcesToPublish"
+                && (string?)target.Attribute("AfterTargets") == "Publish");
+
+        Assert.Contains("build-windows-portable.ps1", buildScript, StringComparison.Ordinal);
+        Assert.Contains("PortableArtifactsDirectory", buildScript, StringComparison.Ordinal);
+        Assert.Contains("-p:PublishSingleFile=false", buildScript, StringComparison.Ordinal);
+        Assert.Contains("--self-contained', 'true'", buildScript, StringComparison.Ordinal);
+        Assert.Contains("Compare-DirectoryContent", buildScript, StringComparison.Ordinal);
+        Assert.Contains("combined-payload-manifest.json", buildScript, StringComparison.Ordinal);
+        Assert.Contains("sourceTreeDirty", buildScript, StringComparison.Ordinal);
+        Assert.Contains("unpackaged-multi-file", buildScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("Package.wxs", buildScript, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("msiexec", buildScript, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("C:\\Users\\", buildScript, StringComparison.OrdinalIgnoreCase);
+
+        Assert.Contains("DOTNET_ROOT", testScript, StringComparison.Ordinal);
+        Assert.Contains("MainWindowHandle", testScript, StringComparison.Ordinal);
+        Assert.Contains("CloseMainWindow", testScript, StringComparison.Ordinal);
+        Assert.Contains("manifest does not cover exactly the installable files", testScript, StringComparison.Ordinal);
+        Assert.Contains("private build path prefix", testScript, StringComparison.Ordinal);
+        Assert.Contains("installedStateChanged = $false", testScript, StringComparison.Ordinal);
+        Assert.DoesNotContain("msiexec", testScript, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("eym_s", testScript, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void WindowsInstallerContract_InstallsApplicationAndCliPerUserAndRemovesOnlyOwnedState()
     {
         var root = FindRepositoryRoot();
         var packagePath = Path.Combine(root, "installer", "Flow.WindowsInstaller", "Package.wxs");
@@ -189,17 +237,27 @@ public sealed class WindowsDistributionFoundationTests
         Assert.Contains("ARPPRODUCTICON", source, StringComparison.Ordinal);
         Assert.Contains("ARPINSTALLLOCATION", source, StringComparison.Ordinal);
         Assert.DoesNotContain("ARPSYSTEMCOMPONENT", source, StringComparison.Ordinal);
-        Assert.DoesNotContain("Shortcut", source, StringComparison.Ordinal);
+        var shortcut = Assert.Single(package.Descendants(), static element => element.Name.LocalName == "Shortcut");
+        Assert.Equal("[APPLICATIONFOLDER]Flow.Windows.exe", (string?)shortcut.Attribute("Target"));
+        Assert.DoesNotContain("flow.exe", (string?)shortcut.Attribute("Target") ?? string.Empty, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Extension", source, StringComparison.Ordinal);
 
         Assert.Contains("WixToolset.Sdk", buildScript, StringComparison.Ordinal);
+        Assert.Contains("CompressionLevel", buildScript, StringComparison.Ordinal);
         Assert.Contains(
             windowsProperties.Descendants("FlowWindowsInstallerToolLicense"),
             static license => license.Value == "MS-RL");
-        Assert.Contains("flow-windows-installer-0.1", buildScript, StringComparison.Ordinal);
-        Assert.Contains("payloadFiles", buildScript, StringComparison.Ordinal);
+        Assert.Contains("flow-windows-installer-0.2", buildScript, StringComparison.Ordinal);
+        Assert.Contains("combined-payload-manifest.json", buildScript, StringComparison.Ordinal);
+        Assert.Contains("FlowApplicationComponents", buildScript, StringComparison.Ordinal);
+        Assert.Contains("Get-StableComponentGuid", buildScript, StringComparison.Ordinal);
         Assert.Contains("FlowWindowsProductCode", buildScript, StringComparison.Ordinal);
         Assert.Contains("Major upgrade", testScript, StringComparison.Ordinal);
+        Assert.Contains("Invoke-InstalledApplicationShortcut", testScript, StringComparison.Ordinal);
+        Assert.Contains("start-menu-launch", testScript, StringComparison.Ordinal);
+        Assert.Contains("user-data-preserved", testScript, StringComparison.Ordinal);
+        Assert.Contains("'/famus'", testScript, StringComparison.Ordinal);
+        Assert.Contains("'-CompressionLevel', 'none'", testScript, StringComparison.Ordinal);
         Assert.Contains("downgrade-refused", testScript, StringComparison.Ordinal);
         Assert.Contains("path-preserved", testScript, StringComparison.Ordinal);
         Assert.Contains("ConvertTo-ComparableUserPath", testScript, StringComparison.Ordinal);
@@ -208,12 +266,21 @@ public sealed class WindowsDistributionFoundationTests
         Assert.DoesNotContain("eym_s", buildScript, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("eym_s", testScript, StringComparison.OrdinalIgnoreCase);
 
+        Assert.Contains(
+            windowsProperties.Descendants("FlowWindowsStartMenuComponentGuid"),
+            static value => Guid.TryParse(value.Value, out _));
+        Assert.Contains(
+            windowsProperties.Descendants("FlowWindowsPayloadComponentNamespace"),
+            static value => Guid.TryParse(value.Value, out _));
+
         foreach (var culture in new[] { "en-US", "pt-BR" })
         {
             var localization = XDocument.Load(Path.Combine(root, "installer", "Flow.WindowsInstaller", $"Installer.{culture}.wxl"));
             Assert.Equal(culture, (string?)localization.Root?.Attribute("Culture"));
             Assert.Contains(localization.Descendants(), static element =>
                 element.Name.LocalName == "String" && (string?)element.Attribute("Id") == "DowngradeError");
+            Assert.Contains(localization.Descendants(), static element =>
+                element.Name.LocalName == "String" && (string?)element.Attribute("Id") == "ShortcutDescription");
         }
     }
 
@@ -225,26 +292,77 @@ public sealed class WindowsDistributionFoundationTests
         var verifier = File.ReadAllText(Path.Combine(root, "eng", "verify-windows-release-artifacts.ps1"));
 
         Assert.Contains("windows-portable:", workflow, StringComparison.Ordinal);
+        Assert.Contains("windows-combined-payload:", workflow, StringComparison.Ordinal);
         Assert.Contains("windows-installer:", workflow, StringComparison.Ordinal);
         Assert.Contains("windows-installer-smoke:", workflow, StringComparison.Ordinal);
         Assert.Contains("windows-release-evidence:", workflow, StringComparison.Ordinal);
         Assert.Contains("build-windows-portable.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("test-windows-portable.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("build-windows-combined-payload.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("test-windows-combined-payload.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("build-windows-installer.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("test-windows-installer.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("verify-windows-release-artifacts.ps1", workflow, StringComparison.Ordinal);
-        Assert.Contains("needs: [resolve, build, windows-release-evidence]", workflow, StringComparison.Ordinal);
+        Assert.Contains("needs: [resolve, validate, build, compare-canonical, windows-release-evidence]", workflow, StringComparison.Ordinal);
+        Assert.Contains("verify-release-artifacts.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("compare-release-evidence.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("name: draft-cross-platform-evidence", workflow, StringComparison.Ordinal);
+        Assert.Contains("build:\n    name: Build draft artifacts\n    needs: resolve", workflow, StringComparison.Ordinal);
+        Assert.Contains("windows-portable:\n    name: Build and smoke test Windows portable\n    needs: resolve", workflow, StringComparison.Ordinal);
         Assert.Contains("'--draft'", workflow, StringComparison.Ordinal);
         Assert.Contains("'--latest=false'", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("--draft=false", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("dotnet nuget push", workflow, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("windows-installer-payload", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("Extract-Archive", workflow, StringComparison.Ordinal);
+        Assert.Contains("compression-level: 0", workflow, StringComparison.Ordinal);
 
-        Assert.Contains("flow-windows-release-evidence-0.1", verifier, StringComparison.Ordinal);
+        Assert.Contains("flow-windows-release-evidence-0.2", verifier, StringComparison.Ordinal);
+        Assert.Contains("CombinedPayloadDirectory", verifier, StringComparison.Ordinal);
+        Assert.Contains("combinedPayloadHashes = 'passed'", verifier, StringComparison.Ordinal);
         Assert.Contains("declaredPayloadMatch = 'passed'", verifier, StringComparison.Ordinal);
+        Assert.Contains("startMenuLaunch = 'passed'", verifier, StringComparison.Ordinal);
         Assert.Contains("majorUpgrade = 'passed'", verifier, StringComparison.Ordinal);
+        Assert.Contains("userDataPreserved = 'passed'", verifier, StringComparison.Ordinal);
         Assert.Contains("ownedRemoval = 'passed'", verifier, StringComparison.Ordinal);
         Assert.Contains("installerManifest.signed", verifier, StringComparison.Ordinal);
         Assert.DoesNotContain("C:\\Users\\", verifier, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void CiWorkflow_ExercisesPromotedCombinedPayloadBeforeDraftRelease()
+    {
+        var root = FindRepositoryRoot();
+        var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "ci.yml"));
+
+        Assert.Contains("windows-installer-integration:", workflow, StringComparison.Ordinal);
+        Assert.Contains("build-windows-portable.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("-PortableArtifactsDirectory ./artifacts/windows-portable", workflow, StringComparison.Ordinal);
+        Assert.Contains("build-windows-installer.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("test-windows-installer.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("-Cultures en-US", workflow, StringComparison.Ordinal);
+        Assert.Contains("-CompressionLevel none", workflow, StringComparison.Ordinal);
+        Assert.Contains("installer-smoke-result.json", workflow, StringComparison.Ordinal);
+        Assert.DoesNotContain("Build WinUI shell", workflow, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WindowsRelease_RequiresBoundSmokeAndSbomWithoutPrivateBuildPaths()
+    {
+        var root = FindRepositoryRoot();
+        var builder = File.ReadAllText(Path.Combine(root, "eng", "build-windows-combined-payload.ps1"));
+        var verifier = File.ReadAllText(Path.Combine(root, "eng", "verify-windows-release-artifacts.ps1"));
+        var smoke = File.ReadAllText(Path.Combine(root, "eng", "test-windows-combined-payload.ps1"));
+
+        Assert.Contains("-p:PathMap=$repositoryRoot=/_/", builder, StringComparison.Ordinal);
+        Assert.Contains("Test-CombinedSmokeEvidence", verifier, StringComparison.Ordinal);
+        Assert.Contains("Test-InstallerSbom", verifier, StringComparison.Ordinal);
+        Assert.Contains("manifestSha256 = Get-Sha256Lower -Path $manifestPath", smoke, StringComparison.Ordinal);
+        foreach (var workflow in new[] { "ci.yml", "release.yml" })
+        {
+            var text = File.ReadAllText(Path.Combine(root, ".github", "workflows", workflow));
+            Assert.Contains("test-windows-release-contract.ps1", text, StringComparison.Ordinal);
+        }
     }
 
     [Fact]

@@ -22,7 +22,8 @@ Documento != Layout != Renderização
 - `Flow.Application`: casos de uso neutros, compartilhados pelos hosts oficiais;
 - `Flow.Cli`: composição e operações de linha de comando.
 - `Flow.Windows.Shell`: estado, localização, configurações e índices reconstruíveis, sessões temporárias de prévia e orquestração de arquivos locais sobre a fronteira compartilhada, sem dependência de WinUI;
-- `Flow.Windows`: composição nativa WinUI 3 para os fluxos visuais.
+- `Flow.Windows`: composição nativa WinUI 3 para os fluxos visuais, com referências a `Flow.Windows.Shell` e `Flow.Updates`;
+- `Flow.Updates`: infraestrutura compartilhada pela CLI e pela aplicação Windows para consultas explícitas de releases, somente para leitura. Não depende dos projetos de domínio nem baixa ou executa instaladores.
 
 As referências entre projetos apontam para dentro. O modelo de documentos não depende de EPUB, HTML, CLI ou sistema operacional.
 

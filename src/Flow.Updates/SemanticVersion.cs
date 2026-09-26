@@ -1,6 +1,6 @@
 using System.Text.RegularExpressions;
 
-namespace Flow.Cli;
+namespace Flow.Updates;
 
 internal sealed partial class SemanticVersion : IComparable<SemanticVersion>
 {

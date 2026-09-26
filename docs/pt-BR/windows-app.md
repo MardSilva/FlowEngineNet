@@ -43,7 +43,7 @@ A aplicação está dividida em dois projetos:
 - `Flow.Windows.Shell` contém configurações neutras, catálogos de texto, estado de navegação e a orquestração visual sobre `Flow.Application`;
 - `Flow.Windows` contém a composição WinUI 3 e as views XAML.
 
-O host usa `WinExe`, portanto não abre um terminal junto com a janela. Ele não referencia `Flow.Cli`, não inicia subprocessos nem acessa a rede. A prévia local restrita usa WebView2, como explicado acima. O `NavigationView` se adapta à largura disponível, os destinos principais podem ser alcançados pelo teclado, os títulos expõem níveis de acessibilidade e os controles têm nomes ou descrições úteis para tecnologias assistivas. Os recursos de tema incluem alto contraste, e o logo muda conforme o tema claro ou escuro.
+O host usa `WinExe`, portanto não abre um terminal junto com a janela. Ele não referencia nem executa `Flow.Cli`. Aplicações externas só abrem por ação explícita, como abrir o PowerShell no modo avançado ou um link oficial no navegador. A prévia local restrita usa WebView2, como explicado acima. O `NavigationView` se adapta à largura disponível, os destinos principais podem ser alcançados pelo teclado, os títulos expõem níveis de acessibilidade e os controles têm nomes ou descrições úteis para tecnologias assistivas. Os recursos de tema incluem alto contraste, e o logo muda conforme o tema claro ou escuro.
 
 A janela preserva um mínimo de 1000 × 660 unidades lógicas. O host converte esse valor conforme o DPI do monitor, por isso a área visual mínima é a mesma em escalas de 100%, 150% e 200%. Em telas menores, o limite é reduzido à área útil do próprio monitor para manter a barra de título e os controles acessíveis.
 
@@ -51,18 +51,35 @@ A página **Como funciona** é um guia dentro da aplicação, não uma cópia do
 
 O projeto usa o componente WinUI do Microsoft Windows App SDK sob a [licença do Microsoft Windows App SDK](https://github.com/microsoft/WindowsAppSDK/blob/main/LICENSE). A dependência fica fixada de forma central e restrita ao host Windows; ela não entra no modelo de documentos nem na CLI multiplataforma.
 
+## Sobre e identidade da distribuição
+
+A página **Sobre**, no rodapé da navegação, mostra a versão pública, a arquitetura do processo e o caráter experimental da aplicação. A versão vem dos metadados do assembly, gerados pela mesma configuração central da CLI. O contrato neutro `FlowWindowsProductIdentity` recebe os metadados da distribuição sem depender da CLI nem do instalador.
+
+O host lê apenas o `VERSION.json` da distribuição adjacente. Quando o manifesto corresponde ao build, a página mostra a revisão de origem e informa se havia alterações ainda não commitadas. Sem metadados, indica um build de desenvolvimento ou avulso; se estiverem malformados, acima do limite ou incompatíveis, a revisão fica indisponível. A página não expõe caminhos de instalação, nomes de máquinas nem metadados de livros. O manifesto também não serve como prova de instalação por MSI ou de confiança no publicador.
+
+A seção expansível de licenças funciona offline. O build monta `Assets/LICENSES.txt` com a licença MIT do Flow e os avisos fornecidos pelos pacotes resolvidos de WinUI, WebView2 e runtime usados pela aplicação gráfica. Quando um pacote fornece apenas uma referência à licença, essa referência é preservada; os textos das licenças não são traduzidos. A publicação self-contained também inclui os avisos fornecidos pelos runtimes .NET resolvidos. Ferramentas usadas apenas no build não aparecem como dependências da aplicação. Os links do projeto, de relatos de problemas e de releases só abrem quando selecionados. Exibir a página não acessa a rede nem consulta atualizações.
+
+## Consulta explícita de atualizações
+
+Em **Sobre**, o botão **Verificar atualizações** consulta as releases oficiais no GitHub. A opção de incluir pré-releases vem marcada nesta aplicação experimental; desmarque-a para consultar apenas versões estáveis. O resultado mostra a versão em execução, a última versão no canal escolhido e um link validado para a release oficial. A aplicação nunca baixa nem instala a nova versão automaticamente.
+
+A aplicação e a CLI compartilham `Flow.Updates`, responsável pela leitura das releases, comparação semântica de versões e transporte HTTP com limites. A CLI mantém a sintaxe dos comandos, o JSON e os códigos de saída. A consulta tem limite de dez segundos, recusa redirecionamentos e aceita até 2 MiB de resposta. Abrir a aplicação ou a página Sobre não inicia a consulta. Cancelamento, falha de rede, timeout, resposta inválida e canal sem releases geram mensagens localizadas, sem afetar as operações com documentos. Sair da página cancela uma consulta em andamento.
+
+A orientação para MSI só aparece quando o diretório da aplicação corresponde ao registro do instalador por utilizador, incluindo o subdiretório `app`. Essa evidência local não comprova assinatura nem integridade. Sem um registro correspondente, a forma de instalação fica sem confirmação. Para atualizar uma instalação MSI, o utilizador precisa abrir a release, escolher o novo MSI e executá-lo. Os testes automatizados usam transportes falsos e não acessam o GitHub.
+
 ## Build e execução local
 
 O projeto WinUI é compilado de forma explícita no Windows, enquanto o build comum da solução continua multiplataforma:
 
 ```powershell
 dotnet restore Flow.sln
+dotnet restore .\src\Flow.Windows\Flow.Windows.csproj -p:Platform=x64
 dotnet build .\src\Flow.Windows\Flow.Windows.csproj --no-restore -p:Platform=x64
 dotnet run --project .\src\Flow.Windows\Flow.Windows.csproj -p:Platform=x64
 ```
 
-Por enquanto, a aplicação roda a partir da saída do build. O MSI da alpha.3 ainda instala apenas a CLI. A inclusão da interface gráfica no instalador, o atalho do menu Iniciar, o upgrade da alpha.3 e a remoção dos dois executáveis pertencem à etapa final de integração do instalador Windows.
+A aplicação pode rodar a partir da saída do build ou do payload combinado self-contained gerado por `eng/build-windows-combined-payload.ps1`. Esse artefato também inclui a CLI portátil sem alterações e um manifesto auditável. O MSI da alpha.4 consome o artefato, instala os dois pontos de entrada por utilizador e cria um único atalho no menu Iniciar para a aplicação gráfica. A CLI não recebe atalho e continua disponível pelo comando `flow` num terminal novo.
 
 Os testes automatizados cobrem recuperação e persistência atômica das configurações, descoberta da pasta pessoal, natureza não canônica do índice, navegação, os dois catálogos de idioma, escolha de tema, contratos das operações, preservação da origem, políticas de saída, limpeza após cancelamento, descarte e hash da prévia, escaping dos comandos, validação de EPUB e Flow, estrutura de segurança do XAML, acessibilidade, alto contraste e limites entre projetos. Testes locais de abertura e UI Automation confirmam que o processo cria uma janela nativa responsiva e expõe a página de processamento. A revisão visual nas escalas de 100%, 150% e 200% continua manual, pois testes unitários não comprovam ausência de cortes nem legibilidade física.
 
-A aplicação ainda não tem banco persistente de biblioteca, progresso de leitura, anotações, pesquisa, paginação de produção nem integração ao instalador. A pasta pessoal e a prévia são conveniências operacionais, não o Flow Reader.
+A aplicação ainda não tem banco persistente de biblioteca, progresso de leitura, anotações, pesquisa nem paginação de produção. A pasta pessoal e a prévia são conveniências operacionais, não o Flow Reader.
