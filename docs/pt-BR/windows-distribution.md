@@ -104,6 +104,10 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-installer.ps1
 
 O teste gera identidades aleatórias para produto, upgrade, componente, Registro e diretório. Ele nunca usa o código do produto de produção nem uma instalação pessoal existente. Dentro dessa identidade isolada, verifica instalação limpa, execução sem .NET no `PATH`, reparo, major upgrade, recusa de downgrade e desinstalação. O diretório de teste contém espaços e Unicode. A conferência final compara as entradas normalizadas e ordenadas do `PATH`: diferenças inofensivas na formatação de separadores ou barras finais são aceitas, mas uma entrada alheia alterada, removida ou reordenada continua reprovando o gate.
 
+O teste de ciclo de instalação começa pela alpha.4: abre o atalho gráfico e verifica a CLI no PowerShell e no cmd. Também inspeciona, importa e valida um EPUB público gerado pelo próprio teste. Depois, remove arquivos controlados da aplicação e o atalho, faz o reparo e desinstala essa instalação limpa. O upgrade parte do código real da alpha.3, que tinha apenas CLI, na revisão `1a2fbc50a7a79bc1f9fdccbb7347b39949743bbe`, com a estrutura original do instalador e identidades isoladas. O teste não altera o rótulo do executável atual para simular uma versão anterior. Após o upgrade para alpha.4, repete as verificações da aplicação e da CLI, recusa o downgrade e remove o produto. Os arquivos-sentinela, o EPUB de teste e os documentos gerados devem permanecer; as configurações pessoais existentes são comparadas sem alteração.
+
+Para reaproveitar artefatos locais, use `-PayloadDirectory <artefatos-combinados>` e, opcionalmente, `-BaselinePortableArtifactsDirectory <artefatos-portateis-alpha3>`. O script confere manifestos, revisões e hashes antes de aceitar as entradas. Sem o diretório opcional da versão anterior, ele publica uma vez a CLI da revisão histórica fixada. Essa revisão precisa existir no checkout do Git. Diagnósticos e arquivos de teste permanecem em `artifacts/windows-installer-test-*/` para consulta.
+
 O instalador usa WiX Toolset 4.0.6, fixado no projeto e licenciado sob MS-RL. WiX 6 e 7 não foram adotados porque a distribuição atual dessas versões acrescenta uma EULA de Open Source Maintenance Fee. O WiX participa apenas do build e não é instalado com o Flow. Versão, licença e papel de ferramenta excluída da distribuição aparecem no SBOM do instalador. O MSI usa os mecanismos padrão de registro e major upgrade documentados pela [Microsoft](https://learn.microsoft.com/pt-br/windows/win32/msi/configuring-add-remove-programs-with-windows-installer) e pelo [WiX](https://docs.firegiant.com/wix/schema/wxs/majorupgrade/).
 
 O MSI deve ser gerado uma única vez para cada candidato a release e identificado pelo checksum. Compilar de novo a mesma revisão não produz necessariamente bytes idênticos, pois o Windows Installer usa metadados de identidade próprios para cada pacote gerado. O ZIP portátil continua sendo o artefato Windows reproduzível byte a byte. O manifesto do MSI registra a identidade fixa do produto, a revisão do código e a versão do payload usados no instalador.
@@ -122,7 +126,30 @@ Pull requests e branches protegidas percorrem a integração Windows antes de qu
 
 O gate final exige que `.nupkg`, ZIP portátil, payload combinado e MSI indiquem a mesma versão pública e a mesma revisão do Git. Ele verifica o hash de cada arquivo do payload combinado, confere se o manifesto do instalador declara exatamente esse conjunto e confirma que a CLI e a licença continuam iguais às do pacote portátil promovido. Os formatos não precisam ter bytes iguais. Evidências do instalador, manifestos de distribuição, SBOMs separados e um arquivo consolidado de checksums do Windows só seguem para o draft depois dessas verificações.
 
+O CI passa explicitamente `-ExpectedCultures en-US` ao teste do instalador. Na release, o padrão continua exigindo `en-US` e `pt-BR`; um pacote ausente, extra ou alterado reprova a validação. O script `eng/test-windows-installer-contract.ps1` exercita essas verificações sem instalar nada. O ciclo isolado de instalação roda em inglês; conferir os metadados dos dois MSIs não substitui o teste visual do instalador em português.
+
+A evidência `flow-windows-installer-smoke-0.2` vincula o resultado ao SHA-256 do manifesto do instalador e à revisão do código, registrando as sete fases do MSI e seus códigos de saída. O sucesso só é gravado após a limpeza. O gate de release rejeita evidências incompletas ou de outro candidato. Os dois workflows preservam os logs de diagnóstico do MSI mesmo quando uma verificação posterior falha.
+
 O workflow cria apenas uma GitHub Release em rascunho, depois da confirmação explícita e do environment protegido `draft-release`. Ele não publica no NuGet, não cria uma release pública e não marca uma pré-release como `Latest`.
+
+## Revisão do candidato final
+
+O workflow de draft gera um pacote canônico da CLI e valida esse mesmo pacote no Windows e no Linux, sem empacotá-lo novamente. As evidências dos dois sistemas precisam concordar antes da criação do draft. O gate Windows também exige abertura bem-sucedida da aplicação vinculada ao hash do manifesto combinado, os dois idiomas do MSI e um SBOM com checksum cujos hashes dos executáveis correspondam ao payload. O relatório do smoke combinado acompanha o manifesto nos anexos. Essas verificações não aprovam automaticamente a experiência visual.
+
+Antes de solicitar o draft, registre a revisão exata do candidato e conclua esta revisão em uma instalação isolada:
+
+| Revisão | Verificações necessárias |
+| --- | --- |
+| Temas claro, escuro e alto contraste do Windows | Texto, foco, ícones, controles desabilitados e seções expandidas legíveis em todas as páginas. |
+| Escalas de 100%, 150% e 200% | Janela mínima, maximizada, transições da navegação, textos longos e diálogos sem ações cortadas. Apenas redimensionar a janela não testa mudança de DPI. |
+| Teclado | Tab/Shift+Tab, navegação, seções expansíveis, cancelamento do seletor e das operações, retorno do foco. |
+| EPUB local | Inspeção, importação, validação e prévia de um arquivo público de teste, sem alterar o original. |
+| Instalação | Atalho sem terminal, CLI num terminal novo, reparo, upgrade da alpha.3, recusa de downgrade e remoção com preservação dos dados. |
+| Sobre e atualizações | Versão correta, licenças offline legíveis, nenhuma consulta automática; falhas na consulta explícita não interrompem operações com documentos. |
+
+Para remover, use a entrada do produto nos aplicativos instalados do Windows; não apague manualmente o diretório. Para atualizar, escolha o MSI oficial mais recente após uma consulta explícita. Não desative SmartScreen nem antivírus para concluir a revisão: os pacotes sem assinatura continuam experimentais, e os avisos precisam ser avaliados pelo utilizador.
+
+O ensaio local com `invoke-release-dry-run.ps1 -AllowDirty` verifica o empacotamento, mas produz evidência explicitamente imprópria para publicação. Alterações sem commit, ausência de resultado Windows/Linux para a revisão final, falha nos gates ou revisão visual incompleta continuam bloqueando a aprovação. Registre o que falta como pendente, não como aprovado. Commit e merge são decisões humanas separadas; o ensaio não cria tag nem publica nada.
 
 ## Limite atual
 

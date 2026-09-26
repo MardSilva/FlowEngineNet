@@ -17,6 +17,7 @@ public enum FlowWindowsDestination
     Preview,
     HowItWorks,
     Settings,
+    About,
 }
 
 /// <summary>Contains small, local, and reconstructible shell preferences.</summary>

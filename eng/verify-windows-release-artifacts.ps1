@@ -9,6 +9,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'windows-release-contract.ps1')
+. (Join-Path $PSScriptRoot 'windows-installer-test-support.ps1')
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
 $allowedArtifactsRoot = [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot 'artifacts'))
 if ([string]::IsNullOrWhiteSpace($OutputDirectory)) {
@@ -149,6 +151,9 @@ $portableManifest = Get-JsonFile -Path (Join-Path $portableRoot 'portable-manife
 $portableSmoke = Get-JsonFile -Path (Join-Path $portableRoot 'portable-smoke-result.json')
 $combinedManifestPath = Join-Path $combinedRoot 'combined-payload-manifest.json'
 $combinedManifest = Get-JsonFile -Path $combinedManifestPath
+$combinedSmokePath = Join-Path $combinedRoot 'combined-payload-smoke-result.json'
+$combinedSmoke = Get-JsonFile -Path $combinedSmokePath
+Test-CombinedSmokeEvidence -Smoke $combinedSmoke -Manifest $combinedManifest -ManifestSha256 (Get-Sha256Lower -Path $combinedManifestPath)
 $combinedVersion = Get-JsonFile -Path (Join-Path $combinedRoot 'payload/VERSION.json')
 $installerManifest = Get-JsonFile -Path (Join-Path $installerRoot 'installer-manifest.json')
 $installerSmoke = Get-JsonFile -Path (Join-Path $installerRoot 'installer-smoke-result.json')
@@ -164,7 +169,7 @@ if ($portableManifest.format -ne 'flow-windows-portable-0.1' -or
     $portableSmoke.status -ne 'passed' -or
     $combinedManifest.format -ne 'flow-windows-combined-payload-0.1' -or
     $installerManifest.format -ne 'flow-windows-installer-0.2' -or
-    $installerSmoke.format -ne 'flow-windows-installer-smoke-0.1' -or
+    $installerSmoke.format -ne 'flow-windows-installer-smoke-0.2' -or
     $installerSmoke.status -ne 'passed') {
     throw 'The portable, installer or installer-smoke evidence has an unsupported format or status.'
 }
@@ -216,6 +221,21 @@ if ($portableManifest.runtimeIdentifier -ne 'win-x64' -or
 if ($installerSmoke.productionInstallerVersion -ne $installerManifest.installerVersion) {
     throw 'The installer smoke evidence does not identify the generated MSI version.'
 }
+if ($installerSmoke.installerManifestSha256 -ne (Get-Sha256Lower -Path (Join-Path $installerRoot 'installer-manifest.json')) -or
+    $installerSmoke.sourceRevision -ne $installerManifest.sourceRevision -or
+    $installerSmoke.testedVersion -ne $installerManifest.publicVersion -or
+    $installerSmoke.baselineVersion -ne '0.2.0-alpha.3' -or
+    $installerSmoke.baselineRevision -ne '1a2fbc50a7a79bc1f9fdccbb7347b39949743bbe' -or
+    (@($installerSmoke.testedCultures | Sort-Object) -join ',') -ne 'en-US,pt-BR' -or
+    @($installerSmoke.phases).Count -ne 7 -or @($installerSmoke.phases | Where-Object { -not $_.passed }).Count -ne 0) {
+    throw 'Installer lifecycle evidence is incomplete or belongs to a different candidate.'
+}
+foreach ($phaseName in @('clean-alpha4.log', 'repair-alpha4.log', 'remove-clean-alpha4.log', 'install-alpha3.log',
+        'upgrade-alpha3-alpha4.log', 'downgrade.log', 'uninstall.log')) {
+    $phase = @($installerSmoke.phases | Where-Object log -EQ $phaseName)
+    $allowedCodes = if ($phaseName -eq 'downgrade.log') { @(1603,1638) } else { @(0,3010) }
+    if ($phase.Count -ne 1 -or $phase[0].exitCode -notin $allowedCodes) { throw "Missing or failed installer phase: $phaseName" }
+}
 $windowsPropertiesPath = Join-Path $repositoryRoot 'eng/Flow.WindowsProduct.props'
 $windowsProperties = [xml](Get-Content -LiteralPath $windowsPropertiesPath -Raw -Encoding UTF8)
 $properties = @{}
@@ -231,7 +251,7 @@ if ($installerManifest.installerVersion -ne $properties.FlowWindowsInstallerVers
     throw 'The MSI manifest does not match the checked-in Windows product identity.'
 }
 $requiredOperations = @('clean-install', 'installed-application', 'start-menu-launch', 'installed-cli', 'repair', 'major-upgrade',
-    'downgrade-refused', 'uninstall', 'user-data-preserved', 'path-preserved')
+    'downgrade-refused', 'uninstall', 'user-data-preserved', 'path-preserved', 'alpha3-to-alpha4', 'powershell-cli', 'cmd-cli', 'public-epub', 'settings-preserved')
 foreach ($operation in $requiredOperations) {
     if ($operation -notin @($installerSmoke.operations)) {
         throw "The installer smoke evidence is missing operation '$operation'."
@@ -242,6 +262,12 @@ $canonicalFiles = Test-Checksums -Directory $canonicalRoot
 $portableFiles = Test-Checksums -Directory $portableRoot
 $combinedFiles = Test-CombinedPayloadChecksums -Directory $combinedRoot
 $installerFiles = Test-Checksums -Directory $installerRoot
+Get-TestMsiPackages -Directory $installerRoot -Manifest $installerManifest -ExpectedCultures @('en-US', 'pt-BR') | Out-Null
+$installerSboms = @(Get-ChildItem -LiteralPath $installerRoot -Filter '*.cdx.json' -File)
+if ($installerSboms.Count -ne 1 -or $installerSboms[0].Name -notin @($installerFiles.name)) {
+    throw 'Exactly one checksummed installer SBOM is required.'
+}
+Test-InstallerSbom -Sbom (Get-JsonFile -Path $installerSboms[0].FullName) -Manifest $installerManifest
 $combinedPayloadRoot = Join-Path $combinedRoot 'payload'
 $combinedActualPaths = @(Get-ChildItem -LiteralPath $combinedPayloadRoot -File -Recurse |
     ForEach-Object { [System.IO.Path]::GetRelativePath($combinedPayloadRoot, $_.FullName).Replace('\', '/') } | Sort-Object)
@@ -319,6 +345,8 @@ try {
             combinedPayloadHashes = 'passed'
             installerChecksums = 'passed'
             declaredPayloadMatch = 'passed'
+            combinedApplicationSmoke = 'passed'
+            installerSbom = 'passed'
             silentInstall = 'passed'
             installedApplication = 'passed'
             startMenuLaunch = 'passed'
@@ -345,6 +373,7 @@ try {
         (Join-Path $portableRoot 'portable-manifest.json')
         (Join-Path $portableRoot 'portable-smoke-result.json')
         $combinedManifestPath
+        $combinedSmokePath
         $msiFiles.FullName
         (Get-ChildItem -LiteralPath $installerRoot -Filter '*.cdx.json' -File).FullName
         (Join-Path $installerRoot 'installer-manifest.json')

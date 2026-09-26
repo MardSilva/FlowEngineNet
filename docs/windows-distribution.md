@@ -104,6 +104,10 @@ pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-installer.ps1
 
 The test uses random product, upgrade, component, registry and directory identities. It never addresses the production product code or an existing personal installation. Within that isolated identity it verifies clean installation, execution without .NET on `PATH`, repair, major upgrade, downgrade rejection and uninstallation. The test also uses a directory containing spaces and Unicode. Its final check compares normalized, ordered `PATH` entries: harmless separator and trailing-slash formatting changes are accepted, but a changed, removed, or reordered unrelated entry still fails the gate.
 
+The lifecycle test first installs alpha.4, launches its graphical shortcut and checks the CLI in PowerShell and cmd. It inspects, imports and validates a generated public EPUB fixture. It then removes controlled application files and the shortcut, repairs them and uninstalls the clean installation. The upgrade starts from the actual CLI-only alpha.3 source at revision `1a2fbc50a7a79bc1f9fdccbb7347b39949743bbe`, using its original installer structure with isolated identities. It does not relabel the current executable as an older release. After upgrading to alpha.4, it repeats the application and CLI checks, rejects a downgrade and removes the product. User-data sentinels, the fixture and generated documents must survive; existing personal settings are compared without being modified.
+
+For local reuse, pass `-PayloadDirectory <combined-artifacts>` and optionally `-BaselinePortableArtifactsDirectory <alpha3-portable-artifacts>`. The script checks the manifests, revisions and hashes before accepting either input. Without the optional baseline directory, it publishes the pinned historical CLI once. The Git checkout must contain that revision. Generated diagnostics and fixtures remain under `artifacts/windows-installer-test-*/` for inspection.
+
 The installer is built with WiX Toolset 4.0.6, fixed in the project and licensed under MS-RL. WiX 6 and 7 were not selected because their current distribution adds a separate Open Source Maintenance Fee EULA. WiX is a build-time tool and is not installed with Flow. Its version, license and excluded build-tool role are recorded in the installer SBOM. The MSI uses the standard Windows Installer registration and major-upgrade mechanisms described by [Microsoft](https://learn.microsoft.com/en-us/windows/win32/msi/configuring-add-remove-programs-with-windows-installer) and [WiX](https://docs.firegiant.com/wix/schema/wxs/majorupgrade/).
 
 The MSI is built once for each release candidate and then identified by its checksum. Rebuilding the same source is not expected to reproduce identical MSI bytes because Windows Installer packages require package-level identity metadata for each build. The portable ZIP remains the byte-reproducible Windows artifact; the MSI manifest records the fixed product identity, source revision and payload version used for the installer.
@@ -122,7 +126,30 @@ Pull requests and protected branches run the Windows integration path before a r
 
 The final Windows gate requires the `.nupkg`, portable ZIP, combined payload and MSI to name the same public version and Git revision. It verifies every combined-payload hash, checks that the installer manifest declares that exact file set and confirms that the CLI and license still match the promoted portable package. The formats are not expected to have equal bytes. Installer evidence, distribution manifests, separate SBOMs and a consolidated Windows checksum file are attached only after these checks pass.
 
+CI explicitly selects `-ExpectedCultures en-US` for the installer test. The release default still requires both `en-US` and `pt-BR`; a missing, extra or altered package fails validation. `eng/test-windows-installer-contract.ps1` exercises these checks without installing anything. The isolated lifecycle itself runs in English; checking both MSI metadata sets is not a visual test of the Portuguese installer.
+
+The `flow-windows-installer-smoke-0.2` evidence binds the result to the installer manifest SHA-256 and source revision and records all seven MSI phases and their exit codes. Success is written only after cleanup. The release gate rejects incomplete or mismatched evidence. Both workflows retain MSI diagnostic logs even when a later check fails.
+
 The workflow can create only a draft GitHub Release after explicit confirmation and the protected `draft-release` environment. It does not publish to NuGet, create a public release or mark a prerelease as `Latest`.
+
+## Final candidate review
+
+The draft workflow builds one canonical CLI package and validates that same package on Windows and Linux without repacking it. Their evidence must agree before draft creation. The Windows gate also requires a successful graphical launch bound to the combined manifest hash, both MSI cultures and a checksummed installer SBOM whose executable hashes match the payload. The combined smoke report is attached alongside the manifest. These checks do not approve the visual experience automatically.
+
+Before requesting a draft, record the exact candidate revision and complete this review on an isolated installation:
+
+| Review | Required checks |
+| --- | --- |
+| Light, dark and Windows high contrast | Readable text, focus indicators, icons, disabled controls and expanded sections on every page. |
+| 100%, 150% and 200% display scale | Minimum window, maximized window, navigation transitions, long text and dialogs without clipped actions. Resizing alone does not test DPI changes. |
+| Keyboard | Tab/Shift+Tab, navigation, expanders, file-picker cancellation, operation cancellation and return of focus. |
+| Local EPUB | Inspect, import, validate and preview a public fixture; keep the original unchanged. |
+| Installation | Start-menu launch without a console, CLI in a new terminal, repair, alpha.3 upgrade, downgrade refusal and removal with user data preserved. |
+| About and updates | Matching version, readable offline licenses, no automatic request; explicit update failure leaves document operations usable. |
+
+Use the installed product's Windows removal entry; do not manually delete its directory. For an update, choose the newer official MSI after an explicit update check. Never disable SmartScreen or antivirus to complete a review: unsigned packages remain experimental and any warning must be evaluated by the user.
+
+A local `invoke-release-dry-run.ps1 -AllowDirty` is useful for checking packaging, but it explicitly produces non-releasable evidence. Uncommitted changes, a missing Windows/Linux result for the final revision, a failed artifact gate or an incomplete visual review remain blockers. Record pending checks as pending, not passed. Commit and merge are separate human decisions; this rehearsal does not create a tag or publish anything.
 
 ## Current boundary
 

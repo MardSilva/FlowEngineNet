@@ -303,7 +303,10 @@ public sealed class WindowsDistributionFoundationTests
         Assert.Contains("build-windows-installer.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("test-windows-installer.ps1", workflow, StringComparison.Ordinal);
         Assert.Contains("verify-windows-release-artifacts.ps1", workflow, StringComparison.Ordinal);
-        Assert.Contains("needs: [resolve, validate, build, windows-release-evidence]", workflow, StringComparison.Ordinal);
+        Assert.Contains("needs: [resolve, validate, build, compare-canonical, windows-release-evidence]", workflow, StringComparison.Ordinal);
+        Assert.Contains("verify-release-artifacts.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("compare-release-evidence.ps1", workflow, StringComparison.Ordinal);
+        Assert.Contains("name: draft-cross-platform-evidence", workflow, StringComparison.Ordinal);
         Assert.Contains("build:\n    name: Build draft artifacts\n    needs: resolve", workflow, StringComparison.Ordinal);
         Assert.Contains("windows-portable:\n    name: Build and smoke test Windows portable\n    needs: resolve", workflow, StringComparison.Ordinal);
         Assert.Contains("'--draft'", workflow, StringComparison.Ordinal);
@@ -341,6 +344,25 @@ public sealed class WindowsDistributionFoundationTests
         Assert.Contains("-CompressionLevel none", workflow, StringComparison.Ordinal);
         Assert.Contains("installer-smoke-result.json", workflow, StringComparison.Ordinal);
         Assert.DoesNotContain("Build WinUI shell", workflow, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void WindowsRelease_RequiresBoundSmokeAndSbomWithoutPrivateBuildPaths()
+    {
+        var root = FindRepositoryRoot();
+        var builder = File.ReadAllText(Path.Combine(root, "eng", "build-windows-combined-payload.ps1"));
+        var verifier = File.ReadAllText(Path.Combine(root, "eng", "verify-windows-release-artifacts.ps1"));
+        var smoke = File.ReadAllText(Path.Combine(root, "eng", "test-windows-combined-payload.ps1"));
+
+        Assert.Contains("-p:PathMap=$repositoryRoot=/_/", builder, StringComparison.Ordinal);
+        Assert.Contains("Test-CombinedSmokeEvidence", verifier, StringComparison.Ordinal);
+        Assert.Contains("Test-InstallerSbom", verifier, StringComparison.Ordinal);
+        Assert.Contains("manifestSha256 = Get-Sha256Lower -Path $manifestPath", smoke, StringComparison.Ordinal);
+        foreach (var workflow in new[] { "ci.yml", "release.yml" })
+        {
+            var text = File.ReadAllText(Path.Combine(root, ".github", "workflows", workflow));
+            Assert.Contains("test-windows-release-contract.ps1", text, StringComparison.Ordinal);
+        }
     }
 
     [Fact]

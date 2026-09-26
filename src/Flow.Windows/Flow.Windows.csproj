@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Flow.Windows.Shell\Flow.Windows.Shell.csproj" />
+    <ProjectReference Include="..\Flow.Updates\Flow.Updates.csproj" />
   </ItemGroup>
 
   <ItemGroup>
@@ -58,4 +59,5 @@
           SkipUnchangedFiles="true" />
   </Target>
 
+  <Import Project="..\..\eng\Flow.WindowsLicenses.targets" />
 </Project>

@@ -52,6 +52,10 @@ jobs:
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-release-introduction.ps1
 
+      - name: Verify Windows release evidence contract
+        shell: pwsh
+        run: pwsh -NoProfile -File ./eng/test-windows-release-contract.ps1
+
       - name: Build
         run: dotnet build Flow.sln --no-restore
 
@@ -128,6 +132,10 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Verify installer culture gate
+        shell: pwsh
+        run: pwsh -NoProfile -File ./eng/test-windows-installer-contract.ps1
+
       - name: Build portable CLI once
         shell: pwsh
         run: >-
@@ -169,6 +177,7 @@ jobs:
           pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-windows-installer.ps1
           -ArtifactsDirectory ./artifacts/windows-installer
           -PayloadDirectory ./artifacts/windows-combined-payload
+          -ExpectedCultures en-US
 
       - name: Store Windows validation evidence
         uses: actions/upload-artifact@v7
@@ -180,6 +189,17 @@ jobs:
             artifacts/windows-installer/installer-smoke-result.json
           if-no-files-found: error
           retention-days: 1
+
+      - name: Preserve installer diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-installer-diagnostics
+          path: |
+            artifacts/windows-installer-test-*/logs/*.log
+            artifacts/windows-installer/installer-smoke-result.json
+          if-no-files-found: warn
+          retention-days: 7
 
   canonical-release:
     name: Build canonical CLI release

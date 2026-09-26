@@ -3,7 +3,7 @@ using System.Net.Http.Headers;
 using System.Text.Json;
 using Microsoft.Win32;
 
-namespace Flow.Cli;
+namespace Flow.Updates;
 
 /// <summary>Identifies a recognized local Flow distribution mechanism.</summary>
 public enum FlowInstallationMethod
@@ -46,7 +46,7 @@ internal interface IUpdateReleaseSource
     public Task<byte[]> GetReleasesAsync(CancellationToken cancellationToken);
 }
 
-internal enum UpdateCheckFailureKind
+public enum UpdateCheckFailureKind
 {
     Network,
     Timeout,
@@ -54,7 +54,7 @@ internal enum UpdateCheckFailureKind
     NoRelease,
 }
 
-internal sealed class UpdateCheckException(UpdateCheckFailureKind kind, string message, Exception? innerException = null)
+public sealed class UpdateCheckException(UpdateCheckFailureKind kind, string message, Exception? innerException = null)
     : Exception(message, innerException)
 {
     public UpdateCheckFailureKind Kind { get; } = kind;
@@ -77,7 +77,7 @@ internal sealed class HttpUpdateReleaseSource : IUpdateReleaseSource, IDisposabl
         if (!_client.DefaultRequestHeaders.UserAgent.Any())
         {
             _client.DefaultRequestHeaders.UserAgent.Add(
-                new ProductInfoHeaderValue(FlowUpdateContract.UserAgentProduct, CliProductInfo.Version));
+                new ProductInfoHeaderValue(FlowUpdateContract.UserAgentProduct, UpdateProductInfo.Version));
         }
 
         _client.DefaultRequestHeaders.Accept.Add(
@@ -149,6 +149,10 @@ internal sealed class HttpUpdateReleaseSource : IUpdateReleaseSource, IDisposabl
         {
             throw new UpdateCheckException(UpdateCheckFailureKind.Network, "The release request failed.", exception);
         }
+        catch (IOException exception)
+        {
+            throw new UpdateCheckException(UpdateCheckFailureKind.Network, "The release response was interrupted.", exception);
+        }
     }
 
     public void Dispose()
@@ -165,14 +169,15 @@ internal sealed record InstallationDetectionContext(
     string ExecutableDirectory,
     string ApplicationBaseDirectory,
     string? RegisteredMsiInstallPath,
-    bool HasPortableVersionFile);
+    bool HasPortableVersionFile,
+    bool IsGraphicalApplication = false);
 
 internal interface IInstallationMethodDetector
 {
     public FlowInstallationMethod Detect();
 }
 
-internal sealed class DefaultInstallationMethodDetector : IInstallationMethodDetector
+internal sealed class DefaultInstallationMethodDetector(bool graphicalApplication = false) : IInstallationMethodDetector
 {
     public FlowInstallationMethod Detect()
     {
@@ -183,7 +188,8 @@ internal sealed class DefaultInstallationMethodDetector : IInstallationMethodDet
             executableDirectory,
             AppContext.BaseDirectory,
             registeredPath,
-            File.Exists(Path.Combine(executableDirectory, "VERSION.json"))));
+            File.Exists(Path.Combine(executableDirectory, "VERSION.json")),
+            graphicalApplication));
     }
 
     internal static FlowInstallationMethod Detect(InstallationDetectionContext context)
@@ -191,7 +197,10 @@ internal sealed class DefaultInstallationMethodDetector : IInstallationMethodDet
         ArgumentNullException.ThrowIfNull(context);
         if (context.IsWindows
             && !string.IsNullOrWhiteSpace(context.RegisteredMsiInstallPath)
-            && PathsEqual(context.RegisteredMsiInstallPath, context.ExecutableDirectory, windows: true))
+            && (PathsEqual(context.RegisteredMsiInstallPath, context.ExecutableDirectory, windows: true)
+                || (context.IsGraphicalApplication && PathsEqual(
+                    context.RegisteredMsiInstallPath.TrimEnd('\\', '/') + "/app",
+                    context.ExecutableDirectory, windows: true))))
         {
             return FlowInstallationMethod.Msi;
         }
@@ -216,8 +225,15 @@ internal sealed class DefaultInstallationMethodDetector : IInstallationMethodDet
             return null;
         }
 
-        using var key = Registry.CurrentUser.OpenSubKey(@"Software\FlowEngineNet\Installer");
-        return key?.GetValue("InstallPath") as string;
+        try
+        {
+            using var key = Registry.CurrentUser.OpenSubKey(@"Software\FlowEngineNet\Installer");
+            return key?.GetValue("InstallPath") as string;
+        }
+        catch (Exception exception) when (exception is UnauthorizedAccessException or System.Security.SecurityException or IOException)
+        {
+            return null;
+        }
     }
 
     private static bool PathsEqual(string left, string right, bool windows)
@@ -273,7 +289,7 @@ internal sealed class FlowUpdateChecker(
     private readonly string _currentVersion = currentVersion ?? throw new ArgumentNullException(nameof(currentVersion));
 
     public static FlowUpdateChecker CreateDefault() =>
-        new(new HttpUpdateReleaseSource(), new DefaultInstallationMethodDetector(), CliProductInfo.Version);
+        new(new HttpUpdateReleaseSource(), new DefaultInstallationMethodDetector(), UpdateProductInfo.Version);
 
     public async Task<FlowUpdateCheckResult> CheckAsync(
         UpdateChannel channel,
@@ -292,6 +308,7 @@ internal sealed class FlowUpdateChecker(
         }
 
         var bytes = await _source.GetReleasesAsync(cancellationToken).ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
         var releases = ParseReleases(bytes);
         var candidates = releases
             .Where(release => !release.Draft)
@@ -449,6 +466,7 @@ internal sealed class FlowUpdateChecker(
         uri = null;
         if (!Uri.TryCreate(value, UriKind.Absolute, out var parsed)
             || parsed.Scheme != Uri.UriSchemeHttps
+            || !parsed.IsDefaultPort || !string.IsNullOrEmpty(parsed.UserInfo)
             || !parsed.Host.Equals("github.com", StringComparison.OrdinalIgnoreCase)
             || !parsed.AbsolutePath.StartsWith(pathPrefix, StringComparison.Ordinal))
         {

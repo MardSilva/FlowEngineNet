@@ -154,18 +154,16 @@ public sealed class FlowWindowsProjectConformanceTests
     }
 
     [Fact]
-    public void WindowsCiRestoresTheWinUiProjectBeforeBuildingWithoutRestore()
+    public void WindowsCiPublishesTheWinUiProjectWithRestoreBeforeTheRepeatBuild()
     {
         var root = FindRepositoryRoot();
         var workflow = File.ReadAllText(Path.Combine(root, ".github", "workflows", "ci.yml"));
-        var restore = "dotnet restore src/Flow.Windows/Flow.Windows.csproj -p:Platform=x64";
-        var build = "dotnet build src/Flow.Windows/Flow.Windows.csproj --no-restore -p:Platform=x64";
-
-        var restoreIndex = workflow.IndexOf(restore, StringComparison.Ordinal);
-        var buildIndex = workflow.IndexOf(build, StringComparison.Ordinal);
-
-        Assert.True(restoreIndex >= 0, "The workflow must restore the WinUI project explicitly.");
-        Assert.True(buildIndex > restoreIndex, "The WinUI restore must run before its no-restore build.");
+        Assert.Contains("./eng/build-windows-combined-payload.ps1", workflow, StringComparison.Ordinal);
+        var builder = File.ReadAllText(Path.Combine(root, "eng", "build-windows-combined-payload.ps1"));
+        var first = "Publish-WindowsApplication -Destination $applicationA -RuntimeIdentifier $runtimeIdentifier -Revision $revision";
+        var repeat = "Publish-WindowsApplication -Destination $applicationB -RuntimeIdentifier $runtimeIdentifier -Revision $revision -NoRestore";
+        Assert.Contains(first + Environment.NewLine, builder.Replace("\r\n", "\n").Replace("\n", Environment.NewLine), StringComparison.Ordinal);
+        Assert.True(builder.IndexOf(repeat, StringComparison.Ordinal) > builder.IndexOf(first, StringComparison.Ordinal));
     }
 
     [Fact]

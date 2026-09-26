@@ -1,0 +1,53 @@
+<Page
+    x:Class="Flow.Windows.Pages.AboutPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Background="{ThemeResource FlowContentBackgroundBrush}">
+    <VisualStateManager.VisualStateGroups>
+        <VisualStateGroup>
+            <VisualState>
+                <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="0" /></VisualState.StateTriggers>
+                <VisualState.Setters><Setter Target="PageContent.Padding" Value="20,24,20,36" /></VisualState.Setters>
+            </VisualState>
+            <VisualState>
+                <VisualState.StateTriggers><AdaptiveTrigger MinWindowWidth="960" /></VisualState.StateTriggers>
+                <VisualState.Setters><Setter Target="PageContent.Padding" Value="40,32,40,48" /></VisualState.Setters>
+            </VisualState>
+        </VisualStateGroup>
+    </VisualStateManager.VisualStateGroups>
+    <ScrollViewer x:Name="PageScrollViewer" HorizontalContentAlignment="Center"
+                  HorizontalScrollMode="Disabled" HorizontalScrollBarVisibility="Disabled"
+                  VerticalScrollBarVisibility="Auto">
+        <StackPanel x:Name="PageContent" MaxWidth="1000" Padding="24,32,24,48" Spacing="16">
+            <TextBlock x:Name="TitleText" Style="{ThemeResource TitleTextBlockStyle}"
+                       TextWrapping="Wrap" AutomationProperties.HeadingLevel="Level1" />
+            <TextBlock Text="Flow Engine .NET" Style="{ThemeResource SubtitleTextBlockStyle}" />
+            <TextBlock x:Name="LeadText" TextWrapping="Wrap" />
+            <TextBlock x:Name="IdentityText" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+            <TextBlock x:Name="DistributionText" TextWrapping="Wrap" />
+            <TextBlock x:Name="ModifiedText" TextWrapping="Wrap" Visibility="Collapsed" />
+            <TextBlock x:Name="UpdatesTitle" Style="{ThemeResource SubtitleTextBlockStyle}"
+                       AutomationProperties.HeadingLevel="Level2" />
+            <TextBlock x:Name="UpdatesLead" TextWrapping="Wrap" />
+            <CheckBox x:Name="PrereleaseOption" IsChecked="True" />
+            <StackPanel Orientation="Horizontal" Spacing="12">
+                <Button x:Name="CheckUpdatesButton" Click="CheckUpdates_Click" />
+                <Button x:Name="CancelUpdateButton" Click="CancelUpdate_Click" IsEnabled="False" />
+                <ProgressRing x:Name="UpdateProgress" Width="24" Height="24" IsActive="False" Visibility="Collapsed" />
+            </StackPanel>
+            <TextBlock x:Name="UpdateStatusText" TextWrapping="Wrap" AutomationProperties.LiveSetting="Polite" />
+            <HyperlinkButton x:Name="UpdateReleaseLink" Visibility="Collapsed" />
+            <TextBlock x:Name="UpdateInstructions" TextWrapping="Wrap" Visibility="Collapsed" />
+            <TextBlock x:Name="LinksTitle" Style="{ThemeResource SubtitleTextBlockStyle}"
+                       AutomationProperties.HeadingLevel="Level2" />
+            <TextBlock x:Name="LinksLead" TextWrapping="Wrap" />
+            <HyperlinkButton x:Name="ProjectLink" NavigateUri="https://github.com/MardSilva/FlowEngineNet" />
+            <HyperlinkButton x:Name="SupportLink" NavigateUri="https://github.com/MardSilva/FlowEngineNet/issues" />
+            <HyperlinkButton x:Name="ReleasesLink" NavigateUri="https://github.com/MardSilva/FlowEngineNet/releases" />
+            <TextBlock x:Name="LicensesLead" TextWrapping="Wrap" />
+            <Expander x:Name="LicensesPanel" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                <TextBlock x:Name="LicensesText" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+            </Expander>
+        </StackPanel>
+    </ScrollViewer>
+</Page>

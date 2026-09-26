@@ -112,6 +112,10 @@ jobs:
         shell: pwsh
         run: pwsh -NoProfile -ExecutionPolicy Bypass -File ./eng/test-release-introduction.ps1
 
+      - name: Verify Windows release evidence contract
+        shell: pwsh
+        run: pwsh -NoProfile -File ./eng/test-windows-release-contract.ps1
+
       - name: Build
         run: dotnet build Flow.sln --no-restore
 
@@ -159,6 +163,74 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           compression-level: 0
+
+  verify-canonical:
+    name: Verify promoted CLI / ${{ matrix.os }}
+    needs: [resolve, build]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.source_revision }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: draft-release-candidate
+          path: artifacts/canonical-release
+      - name: Validate the same canonical package without rebuilding
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -File ./eng/verify-release-artifacts.ps1
+          -ArtifactsDirectory ./artifacts/canonical-release
+          -OutputDirectory ./artifacts/release-validation
+      - uses: actions/upload-artifact@v7
+        with:
+          name: draft-cli-validation-${{ runner.os }}
+          path: artifacts/release-validation/release-validation.json
+          if-no-files-found: error
+          retention-days: 7
+
+  compare-canonical:
+    name: Confirm promoted CLI on Windows and Linux
+    needs: [resolve, build, verify-canonical]
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ needs.resolve.outputs.source_revision }}
+          persist-credentials: false
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          name: draft-release-candidate
+          path: artifacts/canonical-release
+      - uses: actions/download-artifact@v8.0.1
+        with:
+          pattern: draft-cli-validation-*
+          path: artifacts/platform-validations
+      - name: Compare canonical hashes and platform evidence
+        shell: pwsh
+        run: >-
+          pwsh -NoProfile -File ./eng/compare-release-evidence.ps1
+          -CanonicalEvidenceDirectory ./artifacts/canonical-release
+          -WindowsValidationDirectory ./artifacts/platform-validations/draft-cli-validation-Windows
+          -LinuxValidationDirectory ./artifacts/platform-validations/draft-cli-validation-Linux
+          -OutputPath ./artifacts/cross-platform/release-comparison.json
+      - uses: actions/upload-artifact@v7
+        with:
+          name: draft-cross-platform-evidence
+          path: artifacts/cross-platform/release-comparison.json
+          if-no-files-found: error
+          retention-days: 7
 
   windows-portable:
     name: Build and smoke test Windows portable
@@ -333,6 +405,17 @@ jobs:
           retention-days: 7
           compression-level: 0
 
+      - name: Preserve installer diagnostics
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: draft-installer-diagnostics
+          path: |
+            artifacts/windows-installer-test-*/logs/*.log
+            artifacts/windows-installer/installer-smoke-result.json
+          if-no-files-found: warn
+          retention-days: 7
+
   windows-release-evidence:
     name: Bind Windows artifacts to canonical release
     needs: [resolve, build, windows-portable, windows-combined-payload, windows-installer-smoke]
@@ -391,6 +474,7 @@ jobs:
               Get-Item -LiteralPath ./artifacts/windows-portable/portable-manifest.json
               Get-Item -LiteralPath ./artifacts/windows-portable/portable-smoke-result.json
               Get-Item -LiteralPath ./artifacts/windows-combined-payload/combined-payload-manifest.json
+              Get-Item -LiteralPath ./artifacts/windows-combined-payload/combined-payload-smoke-result.json
               Get-ChildItem -LiteralPath ./artifacts/windows-installer -Filter '*.msi' -File
               Get-ChildItem -LiteralPath ./artifacts/windows-installer -Filter '*.cdx.json' -File
               Get-Item -LiteralPath ./artifacts/windows-installer/installer-manifest.json
@@ -412,7 +496,7 @@ jobs:
 
   create-draft:
     name: Create draft GitHub Release
-    needs: [resolve, validate, build, windows-release-evidence]
+    needs: [resolve, validate, build, compare-canonical, windows-release-evidence]
     runs-on: ubuntu-latest
     environment: draft-release
     permissions:
@@ -436,6 +520,12 @@ jobs:
         with:
           name: draft-windows-release-assets
           path: artifacts/windows-release
+
+      - name: Download Windows/Linux comparison
+        uses: actions/download-artifact@v8.0.1
+        with:
+          name: draft-cross-platform-evidence
+          path: artifacts/release
 
       - name: Create draft release
         shell: pwsh

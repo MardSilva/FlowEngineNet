@@ -206,6 +206,7 @@ $result = [ordered]@{
     sourceRevision = $manifest.sourceRevision
     runtimeIdentifier = $manifest.runtimeIdentifier
     manifestCoverage = 'passed'
+    manifestSha256 = Get-Sha256Lower -Path $manifestPath
     cliExecution = 'passed'
     applicationLaunch = if ($SkipApplicationLaunch) { 'skipped' } else { 'passed' }
     installedStateChanged = $false

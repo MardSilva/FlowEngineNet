@@ -91,13 +91,6 @@ public sealed record ExecutionStatusCommand(
 
 public sealed record ExecutionCleanCommand(string DestinationPath, Guid ExecutionId) : CliCommand;
 
-/// <summary>Selects which class of official Flow releases may be considered.</summary>
-public enum UpdateChannel
-{
-    Stable,
-    Prerelease,
-}
-
 /// <summary>Requests an explicit, read-only check of the official release source.</summary>
 public sealed record UpdateCheckCommand(
     UpdateChannel Channel = UpdateChannel.Stable,

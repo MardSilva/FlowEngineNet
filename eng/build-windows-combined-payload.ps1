@@ -90,6 +90,7 @@ function Publish-WindowsApplication {
         '-p:DebugSymbols=false',
         '-p:GenerateDocumentationFile=false',
         '-p:ContinuousIntegrationBuild=true',
+        "-p:PathMap=$repositoryRoot=/_/",
         "-p:SourceRevisionId=$Revision"
     )
     if ($NoRestore) {
