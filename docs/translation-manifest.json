@@ -4,6 +4,11 @@
   "targetLanguage": "pt-BR",
   "documents": [
     {
+      "source": "docs/windows-store.md",
+      "translation": "docs/pt-BR/windows-store.md",
+      "sourceSha256": "56A401B7AE09FF32C81A993059BB03772F32FC1321572BE6CDFB68A97FA37374"
+    },
+    {
       "source": "README.md",
       "translation": "README.pt-BR.md",
       "sourceSha256": "9AA5EC033B894A961E3235B7F9B4672D6B7DF0FBD1AD436CCC441FCB8D7007F2"

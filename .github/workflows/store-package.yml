@@ -1,0 +1,36 @@
+name: Microsoft Store package rehearsal
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - name: Build reviewed combined payload
+        shell: pwsh
+        run: ./eng/build-windows-combined-payload.ps1
+      - name: Verify combined payload
+        shell: pwsh
+        run: ./eng/test-windows-combined-payload.ps1 -SkipApplicationLaunch
+      - name: Package existing payload without rebuilding
+        shell: pwsh
+        run: ./eng/build-windows-store.ps1 -CombinedPayloadDirectory artifacts/windows-combined-payload
+      - name: Retain unsigned candidate and provenance
+        uses: actions/upload-artifact@v4
+        with:
+          name: flow-store-candidate-${{ github.sha }}
+          path: |
+            artifacts/windows-store/*.msix
+            artifacts/windows-store/store-package.json
+            artifacts/windows-store/SHA256SUMS
+            artifacts/windows-combined-payload/combined-payload-manifest.json
+            artifacts/windows-combined-payload/combined-payload-smoke-result.json
+          if-no-files-found: error

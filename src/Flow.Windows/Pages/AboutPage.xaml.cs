@@ -34,6 +34,17 @@ public sealed partial class AboutPage : Page
         CheckUpdatesButton.Content = text["UpdatesCheck"];
         CancelUpdateButton.Content = text["UpdatesCancel"];
         UpdateReleaseLink.Content = text["UpdatesOpenRelease"];
+        if (StoreDistribution.IsStorePackage)
+        {
+            DistributionText.Text = text["AboutStore"];
+            UpdatesLead.Text = text["UpdatesStoreLead"];
+            PrereleaseOption.Visibility = Visibility.Collapsed;
+            CheckUpdatesButton.Visibility = Visibility.Collapsed;
+            CancelUpdateButton.Visibility = Visibility.Collapsed;
+            UpdateReleaseLink.Content = text["UpdatesOpenStore"];
+            UpdateReleaseLink.NavigateUri = new Uri(StoreDistribution.ProductUri);
+            UpdateReleaseLink.Visibility = Visibility.Visible;
+        }
         Unloaded += (_, _) => _updateCancellation?.Cancel();
         LinksTitle.Text = text["AboutLinks"];
         LinksLead.Text = text["AboutLinksLead"];
@@ -50,7 +61,7 @@ public sealed partial class AboutPage : Page
 
     private async void CheckUpdates_Click(object sender, RoutedEventArgs e)
     {
-        if (_updateCancellation is not null)
+        if (StoreDistribution.IsStorePackage || _updateCancellation is not null)
         {
             return;
         }
