@@ -51,6 +51,7 @@ public sealed partial class OperationsPage : Page
         Localize();
         SelectOperation(initialOperation);
         AdvancedPanel.Visibility = advancedMode ? Visibility.Visible : Visibility.Collapsed;
+        OpenPowerShellButton.Visibility = StoreDistribution.IsStorePackage ? Visibility.Collapsed : Visibility.Visible;
         SetSource(initialSourcePath);
         PageScrollViewer.SizeChanged += (_, args) => UpdateResponsiveLayout(args.NewSize.Width);
         Loaded += (_, _) => UpdateResponsiveLayout(PageScrollViewer.ActualWidth);
@@ -140,6 +141,11 @@ public sealed partial class OperationsPage : Page
 
     private async void OpenPowerShellButton_Click(object sender, RoutedEventArgs e)
     {
+        if (StoreDistribution.IsStorePackage)
+        {
+            return;
+        }
+
         CopyCommandButton_Click(sender, e);
         await _openPowerShell();
     }

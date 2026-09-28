@@ -214,6 +214,11 @@ public sealed partial class MainWindow : Window
 
     private static Task OpenPowerShellAsync()
     {
+        if (StoreDistribution.IsStorePackage)
+        {
+            return Task.CompletedTask;
+        }
+
         System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
         {
             FileName = "powershell.exe",

@@ -41,6 +41,21 @@ public sealed class WindowsStorePackagingTests
         Assert.Contains("CreateWithOptionsAsync(null, userDataFolder, null)", preview, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void StoreHidesAndGuardsExternalShellAndManifestDeclaresPerMonitorDpi()
+    {
+        var root = FindRoot();
+        var operations = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "Pages", "OperationsPage.xaml.cs"));
+        Assert.Contains("OpenPowerShellButton.Visibility = StoreDistribution.IsStorePackage ? Visibility.Collapsed", operations, StringComparison.Ordinal);
+        var window = File.ReadAllText(Path.Combine(root, "src", "Flow.Windows", "MainWindow.xaml.cs"));
+        var handler = window[window.IndexOf("private static Task OpenPowerShellAsync()", StringComparison.Ordinal)..];
+        Assert.True(handler.IndexOf("if (StoreDistribution.IsStorePackage)", StringComparison.Ordinal) <
+            handler.IndexOf("System.Diagnostics.Process.Start", StringComparison.Ordinal));
+        var manifest = XDocument.Load(Path.Combine(root, "src", "Flow.Windows", "app.manifest"));
+        XNamespace dpi = "http://schemas.microsoft.com/SMI/2016/WindowsSettings";
+        Assert.Equal("PerMonitorV2, PerMonitor", manifest.Descendants(dpi + "dpiAwareness").Single().Value);
+    }
+
     private static string FindRoot()
     {
         var directory = new DirectoryInfo(AppContext.BaseDirectory);
