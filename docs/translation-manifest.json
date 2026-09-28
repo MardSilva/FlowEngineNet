@@ -6,12 +6,17 @@
     {
       "source": "docs/windows-store.md",
       "translation": "docs/pt-BR/windows-store.md",
-      "sourceSha256": "56A401B7AE09FF32C81A993059BB03772F32FC1321572BE6CDFB68A97FA37374"
+      "sourceSha256": "894F22370E10B916665D4C138021376C142F30D51A82DFC9DC18B55821119955"
+    },
+    {
+      "source": "docs/website-release-1.0.md",
+      "translation": "docs/pt-BR/website-release-1.0.md",
+      "sourceSha256": "DD07618F742A8E47D46D5A0DABC3D2A13349319A9FB5F8EF4087182336B655F8"
     },
     {
       "source": "README.md",
       "translation": "README.pt-BR.md",
-      "sourceSha256": "9AA5EC033B894A961E3235B7F9B4672D6B7DF0FBD1AD436CCC441FCB8D7007F2"
+      "sourceSha256": "D0FB4D53CE27187B0CCDA51DD70D335D3200766AB7942D97031405446C1655A9"
     },
     {
       "source": "docs/0.1-release-review.md",

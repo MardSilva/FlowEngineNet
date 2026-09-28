@@ -2,7 +2,7 @@
 
 English | [Português (Brasil)](pt-BR/windows-store.md)
 
-The Store channel is being prepared for `0.2.0-alpha.4`. Packaging does not promote the engine to a stable release. The public version remains in `Directory.Build.props`; the initial numeric MSIX version is `0.2.4.0`. Increase the MSIX version for every subsequent Store update and keep its fourth component zero.
+The first stable release is being prepared as `1.0.0`, with MSIX version `1.0.0.0`. This product decision covers the existing local EPUB workflow; it does not imply Store approval or support for PDF import, OCR or a full reading application. The public version is defined in `Directory.Build.props`. Increase the MSIX version for each Store update, keep its major component nonzero and its fourth component zero.
 
 The reserved identity is `ESSoftwares.FlowEngine`, publisher `CN=21D9EB03-6223-4C3C-91C6-B132CCE87A14`, display publisher `ES Softwares`, family `ESSoftwares.FlowEngine_nxa5g9xs5gbp2`, Store ID `9NMJW9XHMJ0F`. These are public identifiers, not signing credentials.
 
@@ -39,4 +39,4 @@ The `runFullTrust` capability is required for this desktop application to proces
 
 Microsoft signs Store-distributed MSIX packages after certification. The unsigned build is not a double-click installer for customers. Building it does not buy, create or install a certificate. See [package requirements](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/app-package-requirements).
 
-A stable release needs a defined supported scope and evidence for that scope, including installation, upgrades, data preservation and known limitations. The first Store submission can remain an alpha; `1.0` is a separate product decision.
+The earlier `0.2.4.0` test package produced a DPI WARNING with WACK 26100.7705 and 28000.2705. The analyzer received ACCESS DENIED opening the installed executable for read/execute, while an identical copy passed. No DPI manifest or WindowsApps permission changes were made. The optional Blocked executables FAIL is separate. The owner reports sending the support request; a response is pending. Preserve these historical results and test the new candidate separately. Local WACK results are not Store certification decisions.

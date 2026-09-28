@@ -2,7 +2,7 @@
 
 [English](../windows-store.md) | Português (Brasil)
 
-O canal da Store está sendo preparado para `0.2.0-alpha.4`. O empacotamento não torna o motor uma versão estável. A versão pública continua em `Directory.Build.props`; a versão numérica inicial do MSIX é `0.2.4.0`. Aumente a versão do MSIX em cada atualização da Store e mantenha o quarto componente igual a zero.
+A primeira versão estável está sendo preparada como `1.0.0`, com MSIX `1.0.0.0`. Essa decisão de produto cobre o fluxo local de EPUB já implementado; não significa aprovação pela Store nem suporte a importação de PDF, OCR ou um aplicativo completo de leitura. A versão pública fica em `Directory.Build.props`. Aumente a versão do MSIX em cada atualização, mantenha o primeiro componente diferente de zero e o quarto igual a zero.
 
 A identidade reservada é `ESSoftwares.FlowEngine`, com publisher `CN=21D9EB03-6223-4C3C-91C6-B132CCE87A14`, nome de editor `ES Softwares`, família `ESSoftwares.FlowEngine_nxa5g9xs5gbp2` e Store ID `9NMJW9XHMJ0F`. São identificadores públicos, não credenciais de assinatura.
 
@@ -39,4 +39,4 @@ A capacidade `runFullTrust` permite que esta aplicação desktop processe arquiv
 
 A Microsoft assina os MSIX distribuídos pela Store após a certificação. O arquivo sem assinatura não é um instalador de dois cliques para o público. A compilação não compra, cria ou instala certificados. Consulte os [requisitos de pacotes](https://learn.microsoft.com/en-us/windows/apps/publish/publish-your-app/msix/app-package-requirements).
 
-Uma versão estável precisa de um escopo suportado definido e evidências para esse escopo, incluindo instalação, atualização, preservação de dados e limitações conhecidas. A primeira submissão à Store pode continuar como alpha; `1.0` é uma decisão de produto separada.
+O pacote de teste anterior, `0.2.4.0`, apresentou WARNING de DPI no WACK 26100.7705 e 28000.2705. O analisador recebeu ACCESS DENIED ao abrir o executável instalado para leitura/execução, enquanto uma cópia idêntica passou. Não foram alterados o manifesto DPI nem as permissões de WindowsApps. O FAIL opcional de Blocked executables é separado. O responsável informou que enviou o pedido ao suporte; a resposta está pendente. Preserve esses resultados históricos e teste o novo candidato separadamente. O resultado local do WACK não é uma decisão de certificação da Store.

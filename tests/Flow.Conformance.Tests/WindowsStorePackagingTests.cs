@@ -14,7 +14,11 @@ public sealed class WindowsStorePackagingTests
         Assert.Equal("ESSoftwares.FlowEngine", (string?)identity.Attribute("Name"));
         Assert.Equal("CN=21D9EB03-6223-4C3C-91C6-B132CCE87A14", (string?)identity.Attribute("Publisher"));
         Assert.Equal("x64", (string?)identity.Attribute("ProcessorArchitecture"));
-        Assert.Equal(0, Version.Parse(identity.Attribute("Version")!.Value).Revision);
+        var version = Version.Parse(identity.Attribute("Version")!.Value);
+        Assert.InRange(version.Major, 1, 65535);
+        Assert.InRange(version.Minor, 0, 65535);
+        Assert.InRange(version.Build, 0, 65535);
+        Assert.Equal(0, version.Revision);
         Assert.Equal("ES Softwares", package.Element(ns + "Properties")!.Element(ns + "PublisherDisplayName")!.Value);
         Assert.Equal(new[] { "en-US", "pt-BR" }, package.Element(ns + "Resources")!.Elements().Select(e => (string)e.Attribute("Language")!));
         var family = Assert.Single(package.Element(ns + "Dependencies")!.Elements());

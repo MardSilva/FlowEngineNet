@@ -9,7 +9,7 @@ namespace Flow.Conformance.Tests;
 public sealed class WindowsDistributionFoundationTests
 {
     private const string UpgradeCode = "{C412C622-FA2F-400C-88EE-BA5D4A573F7D}";
-    private const string ProductCode = "{2072AAB6-E0D0-446D-BB8E-9555DA3F1838}";
+    private const string ProductCode = "{70396CAE-340F-4B12-B581-6C63CBE50497}";
     private static readonly IReadOnlyDictionary<string, string> ExpectedSourceHashes =
         new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -92,7 +92,7 @@ public sealed class WindowsDistributionFoundationTests
         Assert.Equal("FlowEngineNet", properties["FlowProductId"]);
         Assert.Equal("Flow Engine .NET", properties["FlowProductName"]);
         Assert.Equal("Flow Engine contributors", properties["FlowProductPublisher"]);
-        Assert.Equal("0.2.4", properties["FlowWindowsInstallerVersion"]);
+        Assert.Equal("1.0.0", properties["FlowWindowsInstallerVersion"]);
         Assert.Equal(UpgradeCode, properties["FlowWindowsUpgradeCode"]);
         Assert.True(Guid.TryParse(properties["FlowWindowsUpgradeCode"], out _));
         Assert.Equal(ProductCode, properties["FlowWindowsProductCode"]);
@@ -104,7 +104,7 @@ public sealed class WindowsDistributionFoundationTests
         Assert.Equal("Programs\\FlowEngineNet", properties["FlowWindowsInstallDirectory"]);
 
         var installerVersion = Version.Parse(properties["FlowWindowsInstallerVersion"]);
-        Assert.Equal(4, installerVersion.Build);
+        Assert.Equal(0, installerVersion.Build);
         Assert.Contains(
             propertyElements,
             static element => element.Name.LocalName == "FlowPublicVersion" && element.Value == "$(VersionPrefix)-$(VersionSuffix)");

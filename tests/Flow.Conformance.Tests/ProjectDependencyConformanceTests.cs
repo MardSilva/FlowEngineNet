@@ -9,7 +9,8 @@ public sealed class ProjectDependencyConformanceTests
     {
         var properties = XDocument.Load(Path.Combine(FindRepositoryRoot(), "Directory.Build.props"));
 
-        Assert.Equal("0.2.0", properties.Descendants("VersionPrefix").Single().Value);
+        Assert.Equal("1.0.0", properties.Descendants("VersionPrefix").Single().Value);
+        Assert.Empty(properties.Descendants("VersionSuffix").Single().Value);
         Assert.Equal("false", properties.Descendants("IsPackable").Single().Value);
         Assert.Equal("true", properties.Descendants("GenerateDocumentationFile").Single().Value);
     }

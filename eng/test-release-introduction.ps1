@@ -42,8 +42,6 @@ try {
         '--add-source ./flow-package',
         'flow --language pt-BR --banner menu',
         "blob/v$version/README.md",
-        'Experimental prerelease',
-        'Pré-release experimental',
         'Installed apps > Flow Engine .NET > Uninstall',
         'Aplicativos instalados > Flow Engine .NET > Desinstalar',
         'not code-signed',
@@ -51,6 +49,14 @@ try {
         'SHA256SUMS',
         'not published to NuGet.org yet'
     )
+    if ($version.Contains('-')) {
+        $requiredFragments += @('Experimental prerelease', 'Pré-release experimental')
+    } else {
+        $requiredFragments += @('Stable release for the documented local EPUB workflow', 'Versão estável para o fluxo local de EPUB documentado')
+        if ($text.Contains('Experimental prerelease') -or $text.Contains('Pré-release experimental')) {
+            throw 'Stable release introduction still advertises a prerelease.'
+        }
+    }
     foreach ($fragment in $requiredFragments) {
         if (-not $text.Contains($fragment, [System.StringComparison]::Ordinal)) {
             throw "Release introduction is missing required text: $fragment"

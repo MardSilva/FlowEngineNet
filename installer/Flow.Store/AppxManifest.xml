@@ -5,7 +5,7 @@
          IgnorableNamespaces="uap rescap">
   <Identity Name="ESSoftwares.FlowEngine"
             Publisher="CN=21D9EB03-6223-4C3C-91C6-B132CCE87A14"
-            Version="0.2.4.0" ProcessorArchitecture="x64" />
+    Version="1.0.0.0" ProcessorArchitecture="x64" />
   <Properties>
     <DisplayName>Flow Engine</DisplayName>
     <PublisherDisplayName>ES Softwares</PublisherDisplayName>

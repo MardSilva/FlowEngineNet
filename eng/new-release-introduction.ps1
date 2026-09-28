@@ -18,14 +18,24 @@ if ($Version -ne [string]$plan.packageVersion) {
     throw "Release notes version '$Version' does not match the planned version '$($plan.packageVersion)'."
 }
 
-if ($Version -notmatch '^0\.2\.0-(alpha|beta|rc)\.\d+$') {
-    throw "Release notes require a supported 0.2.0 prerelease version: $Version"
+if ($Version -notmatch '^\d+\.\d+\.\d+(?:-(alpha|beta|rc)\.\d+)?$') {
+    throw "Release notes require a supported semantic version: $Version"
+}
+$isPrerelease = $Version.Contains('-')
+if (($isPrerelease -and $plan.channel -ne 'prerelease') -or
+    (-not $isPrerelease -and $plan.channel -ne 'stable')) {
+    throw 'Release version and channel must agree.'
+}
+$releaseNotice = if ($isPrerelease) {
+    '> Experimental prerelease. The command line, `.flow.json` format and 0.x APIs may still change.' + "`n> `n" +
+    '> Pré-release experimental. A linha de comando, o formato `.flow.json` e as APIs 0.x ainda podem mudar.'
+} else {
+    '> Stable release for the documented local EPUB workflow. The Flow format and cryptographic signatures remain experimental; PDF import and a complete reader are not included.' + "`n> `n" +
+    '> Versão estável para o fluxo local de EPUB documentado. O formato Flow e as assinaturas criptográficas continuam experimentais; importação de PDF e um leitor completo não estão incluídos.'
 }
 
 $notesTemplate = @'
-> Experimental prerelease. The command line, `.flow.json` format and all 0.x APIs may still change.
->
-> Pré-release experimental. A linha de comando, o formato `.flow.json` e todas as APIs 0.x ainda podem mudar.
+{RELEASE_NOTICE}
 
 [English documentation](https://github.com/MardSilva/FlowEngineNet/blob/v{VERSION}/README.md) | [Documentação em português](https://github.com/MardSilva/FlowEngineNet/blob/v{VERSION}/README.pt-BR.md)
 
@@ -33,9 +43,9 @@ $notesTemplate = @'
 
 ### Windows installer / Instalador para Windows
 
-Download `FlowEngineNet.Setup.{VERSION}.en-US.win-x64.msi` or `FlowEngineNet.Setup.{VERSION}.pt-BR.win-x64.msi` and open it. The per-user installer does not require the .NET SDK or administrator privileges. This experimental prerelease is not code-signed, so Windows may show an unknown-publisher or SmartScreen warning. Verify the SHA-256 before continuing.
+Download `FlowEngineNet.Setup.{VERSION}.en-US.win-x64.msi` or `FlowEngineNet.Setup.{VERSION}.pt-BR.win-x64.msi` and open it. The per-user installer does not require the .NET SDK or administrator privileges. This MSI is not code-signed, so Windows may show an unknown-publisher or SmartScreen warning. Verify the SHA-256 before continuing.
 
-Baixe `FlowEngineNet.Setup.{VERSION}.pt-BR.win-x64.msi` ou `FlowEngineNet.Setup.{VERSION}.en-US.win-x64.msi` e abra o arquivo. O instalador por utilizador não exige o SDK do .NET nem privilégios de administrador. Esta pré-release experimental não tem assinatura de código; por isso, o Windows pode mostrar um aviso de publicador desconhecido ou do SmartScreen. Confira o SHA-256 antes de continuar.
+Baixe `FlowEngineNet.Setup.{VERSION}.pt-BR.win-x64.msi` ou `FlowEngineNet.Setup.{VERSION}.en-US.win-x64.msi` e abra o arquivo. O instalador por utilizador não exige o SDK do .NET nem privilégios de administrador. Este MSI não tem assinatura de código; por isso, o Windows pode mostrar um aviso de publicador desconhecido ou do SmartScreen. Confira o SHA-256 antes de continuar.
 
 To remove Flow, use **Settings > Apps > Installed apps > Flow Engine .NET > Uninstall**. Removal deletes only installer-owned application files and registration. Books, Flow documents, preferences, reports and exports are preserved.
 
@@ -78,7 +88,7 @@ Use `SHA256SUMS` to verify the attached files. The CycloneDX SBOM, in-toto state
 
 Use `SHA256SUMS` para verificar os arquivos anexados. O SBOM CycloneDX, a declaração in-toto, o manifesto e as evidências registram como o pacote foi produzido e validado. Esses registros não são um certificado de assinatura de código nem uma garantia de suporte.
 '@
-$notes = $notesTemplate.Replace('{VERSION}', $Version, [System.StringComparison]::Ordinal)
+$notes = $notesTemplate.Replace('{VERSION}', $Version, [System.StringComparison]::Ordinal).Replace('{RELEASE_NOTICE}', $releaseNotice, [System.StringComparison]::Ordinal)
 
 $normalized = $notes.Replace("`r`n", "`n").Replace("`r", "`n").TrimEnd() + "`n"
 if ([string]::IsNullOrWhiteSpace($OutputPath)) {

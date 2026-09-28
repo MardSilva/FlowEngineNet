@@ -106,7 +106,13 @@ try {
 finally { $source.Dispose() }
 [xml]$appx = Get-Content -LiteralPath (Join-Path $stage 'AppxManifest.xml') -Raw
 $packageVersion = $appx.Package.Identity.Version
-if ($packageVersion -notmatch '^\d+\.\d+\.\d+\.0$') { throw 'Store version must end in .0.' }
+$numericVersion = $null
+if ($packageVersion -notmatch '^\d+\.\d+\.\d+\.0$' -or
+    -not [Version]::TryParse($packageVersion, [ref]$numericVersion) -or
+    $numericVersion.Major -lt 1 -or $numericVersion.Major -gt 65535 -or
+    $numericVersion.Minor -gt 65535 -or $numericVersion.Build -gt 65535) {
+    throw 'Store version must have a nonzero major, components up to 65535, and end in .0.'
+}
 $package = Join-Path $output "FlowEngine.Store.$packageVersion.x64.msix"
 & $MakeAppxPath pack /d $stage /p $package /o
 if ($LASTEXITCODE -ne 0) { throw 'MakeAppx package validation failed. Staging was retained for diagnosis.' }
