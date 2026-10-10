@@ -65,7 +65,7 @@ public sealed partial class SupportPage : Page
             if (!await global::Windows.System.Launcher.LaunchUriAsync(
                     new Uri(FlowSupporterClient.ServiceOrigin, "auth/patreon/start")))
             {
-                ShowMessage("SupportUnavailable", InfoBarSeverity.Warning);
+                ShowMessage(_key is null ? "SupportConnectUnavailable" : "SupportUnavailable", InfoBarSeverity.Warning);
             }
         }
         catch (System.Runtime.InteropServices.COMException)
@@ -156,7 +156,7 @@ public sealed partial class SupportPage : Page
         {
             if (!_lifetime.IsCancellationRequested)
             {
-                ShowMessage("SupportUnavailable", InfoBarSeverity.Warning);
+                ShowMessage(_key is null ? "SupportConnectUnavailable" : "SupportUnavailable", InfoBarSeverity.Warning);
             }
         }
         catch (System.Runtime.InteropServices.COMException)
