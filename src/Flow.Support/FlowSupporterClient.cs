@@ -14,6 +14,9 @@ public sealed class FlowSupporterClient(HttpClient client)
         using var request = new HttpRequestMessage(HttpMethod.Get,
             new Uri(ServiceOrigin, "api/v1/supporter/me?productId=flow"));
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", key.Trim());
+        request.Headers.UserAgent.Add(new ProductInfoHeaderValue("FlowEngineNet",
+            typeof(FlowSupporterClient).Assembly.GetName().Version?.ToString(3) ?? "1.0.0"));
+        request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
         using var response = await client.SendAsync(request, cancellationToken);
         response.EnsureSuccessStatusCode();
         var status = await response.Content.ReadFromJsonAsync<FlowSupporterStatus>(cancellationToken)

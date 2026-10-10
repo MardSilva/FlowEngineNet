@@ -34,6 +34,9 @@ public sealed class FlowSupporterTests
             Assert.Equal("https://mard-cloud.duckdns.org/api/v1/supporter/me?productId=flow", request.RequestUri!.AbsoluteUri);
             Assert.Equal("Bearer", request.Headers.Authorization!.Scheme);
             Assert.Equal("test-key", request.Headers.Authorization.Parameter);
+            Assert.Contains(request.Headers.UserAgent, item => item.Product?.Name == "FlowEngineNet"
+                && !string.IsNullOrWhiteSpace(item.Product.Version));
+            Assert.Contains(request.Headers.Accept, item => item.MediaType == "application/json");
             Assert.Null(request.Content);
             return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
             {
