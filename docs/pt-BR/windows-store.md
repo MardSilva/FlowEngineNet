@@ -2,7 +2,7 @@
 
 [English](../windows-store.md) | Português (Brasil)
 
-A primeira versão estável está sendo preparada como `1.0.0`, com MSIX `1.0.0.0`. Essa decisão de produto cobre o fluxo local de EPUB já implementado; não significa aprovação pela Store nem suporte a importação de PDF, OCR ou um aplicativo completo de leitura. A versão pública fica em `Directory.Build.props`. Aumente a versão do MSIX em cada atualização, mantenha o primeiro componente diferente de zero e o quarto igual a zero.
+A próxima versão de manutenção está sendo preparada como `1.0.1`, com MSIX `1.0.1.0`. Ela preserva a integração de apoiadores introduzida na `1.0.0` e corrige o teste de conformidade de dependências que falhou no Windows e no Linux. `Flow.Support` é aprovado como adaptador independente usado pela aplicação Windows e não tem dependências de outros projetos. O MSI usa versão `1.0.1`, um novo ProductCode e o UpgradeCode existente para manter a mesma família de atualização. Essa preparação não resolve o aviso de DPI do WACK nem significa certificação pela Store. A versão pública fica em `Directory.Build.props`. Aumente a versão do MSIX em cada atualização, mantenha o primeiro componente diferente de zero e o quarto igual a zero.
 
 A identidade reservada é `ESSoftwares.FlowEngine`, com publisher `CN=21D9EB03-6223-4C3C-91C6-B132CCE87A14`, nome de editor `ES Softwares`, família `ESSoftwares.FlowEngine_nxa5g9xs5gbp2` e Store ID `9NMJW9XHMJ0F`. São identificadores públicos, não credenciais de assinatura.
 
