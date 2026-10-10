@@ -9,7 +9,8 @@ public sealed class ProjectDependencyConformanceTests
     {
         var properties = XDocument.Load(Path.Combine(FindRepositoryRoot(), "Directory.Build.props"));
 
-        Assert.Equal("0.2.0", properties.Descendants("VersionPrefix").Single().Value);
+        Assert.Equal("1.0.1", properties.Descendants("VersionPrefix").Single().Value);
+        Assert.Empty(properties.Descendants("VersionSuffix").Single().Value);
         Assert.Equal("false", properties.Descendants("IsPackable").Single().Value);
         Assert.Equal("true", properties.Descendants("GenerateDocumentationFile").Single().Value);
     }
@@ -31,9 +32,15 @@ public sealed class ProjectDependencyConformanceTests
             ["Flow.Epub.Corpus"] = ["Flow.Documents", "Flow.Epub", "Flow.Layout", "Flow.Rendering.Html", "Flow.Security"],
             ["Flow.Cli"] = ["Flow.Application", "Flow.Documents", "Flow.Epub", "Flow.Epub.Corpus", "Flow.Layout", "Flow.Rendering.Html", "Flow.Security", "Flow.Updates"],
             ["Flow.Updates"] = [],
+            ["Flow.Support"] = [],
             ["Flow.Windows.Shell"] = ["Flow.Application", "Flow.Documents", "Flow.Rendering.Html"],
-            ["Flow.Windows"] = ["Flow.Windows.Shell", "Flow.Updates"],
+            ["Flow.Windows"] = ["Flow.Support", "Flow.Windows.Shell", "Flow.Updates"],
         };
+
+        var productionProjects = Directory.GetFiles(Path.Combine(root, "src"), "*.csproj", SearchOption.AllDirectories)
+            .Select(static path => Path.GetFileNameWithoutExtension(path))
+            .Order(StringComparer.Ordinal);
+        Assert.Equal(expected.Keys.Order(StringComparer.Ordinal), productionProjects);
 
         foreach (var (projectName, expectedReferences) in expected)
         {

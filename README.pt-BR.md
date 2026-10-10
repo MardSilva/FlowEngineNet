@@ -2,7 +2,7 @@
 
 [English](README.md) | [Português (Brasil)](README.pt-BR.md)
 
-> **Experimental:** o Flow 0.x é um projeto de pesquisa, não um formato padronizado. Ainda não deve ser usado para arquivos permanentes, documentos jurídicos ou cargas de produção.
+> O formato de documento Flow e as assinaturas criptográficas continuam experimentais; não são um padrão de arquivamento. Preserve os documentos originais e não dependa do Flow para arquivos permanentes, documentos jurídicos ou registros críticos.
 
 O Flow Engine .NET pesquisa um modelo de documento no qual identidade canônica e conteúdo semântico não dependem de viewport, tipografia, layout, paginação ou tecnologia de renderização.
 
@@ -14,7 +14,7 @@ O projeto não substitui PDF nem EPUB. A versão atual testa a base do motor e u
 
 ## Marco atual
 
-O marco em desenvolvimento é o **`0.2.0-alpha.4`**. A prerelease mais recente é a [`v0.2.0-alpha.2`](https://github.com/MardSilva/FlowEngineNet/releases/tag/v0.2.0-alpha.2).
+A versão estável **`1.0.0`** está sendo preparada para o fluxo local de EPUB já implementado, incluindo a aplicação Windows. Submissão e certificação pela Microsoft Store são etapas separadas; esta branch não indica que a versão já está disponível ao público. Consulte o [empacotamento para a Store](docs/pt-BR/windows-store.md) e as [releases publicadas](https://github.com/MardSilva/FlowEngineNet/releases) para conferir a distribuição.
 
 Já estão implementados:
 

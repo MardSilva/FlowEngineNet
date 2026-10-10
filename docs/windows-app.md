@@ -83,3 +83,13 @@ The application can run from its build output or from the self-contained combine
 Automated tests cover settings recovery and atomic persistence, personal-folder discovery, noncanonical index behavior, navigation, both localization catalogs, theme selection, operation contracts, source preservation, output policies, cancellation cleanup, preview disposal and hash parity, command escaping, EPUB and Flow validation, XAML security structure, accessibility, high-contrast resources and project dependency boundaries. Local launch and UI Automation smoke tests confirm that the process creates a responsive native window and exposes the document-processing page. Visual review at Windows display scales of 100%, 150% and 200% remains a manual release check because unit tests cannot prove text clipping or physical readability.
 
 The application still has no persistent library database, reading progress, annotations, search or production pagination. The personal folder and preview are operational conveniences, not the Flow Reader.
+
+## Supporter recognition
+
+The **Support** page connects Flow to SupporterKit.NET at `https://mard-cloud.duckdns.org`. Choose **Sign in with Patreon**, issue an application key on the management page, and paste it into Flow. Connecting validates the key and saves it in Windows Credential Locker. **Refresh** checks the saved key; **Disconnect** removes it from this installation without revoking it on the server.
+
+Recognition uses the public consent and display name returned by SupporterKit. Without consent, Flow shows **Anonymous supporter**. Free membership and the configured US$3, US$7 and US$15 tiers are displayed separately from payment problems or ended support. Paid tier labels are mapped to this creator's campaign IDs in `SupportPage.xaml.cs`; another campaign needs its own mapping. Support duration starts at the confirmed current support period: days after seven days, months and days after one month, then years and months after one year.
+
+Opening the page does not contact the service. Requests occur only after **Connect** or **Refresh**, and contain the application key and the product ID `flow`; documents and local paths stay on the device. A failed request preserves the saved key and any recognition already displayed on that page. Stale server data is marked with a warning. The integration does not restrict EPUB operations or grant permanent licenses.
+
+The application never receives Patreon creator tokens, client secrets or webhook secrets. Public name and consent are managed in the browser through SupporterKit. The integration is included in version **1.0.0**; changing the source does not replace a package already submitted to Microsoft Store.

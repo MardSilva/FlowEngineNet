@@ -95,7 +95,11 @@ public sealed partial class PreviewPage : Page
 
     private async Task ConfigureWebViewAsync(FlowWindowsPreviewSession session)
     {
-        await PreviewWebView.EnsureCoreWebView2Async();
+        var userDataFolder = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "FlowEngineNet", "WebView2");
+        var environment = await CoreWebView2Environment.CreateWithOptionsAsync(null, userDataFolder, null);
+        await PreviewWebView.EnsureCoreWebView2Async(environment);
         var core = PreviewWebView.CoreWebView2;
         core.Settings.AreDevToolsEnabled = false;
         core.Settings.AreDefaultContextMenusEnabled = false;
