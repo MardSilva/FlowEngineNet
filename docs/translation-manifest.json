@@ -36,7 +36,7 @@
     {
       "source": "docs/architecture.md",
       "translation": "docs/pt-BR/architecture.md",
-        "sourceSha256": "8E63632F1FD51FB906EE44920035E29B421987E26F2D1E3CB75114E5FC5BD49A"
+      "sourceSha256": "8E63632F1FD51FB906EE44920035E29B421987E26F2D1E3CB75114E5FC5BD49A"
     },
     {
       "source": "docs/canonicalization.md",
@@ -131,7 +131,7 @@
     {
       "source": "docs/windows-app.md",
       "translation": "docs/pt-BR/windows-app.md",
-        "sourceSha256": "E87DCF7EBB884E03EEA8341184868DA8D58D9DB639298A0FEE3EFC9D421568FF"
+      "sourceSha256": "664696F5F0582A092B9C27B0E6C5F96A7A18B24CEE0D07C3180F99E4C6109B59"
     },
     {
       "source": "docs/windows-distribution.md",

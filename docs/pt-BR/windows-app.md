@@ -83,3 +83,13 @@ A aplicação pode rodar a partir da saída do build ou do payload combinado sel
 Os testes automatizados cobrem recuperação e persistência atômica das configurações, descoberta da pasta pessoal, natureza não canônica do índice, navegação, os dois catálogos de idioma, escolha de tema, contratos das operações, preservação da origem, políticas de saída, limpeza após cancelamento, descarte e hash da prévia, escaping dos comandos, validação de EPUB e Flow, estrutura de segurança do XAML, acessibilidade, alto contraste e limites entre projetos. Testes locais de abertura e UI Automation confirmam que o processo cria uma janela nativa responsiva e expõe a página de processamento. A revisão visual nas escalas de 100%, 150% e 200% continua manual, pois testes unitários não comprovam ausência de cortes nem legibilidade física.
 
 A aplicação ainda não tem banco persistente de biblioteca, progresso de leitura, anotações, pesquisa nem paginação de produção. A pasta pessoal e a prévia são conveniências operacionais, não o Flow Reader.
+
+## Reconhecimento de apoio
+
+A página **Apoio** conecta o Flow ao SupporterKit.NET em `https://mard-cloud.duckdns.org`. Selecione **Entrar com Patreon**, emita uma chave da aplicação na página de gestão e cole no Flow. Ao conectar, o Flow valida a chave e salva no cofre de credenciais do Windows. **Atualizar** consulta a chave salva; **Desconectar** remove a chave desta instalação sem revogá-la no servidor.
+
+O reconhecimento usa o consentimento público e o nome retornados pelo SupporterKit. Sem consentimento, o Flow mostra **Apoiante anônimo**. A participação gratuita e os níveis configurados de US$3, US$7 e US$15 aparecem separados de problemas de pagamento ou apoio encerrado. Os nomes dos níveis pagos estão associados aos IDs desta campanha em `SupportPage.xaml.cs`; outra campanha precisa de seu próprio mapeamento. O tempo de apoio começa no período atual confirmado: dias a partir de sete dias, meses e dias a partir de um mês, e anos e meses a partir de um ano.
+
+Abrir a página não consulta o serviço. As chamadas acontecem apenas ao selecionar **Conectar** ou **Atualizar** e enviam a chave da aplicação e o produto `flow`; documentos e caminhos locais ficam no dispositivo. Uma consulta que falha mantém a chave salva e o reconhecimento já exibido naquela página. Dados desatualizados do servidor aparecem com um aviso. A integração não restringe as operações com EPUB nem concede licenças permanentes.
+
+A aplicação não recebe tokens do criador Patreon, segredo do cliente ou segredo do webhook. O nome público e o consentimento são gerenciados pelo navegador no SupporterKit. A integração está incluída na versão **1.0.0**; alterar o código não substitui um pacote já enviado à Microsoft Store.
